@@ -1,12 +1,12 @@
-# Pipo 🐾
+# Pipo
 
-Bichinho virtual de desktop para Windows 11. Uma bolinha fofa, intelectual e com um leve toque de sarcasmo, que flutua na tela e ajuda no dia a dia com atalhos, dicas e tarefas: desenvolvimento, documentos, jogos, lives e notícias.
+Bichinho virtual de desktop para Windows 11. Uma esfera minimalista, intelectual e com um leve toque de sarcasmo, que flutua na tela e ajuda no dia a dia com atalhos, dicas e tarefas: desenvolvimento, documentos, jogos, lives e notícias.
 
-> Projeto pessoal, em fase de planejamento. O desenvolvimento ainda não começou.
+> Projeto pessoal. Planejamento e visual aprovados; o desenvolvimento ainda não começou.
 
 ## Prévia
 
-Abra [`assets/preview/pipo-preview.html`](assets/preview/pipo-preview.html) no navegador para ver o Pipo animado e todas as expressões.
+Abra [`assets/preview/pipo-preview.html`](assets/preview/pipo-preview.html) no navegador para ver o Pipo animado e todos os estados: esfera grafite, olhos geométricos e anel de status, com cor usada só para comunicar estado.
 
 ## Planejamento
 
