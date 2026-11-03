@@ -2,7 +2,7 @@
 
 Bichinho virtual de desktop para Windows 11. Um personagem minimalista de óculos redondos, intelectual e com um leve toque de sarcasmo, que flutua na tela e ajuda no dia a dia com atalhos, dicas e tarefas: desenvolvimento, documentos, jogos, lives e notícias.
 
-> Projeto pessoal. Fase 0 concluída: projeto base Tauri, Pipo flutuante na tela e CI gerando instaladores. Próxima etapa: Fase 1 (MVP).
+> Projeto pessoal. Fase 1 (MVP) concluída: Pipo flutuante, bandeja do sistema, atalho global, chat com a Claude API e configurações. Próxima etapa: Fase 2 (sensores).
 
 ## Prévia
 
@@ -22,18 +22,30 @@ npm run tauri dev     # abre o Pipo em modo desenvolvimento
 npm run tauri build   # gera os instaladores em src-tauri/target/release/bundle/
 ```
 
-No estado atual (Fase 0), o Pipo aparece como uma esfera flutuante sempre por cima das janelas:
+## Como usar
 
-- **arrastar** move o Pipo pela tela;
-- **clique** alterna entre os estados de humor;
-- **botão direito** fecha o app.
+- **Clique no Pipo** ou **Ctrl + Alt + Shift + Espaço**: abre e fecha o chat.
+- **Arrastar**: move o Pipo; a posição é lembrada.
+- **Botão direito no Pipo** ou **ícone na bandeja**: chat, configurações, ocultar o Pipo e sair.
+- **Esc**: fecha o painel.
+
+O Pipo reage ao chat: fica atento quando o painel abre, pensativo enquanto responde, satisfeito quando termina e em alerta quando algo dá errado.
+
+**Chave da API:** na primeira execução, o Pipo procura `api/api-pipo.txt` (ou o arquivo indicado em `PIPO_API_KEY_FILE`) e guarda a chave no Gerenciador de Credenciais do Windows. Também dá para colar a chave ou importar o arquivo em **Configurações**. Depois de importada, o arquivo pode ser apagado.
+
+**Configurações:** modelo (Haiku 5.5 por padrão, Sonnet 5.5 ou Opus 5.5), nível de sarcasmo, atalho global, tamanho do Pipo e iniciar com o Windows.
 
 ## Estrutura
 
 ```
 src/              interface (React + TypeScript)
   pipo/Pipo.tsx   personagem em SVG e seus estados
+  pet/            janela do Pipo
+  panel/          painel com chat e configurações
 src-tauri/        backend (Rust) e configuração do app
+  src/chat.rs     chat com a Claude API (streaming)
+  src/secrets.rs  chave no Gerenciador de Credenciais
+  src/windows.rs  janelas, bandeja e atalhos
 assets/           prévia visual e ícone
 docs/             plano de implementação
 ```
@@ -41,7 +53,7 @@ docs/             plano de implementação
 ## Stack
 
 - **App desktop:** Tauri 2 (Rust)
-- **Interface:** React + TypeScript + Vite + Tailwind
+- **Interface:** React + TypeScript + Vite
 - **Personagem:** SVG animado por código (React + CSS)
 - **IA:** Claude API (Haiku por padrão, Sonnet para tarefas complexas)
 - **Dados locais:** SQLite

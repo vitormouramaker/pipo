@@ -1,11 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissões da janela principal do Pipo",
-  "windows": ["main"],
+  "description": "Permissões das janelas do Pipo (personagem e painel)",
+  "windows": ["main", "panel"],
   "permissions": [
     "core:default",
-    "core:window:allow-start-dragging",
-    "core:window:allow-close"
+    "core:window:allow-start-dragging"
   ]
 }
