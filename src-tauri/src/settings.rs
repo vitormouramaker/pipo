@@ -63,6 +63,7 @@ pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<
     if let Some(pet) = app.get_webview_window(windows::MAIN) {
         let size = new.pet_size as f64;
         let _ = pet.set_size(LogicalSize::new(size, size));
+        windows::clamp_pet(app);
     }
     Ok(())
 }

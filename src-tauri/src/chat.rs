@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager};
 
-use crate::{secrets, settings, windows, AppState};
+use crate::{db::Db, secrets, settings, windows, AppState};
 
 const API_URL: &str = "https://api.anthropic.com/v1/messages";
 const API_VERSION: &str = "2026-10-21";
@@ -41,7 +41,7 @@ fn system_prompt(sarcasm: u8) -> String {
     let today = chrono::Local::now().format("%d/%m/%Y");
     format!(
         "Você é o Pipo, um assistente de desktop para Windows em forma de mascote: um personagem minimalista \
-         de óculos redondos que flutua na tela do usuário.\n\n\
+         que flutua na tela do usuário.\n\n\
          Personalidade: intelectual, curioso e preciso; gosta de explicar o porquê das coisas. {tone} \
          Não use sarcasmo quando o usuário relatar um erro grave, perda de dados ou parecer estressado: \
          nesses casos, seja direto e acolhedor.\n\n\
@@ -68,11 +68,16 @@ fn visible_text(content: &Value) -> String {
         .unwrap_or_default()
 }
 
-#[tauri::command]
-pub fn chat_history(app: AppHandle) -> Result<Vec<ChatMessage>, String> {
-    let state = app.state::<AppState>();
-    let db = state.db.lock().unwrap();
-    let conversation = db.current_conversation().map_err(|e| e.to_string())?;
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationInfo {
+    id: i64,
+    title: String,
+    updated_at: String,
+    current: bool,
+}
+
+fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
     let messages = db.messages(conversation).map_err(|e| e.to_string())?;
     Ok(messages
         .into_iter()
@@ -82,10 +87,55 @@ pub fn chat_history(app: AppHandle) -> Result<Vec<ChatMessage>, String> {
 }
 
 #[tauri::command]
+pub fn chat_history(app: AppHandle) -> Result<Vec<ChatMessage>, String> {
+    let state = app.state::<AppState>();
+    let db = state.db.lock().unwrap();
+    let conversation = db.current_conversation().map_err(|e| e.to_string())?;
+    history_of(&db, conversation)
+}
+
+#[tauri::command]
 pub fn chat_new(app: AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
     let db = state.db.lock().unwrap();
     db.new_conversation().map(|_| ()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn chat_conversations(app: AppHandle) -> Result<Vec<ConversationInfo>, String> {
+    let state = app.state::<AppState>();
+    let db = state.db.lock().unwrap();
+    let current = db.current_conversation().map_err(|e| e.to_string())?;
+    let rows = db.conversations().map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, first, updated_at)| {
+            let text = visible_text(&first);
+            let line = text.lines().next().unwrap_or("").trim();
+            let mut title: String = line.chars().take(70).collect();
+            if title.is_empty() {
+                title = "Conversa sem título".into();
+            } else if line.chars().count() > 70 {
+                title.push('…');
+            }
+            ConversationInfo { id, title, updated_at, current: id == current }
+        })
+        .collect())
+}
+
+#[tauri::command]
+pub fn chat_open(app: AppHandle, id: i64) -> Result<Vec<ChatMessage>, String> {
+    let state = app.state::<AppState>();
+    let db = state.db.lock().unwrap();
+    db.set_current(id).map_err(|e| e.to_string())?;
+    history_of(&db, id)
+}
+
+#[tauri::command]
+pub fn chat_delete(app: AppHandle, id: i64) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let db = state.db.lock().unwrap();
+    db.delete_conversation(id).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -3,6 +3,7 @@ import { api, MODELS, type Settings } from "../api";
 
 const SARCASM_LABELS = ["Nenhum", "Leve", "Moderado", "Ácido"];
 const SIZES = [
+  { value: 88, label: "Menor" },
   { value: 120, label: "Pequeno" },
   { value: 160, label: "Médio" },
   { value: 200, label: "Grande" },

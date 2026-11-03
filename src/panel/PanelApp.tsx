@@ -18,14 +18,7 @@ export default function PanelApp() {
       setView(e.payload);
       refreshKey();
     });
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") void api.panelHide();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      void unlisten.then((fn) => fn());
-      window.removeEventListener("keydown", onKey);
-    };
+    return () => void unlisten.then((fn) => fn());
   }, []);
 
   return (
@@ -45,7 +38,7 @@ export default function PanelApp() {
             Configurações
           </button>
         </nav>
-        <button className="icon-btn" title="Fechar (Esc)" onClick={() => void api.panelHide()}>
+        <button className="icon-btn" title="Fechar" onClick={() => void api.panelHide()}>
           ✕
         </button>
       </header>

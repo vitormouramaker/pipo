@@ -13,8 +13,8 @@ use tauri_plugin_window_state::StateFlags;
 
 pub struct AppState {
     pub db: Mutex<db::Db>,
-    /// Um seletor de arquivo está aberto: o painel não deve se esconder ao perder o foco.
-    pub dialog_open: AtomicBool,
+    /// O Pipo está sendo arrastado.
+    pub dragging: AtomicBool,
     /// O chat está gerando uma resposta: o Pipo fica em "processando".
     pub busy: AtomicBool,
 }
@@ -53,7 +53,7 @@ pub fn run() {
             let settings = settings::load(&db);
             app.manage(AppState {
                 db: Mutex::new(db),
-                dialog_open: AtomicBool::new(false),
+                dragging: AtomicBool::new(false),
                 busy: AtomicBool::new(false),
             });
 
@@ -62,12 +62,16 @@ pub fn run() {
             if let Err(e) = settings::apply(app.handle(), &settings, None) {
                 eprintln!("{e}");
             }
+            windows::clamp_pet(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             chat::chat_send,
             chat::chat_history,
             chat::chat_new,
+            chat::chat_conversations,
+            chat::chat_open,
+            chat::chat_delete,
             settings::get_settings,
             settings::save_settings,
             secrets::key_status,
@@ -78,6 +82,7 @@ pub fn run() {
             windows::panel_open,
             windows::panel_hide,
             windows::pet_toggle,
+            windows::pet_drag_start,
             windows::app_quit,
         ])
         .run(tauri::generate_context!())

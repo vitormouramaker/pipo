@@ -1,9 +1,10 @@
 use std::sync::atomic::Ordering;
+use std::time::Duration;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
@@ -45,15 +46,6 @@ fn panel(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .visible(false)
         .additional_browser_args(BROWSER_ARGS)
         .build()?;
-
-    let handle = app.clone();
-    window.on_window_event(move |event| {
-        if let WindowEvent::Focused(false) = event {
-            if !handle.state::<AppState>().dialog_open.load(Ordering::SeqCst) {
-                hide_panel(&handle);
-            }
-        }
-    });
     Ok(window)
 }
 
@@ -78,6 +70,40 @@ fn place_panel(app: &AppHandle, panel: &WebviewWindow) {
     };
     let y = (pet_pos.y + pet_size.height as i32 - h).clamp(top, (bottom - h).max(top));
     let _ = panel.set_position(PhysicalPosition::new(x, y));
+}
+
+// Margens transparentes da janela em volta do corpo do Pipo (viewBox 200×200:
+// corpo de x 12–188 e y 26–174). Elas podem sair da tela; o corpo, não.
+const BODY_INSET_X: f64 = 12.0 / 200.0;
+const BODY_INSET_Y: f64 = 26.0 / 200.0;
+
+/// Move o Pipo para (x, y) sem deixar o corpo passar das bordas da área útil do monitor.
+fn move_pet_clamped(app: &AppHandle, x: i32, y: i32, cursor: Option<PhysicalPosition<f64>>) {
+    let Some(pet) = app.get_webview_window(MAIN) else { return };
+    let Ok(size) = pet.outer_size() else { return };
+    let monitor = cursor
+        .and_then(|c| app.monitor_from_point(c.x, c.y).ok().flatten())
+        .or_else(|| pet.current_monitor().ok().flatten())
+        .or_else(|| pet.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else { return };
+
+    let area = monitor.work_area();
+    let (w, h) = (size.width as i32, size.height as i32);
+    let inset_x = (size.width as f64 * BODY_INSET_X) as i32;
+    let inset_y = (size.height as f64 * BODY_INSET_Y) as i32;
+    let (left, top) = (area.position.x, area.position.y);
+    let (right, bottom) = (left + area.size.width as i32, top + area.size.height as i32);
+
+    let x = x.clamp(left - inset_x, right - w + inset_x);
+    let y = y.clamp(top - inset_y, bottom - h + inset_y);
+    let _ = pet.set_position(PhysicalPosition::new(x, y));
+}
+
+/// Recoloca o Pipo dentro da tela (ex.: após mudar de tamanho ou trocar de monitor).
+pub fn clamp_pet(app: &AppHandle) {
+    if let Some(Ok(pos)) = app.get_webview_window(MAIN).map(|w| w.outer_position()) {
+        move_pet_clamped(app, pos.x, pos.y, None);
+    }
 }
 
 pub fn show_panel(app: &AppHandle, view: Option<&str>) {
@@ -167,19 +193,70 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
+// Comandos que podem criar o painel precisam ser assíncronos: no Windows, criar um
+// WebView dentro de um comando síncrono (que roda na thread principal) trava o app.
 #[tauri::command]
-pub fn panel_toggle(app: AppHandle) {
+pub async fn panel_toggle(app: AppHandle) {
     toggle_panel(&app);
 }
 
 #[tauri::command]
-pub fn panel_open(app: AppHandle, view: String) {
+pub async fn panel_open(app: AppHandle, view: String) {
     show_panel(&app, Some(&view));
 }
 
 #[tauri::command]
 pub fn panel_hide(app: AppHandle) {
     hide_panel(&app);
+}
+
+/// O arrasto é feito aqui (e não pelo arrasto nativo do Windows nem por eventos do
+/// WebView) para limitar o Pipo às bordas da tela e não perder o mouse quando o
+/// cursor sai da janela: uma thread segue o cursor enquanto o botão estiver pressionado.
+#[tauri::command]
+pub fn pet_drag_start(app: AppHandle) {
+    let state = app.state::<AppState>();
+    if state.dragging.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let start = app
+        .get_webview_window(MAIN)
+        .and_then(|pet| pet.outer_position().ok())
+        .zip(app.cursor_position().ok());
+    let Some((window, cursor)) = start else {
+        state.dragging.store(false, Ordering::SeqCst);
+        return;
+    };
+
+    std::thread::spawn(move || {
+        let mut last = window;
+        while primary_button_down() {
+            if let Ok(now) = app.cursor_position() {
+                let x = window.x + (now.x - cursor.x).round() as i32;
+                let y = window.y + (now.y - cursor.y).round() as i32;
+                if (x, y) != (last.x, last.y) {
+                    move_pet_clamped(&app, x, y, Some(now));
+                    last = PhysicalPosition::new(x, y);
+                }
+            }
+            std::thread::sleep(Duration::from_millis(8));
+        }
+        app.state::<AppState>().dragging.store(false, Ordering::SeqCst);
+    });
+}
+
+#[cfg(windows)]
+fn primary_button_down() -> bool {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_SWAPBUTTON};
+    // GetAsyncKeyState lê o botão físico; com os botões trocados, o principal é o direito.
+    let button = if unsafe { GetSystemMetrics(SM_SWAPBUTTON) } != 0 { VK_RBUTTON } else { VK_LBUTTON };
+    (unsafe { GetAsyncKeyState(button as i32) } as u16 & 0x8000) != 0
+}
+
+#[cfg(not(windows))]
+fn primary_button_down() -> bool {
+    false
 }
 
 #[tauri::command]

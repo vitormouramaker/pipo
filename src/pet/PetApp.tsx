@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Menu, PredefinedMenuItem } from "@tauri-apps/api/menu";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api } from "../api";
 import { Pipo, PIPO_STATES, type PipoState } from "../pipo/Pipo";
 
-const DRAG_THRESHOLD = 3;
+// Até quantos pixels de movimento ainda conta como clique (e não arrasto).
+const CLICK_TOLERANCE = 4;
 // Estados passageiros voltam sozinhos ao ocioso.
 const TRANSIENT: Partial<Record<PipoState, number>> = { done: 2500, alert: 5000 };
 
@@ -24,7 +24,7 @@ async function showContextMenu() {
 
 export default function PetApp() {
   const [state, setState] = useState<PipoState>("idle");
-  const press = useRef<{ x: number; y: number; dragged: boolean } | null>(null);
+  const press = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const unlisten = listen<string>("pipo-state", (e) => {
@@ -44,20 +44,16 @@ export default function PetApp() {
     <main
       className="stage"
       title="Clique para abrir o chat · arraste para mover · botão direito para o menu"
-      onMouseDown={(e) => {
-        if (e.button === 0) press.current = { x: e.clientX, y: e.clientY, dragged: false };
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        // Coordenadas de tela: a janela se move durante o arrasto.
+        press.current = { x: e.screenX, y: e.screenY };
+        void api.petDragStart();
       }}
-      onMouseMove={(e) => {
+      onPointerUp={(e) => {
         const p = press.current;
-        if (!p || p.dragged || !(e.buttons & 1)) return;
-        if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) {
-          p.dragged = true;
-          getCurrentWindow().startDragging();
-        }
-      }}
-      onMouseUp={() => {
-        if (press.current && !press.current.dragged) void api.panelToggle();
         press.current = null;
+        if (p && Math.hypot(e.screenX - p.x, e.screenY - p.y) <= CLICK_TOLERANCE) void api.panelToggle();
       }}
       onContextMenu={(e) => {
         e.preventDefault();

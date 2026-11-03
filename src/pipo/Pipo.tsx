@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
 
-// Visual aprovado na prévia v5 (assets/preview/pipo-preview.html).
+// Visual aprovado na prévia v6 (assets/preview/pipo-preview.html).
 export const PIPO_STATES = [
   "idle",
   "attentive",
@@ -20,8 +20,6 @@ const C = {
   warn: "#F5B544",
   rest: "#9AA0A9",
   dots: "#8C929C",
-  frame: "#D5D9DF",
-  frameDim: "#7D838D",
   top: "#2C2F35",
   bottom: "#1B1D21",
   edge: "#3A3D44",
@@ -29,7 +27,6 @@ const C = {
 const EL = 66;
 const ER = 134;
 const EY = 102;
-const LENS_R = 27;
 
 // Superelipse: quadrado de cantos bem arredondados
 function squircle(cx: number, cy: number, a: number, b: number, n = 3.2, steps = 120) {
@@ -86,7 +83,7 @@ function arcs(up: boolean, color: string) {
   ));
 }
 
-type Look = { eyes: ReactNode; back?: ReactNode; badge?: ReactNode; dimFrame?: boolean; blinks?: boolean };
+type Look = { eyes: ReactNode; back?: ReactNode; badge?: ReactNode; blinks?: boolean };
 
 function look(state: PipoState): Look {
   switch (state) {
@@ -151,12 +148,11 @@ function look(state: PipoState): Look {
       };
     case "gaming":
       return {
-        dimFrame: true,
         eyes: (
-          <>
+          <g opacity="0.5">
             <circle cx={EL} cy={EY} r="5.5" fill={C.eye} />
             <circle cx={ER} cy={EY} r="5.5" fill={C.eye} />
-          </>
+          </g>
         ),
       };
     case "sleep":
@@ -205,22 +201,11 @@ export function Pipo({ state }: { state: PipoState }) {
           <stop offset="0" stopColor={C.top} />
           <stop offset="1" stopColor={C.bottom} />
         </linearGradient>
-        <clipPath id={`${id}c`}>
-          <circle cx={EL} cy={EY} r={LENS_R - 2} />
-          <circle cx={ER} cy={EY} r={LENS_R - 2} />
-        </clipPath>
       </defs>
       {l.back}
       <g>
         <path d={BODY} fill={`url(#${id}g)`} stroke={C.edge} strokeWidth="1" />
-        <g clipPath={`url(#${id}c)`}>
-          <g className={blinking ? "eyes blinking" : "eyes"}>{l.eyes}</g>
-        </g>
-        <g fill="none" stroke={l.dimFrame ? C.frameDim : C.frame} strokeWidth="3.5" strokeLinecap="round">
-          <circle cx={EL} cy={EY} r={LENS_R} />
-          <circle cx={ER} cy={EY} r={LENS_R} />
-          <path d={`M13 ${EY} H${EL - LENS_R} M${EL + LENS_R} ${EY} H${ER - LENS_R} M${ER + LENS_R} ${EY} H187`} />
-        </g>
+        <g className={blinking ? "eyes blinking" : "eyes"}>{l.eyes}</g>
       </g>
       {l.badge}
     </svg>

@@ -88,9 +88,9 @@
 </head>
 <body>
 <main>
-  <div class="eyebrow">Pipo · prévia visual v5</div>
-  <h1>Minimalista, sóbrio, intelectual.</h1>
-  <p class="sub">Corpo grafite em formato de quadrado arredondado, óculos redondos atravessando o rosto e olhos geométricos. O humor aparece nos olhos, na cor e num pequeno indicador no canto.</p>
+  <div class="eyebrow">Pipo · prévia visual v6</div>
+  <h1>Minimalista, sóbrio, tecnológico.</h1>
+  <p class="sub">Corpo grafite em formato de quadrado arredondado e olhos geométricos. O humor aparece nos olhos, na cor e num pequeno indicador no canto.</p>
 
   <section class="hero">
     <div class="stage" id="stage"></div>
@@ -100,7 +100,7 @@
         <label>Estado</label>
         <div class="seg" id="states"></div>
       </div>
-      <p class="hint">Mova o mouse: os olhos acompanham por trás das lentes. Clique no Pipo para ver a confirmação de comando.</p>
+      <p class="hint">Mova o mouse: os olhos acompanham. Clique no Pipo para ver a confirmação de comando.</p>
     </div>
   </section>
 
@@ -132,10 +132,10 @@
 <script>
 const C = {
   eye: "#2DD4E8", ok: "#4ADE80", warn: "#F5B544", rest: "#9AA0A9", dots: "#8C929C",
-  frame: "#D5D9DF", frameDim: "#7D838D", top: "#2C2F35", bottom: "#1B1D21", edge: "#3A3D44",
+  top: "#2C2F35", bottom: "#1B1D21", edge: "#3A3D44",
 };
-// Olhos/lentes centrados em (66,102) e (134,102)
-const EL = 66, ER = 134, EY = 102, LENS_R = 27;
+// Olhos centrados em (66,102) e (134,102)
+const EL = 66, ER = 134, EY = 102;
 
 // Superelipse: quadrado de cantos bem arredondados
 function squircle(cx, cy, a, b, n = 3.2, steps = 120) {
@@ -179,7 +179,7 @@ const STATES = [
     eyes: () => pair(28, 7, C.eye),
     badge: () => `<rect x="68" y="186" width="64" height="4.5" rx="2.25" fill="${C.eye}"/>` },
   { key: "gaming", name: "Modo jogo", tag: "SILENT", trig: "Jogo em tela cheia: discreto",
-    dimFrame: true, eyes: () => `<circle cx="${EL}" cy="${EY}" r="5.5" fill="${C.eye}"/><circle cx="${ER}" cy="${EY}" r="5.5" fill="${C.eye}"/>` },
+    eyes: () => `<g opacity=".5"><circle cx="${EL}" cy="${EY}" r="5.5" fill="${C.eye}"/><circle cx="${ER}" cy="${EY}" r="5.5" fill="${C.eye}"/></g>` },
   { key: "sleep", name: "Dormindo", tag: "SLEEP", trig: "Inatividade longa ou madrugada", noBlink: true,
     eyes: () => arc(EL, false, C.rest) + arc(ER, false, C.rest),
     badge: () => `<text x="176" y="24" font-family="Inter, sans-serif" font-weight="800" font-size="24" fill="#6B717B">Z</text>` },
@@ -188,22 +188,14 @@ const STATES = [
 let uid = 0;
 function pipo(s, { animated = false, follow = false } = {}) {
   const id = "p" + uid++;
-  const frame = s.dimFrame ? C.frameDim : C.frame;
   return `<svg viewBox="0 0 200 200" role="img" aria-label="Pipo, ${s.name}">
     <defs>
       <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.top}"/><stop offset="1" stop-color="${C.bottom}"/></linearGradient>
-      <clipPath id="${id}c"><circle cx="${EL}" cy="${EY}" r="${LENS_R - 2}"/><circle cx="${ER}" cy="${EY}" r="${LENS_R - 2}"/></clipPath>
     </defs>
     <g>${s.back ? s.back() : ""}</g>
     <g class="${animated ? "breathe" : ""}">
       <path d="${BODY}" fill="url(#${id}g)" stroke="${C.edge}" stroke-width="1"/>
-      <g clip-path="url(#${id}c)">
-        <g ${follow ? "data-follow" : ""}><g class="${animated && !s.noBlink ? "blink" : ""}">${s.eyes()}</g></g>
-      </g>
-      <g fill="none" stroke="${frame}" stroke-width="3.5" stroke-linecap="round">
-        <circle cx="${EL}" cy="${EY}" r="${LENS_R}"/><circle cx="${ER}" cy="${EY}" r="${LENS_R}"/>
-        <path d="M13 ${EY} H${EL - LENS_R} M${EL + LENS_R} ${EY} H${ER - LENS_R} M${ER + LENS_R} ${EY} H187"/>
-      </g>
+      <g ${follow ? "data-follow" : ""}><g class="${animated && !s.noBlink ? "blink" : ""}">${s.eyes()}</g></g>
     </g>
     ${s.badge ? s.badge(animated) : ""}
   </svg>`;
@@ -264,7 +256,6 @@ document.getElementById("mini").innerHTML = pipo(STATES.find(s => s.key === "ale
 
 const PALETTE = [
   ["Grafite (corpo)", `linear-gradient(180deg,${C.top},${C.bottom})`, `${C.top} → ${C.bottom}`],
-  ["Armação", C.frame, C.frame],
   ["Ciano (olhos)", C.eye, C.eye],
   ["Verde (concluído)", C.ok, C.ok],
   ["Âmbar (alerta)", C.warn, C.warn],

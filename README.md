@@ -1,12 +1,12 @@
 # Pipo
 
-Bichinho virtual de desktop para Windows 11. Um personagem minimalista de óculos redondos, intelectual e com um leve toque de sarcasmo, que flutua na tela e ajuda no dia a dia com atalhos, dicas e tarefas: desenvolvimento, documentos, jogos, lives e notícias.
+Bichinho virtual de desktop para Windows 11. Um personagem minimalista e tecnológico, intelectual e com um leve toque de sarcasmo, que flutua na tela e ajuda no dia a dia com atalhos, dicas e tarefas: desenvolvimento, documentos, jogos, lives e notícias.
 
 > Projeto pessoal. Fase 1 (MVP) concluída: Pipo flutuante, bandeja do sistema, atalho global, chat com a Claude API e configurações. Próxima etapa: Fase 2 (sensores).
 
 ## Prévia
 
-Abra [`assets/preview/pipo-preview.html`](assets/preview/pipo-preview.html) no navegador para ver o Pipo animado e todos os estados: corpo grafite em quadrado arredondado, óculos redondos e olhos geométricos, com cor usada só para comunicar estado.
+Abra [`assets/preview/pipo-preview.html`](assets/preview/pipo-preview.html) no navegador para ver o Pipo animado e todos os estados: corpo grafite em quadrado arredondado e olhos geométricos, com cor usada só para comunicar estado.
 
 ## Planejamento
 
@@ -25,15 +25,16 @@ npm run tauri build   # gera os instaladores em src-tauri/target/release/bundle/
 ## Como usar
 
 - **Clique no Pipo** ou **Ctrl + Alt + Shift + Espaço**: abre e fecha o chat.
-- **Arrastar**: move o Pipo; a posição é lembrada.
+- **Arrastar**: move o Pipo, que para nas bordas da tela (e passa para outro monitor); a posição é lembrada.
 - **Botão direito no Pipo** ou **ícone na bandeja**: chat, configurações, ocultar o Pipo e sair.
-- **Esc**: fecha o painel.
+- **X** no canto do painel: fecha o painel.
+- **Histórico** (no topo do chat): todas as conversas anteriores; clique para reabrir ou exclua as que não quiser. **+ Nova conversa** guarda a atual no histórico.
 
 O Pipo reage ao chat: fica atento quando o painel abre, pensativo enquanto responde, satisfeito quando termina e em alerta quando algo dá errado.
 
 **Chave da API:** na primeira execução, o Pipo procura `api/api-pipo.txt` (ou o arquivo indicado em `PIPO_API_KEY_FILE`) e guarda a chave no Gerenciador de Credenciais do Windows. Também dá para colar a chave ou importar o arquivo em **Configurações**. Depois de importada, o arquivo pode ser apagado.
 
-**Configurações:** modelo (Haiku 5.5 por padrão, Sonnet 5.5 ou Opus 5.5), nível de sarcasmo, atalho global, tamanho do Pipo e iniciar com o Windows.
+**Configurações:** modelo (Haiku 5.5 por padrão, Sonnet 5.5 ou Opus 5.5), nível de sarcasmo, atalho global, tamanho do Pipo (Menor, Pequeno, Médio, Grande) e iniciar com o Windows.
 
 ## Estrutura
 

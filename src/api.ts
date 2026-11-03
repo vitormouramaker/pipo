@@ -10,6 +10,8 @@ export type Settings = {
 
 export type ChatMessage = { role: "user" | "assistant"; text: string };
 
+export type Conversation = { id: number; title: string; updatedAt: string; current: boolean };
+
 export type ChatEvent =
   | { type: "delta"; text: string }
   | { type: "done"; stopReason: string | null }
@@ -20,6 +22,9 @@ export type PanelView = "chat" | "settings";
 export const api = {
   chatHistory: () => invoke<ChatMessage[]>("chat_history"),
   chatNew: () => invoke<void>("chat_new"),
+  chatConversations: () => invoke<Conversation[]>("chat_conversations"),
+  chatOpen: (id: number) => invoke<ChatMessage[]>("chat_open", { id }),
+  chatDelete: (id: number) => invoke<void>("chat_delete", { id }),
   chatSend: (text: string, onEvent: (e: ChatEvent) => void) => {
     const channel = new Channel<ChatEvent>();
     channel.onmessage = onEvent;
@@ -35,6 +40,7 @@ export const api = {
   panelToggle: () => invoke<void>("panel_toggle"),
   panelHide: () => invoke<void>("panel_hide"),
   petToggle: () => invoke<void>("pet_toggle"),
+  petDragStart: () => invoke<void>("pet_drag_start"),
   quit: () => invoke<void>("app_quit"),
 };
 

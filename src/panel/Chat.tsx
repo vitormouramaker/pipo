@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type ChatMessage } from "../api";
+import { api, type ChatMessage, type Conversation } from "../api";
 
 type Props = { hasKey: boolean | null; onOpenSettings: () => void };
 
@@ -11,6 +11,16 @@ function renderInline(text: string): ReactNode[] {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
     return <Fragment key={i}>{part}</Fragment>;
   });
+}
+
+// Datas do SQLite vêm em UTC ("AAAA-MM-DD HH:MM:SS").
+function formatDate(utc: string): string {
+  const date = new Date(utc.replace(" ", "T") + "Z");
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  return sameDay
+    ? date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
 function renderText(text: string): ReactNode[] {
@@ -28,6 +38,8 @@ export default function Chat({ hasKey, onOpenSettings }: Props) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<Conversation[] | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -40,7 +52,7 @@ export default function Chat({ hasKey, onOpenSettings }: Props) {
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [messages]);
+  }, [messages, history]);
 
   const send = async () => {
     const text = input.trim();
@@ -74,7 +86,27 @@ export default function Chat({ hasKey, onOpenSettings }: Props) {
     await api.chatNew();
     setMessages([]);
     setError(null);
+    setHistory(null);
     inputRef.current?.focus();
+  };
+
+  const toggleHistory = async () => {
+    setConfirmDelete(null);
+    setHistory(history ? null : await api.chatConversations());
+  };
+
+  const openConversation = async (id: number) => {
+    setMessages(await api.chatOpen(id));
+    setError(null);
+    setHistory(null);
+    inputRef.current?.focus();
+  };
+
+  const deleteConversation = async (id: number) => {
+    await api.chatDelete(id);
+    setConfirmDelete(null);
+    setHistory(await api.chatConversations());
+    if (history?.find((c) => c.id === id)?.current) setMessages(await api.chatHistory());
   };
 
   return (
@@ -88,20 +120,52 @@ export default function Chat({ hasKey, onOpenSettings }: Props) {
         </div>
       )}
 
-      <div className="messages" ref={listRef}>
-        {messages.length === 0 && (
-          <div className="empty">
-            <p className="empty-title">Olá. Sou o Pipo.</p>
-            <p>Pergunte o que quiser: código, documentos, jogos ou o que estiver acontecendo no mundo.</p>
-          </div>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={`msg ${m.role}`}>
-            {m.text ? renderText(m.text) : <span className="typing">pensando…</span>}
-          </div>
-        ))}
-        {error && <div className="msg error">{error}</div>}
+      <div className="chat-toolbar">
+        <button className="link" aria-pressed={history !== null} onClick={() => void toggleHistory()} disabled={busy}>
+          {history ? "← Voltar à conversa" : "Histórico"}
+        </button>
+        <button className="link" onClick={() => void newConversation()} disabled={busy}>
+          + Nova conversa
+        </button>
       </div>
+
+      {history ? (
+        <div className="history">
+          {history.length === 0 && <p className="empty">Nenhuma conversa ainda.</p>}
+          {history.map((c) => (
+            <div key={c.id} className={`history-item${c.current ? " current" : ""}`}>
+              <button className="history-open" onClick={() => void openConversation(c.id)}>
+                <span className="history-title">{c.title}</span>
+                <span className="history-date">{formatDate(c.updatedAt)}</span>
+              </button>
+              {confirmDelete === c.id ? (
+                <button className="history-delete confirm" onClick={() => void deleteConversation(c.id)}>
+                  Confirmar
+                </button>
+              ) : (
+                <button className="history-delete" title="Excluir conversa" onClick={() => setConfirmDelete(c.id)}>
+                  Excluir
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="messages" ref={listRef}>
+          {messages.length === 0 && (
+            <div className="empty">
+              <p className="empty-title">Olá. Sou o Pipo.</p>
+              <p>Pergunte o que quiser: código, documentos, jogos ou o que estiver acontecendo no mundo.</p>
+            </div>
+          )}
+          {messages.map((m, i) => (
+            <div key={i} className={`msg ${m.role}`}>
+              {m.text ? renderText(m.text) : <span className="typing">pensando…</span>}
+            </div>
+          ))}
+          {error && <div className="msg error">{error}</div>}
+        </div>
+      )}
 
       <footer className="composer">
         <textarea
@@ -118,9 +182,7 @@ export default function Chat({ hasKey, onOpenSettings }: Props) {
           }}
         />
         <div className="composer-row">
-          <button className="link" onClick={() => void newConversation()} disabled={busy}>
-            Nova conversa
-          </button>
+          <span />
           <button className="primary" onClick={() => void send()} disabled={busy || !input.trim()}>
             {busy ? "Respondendo…" : "Enviar"}
           </button>

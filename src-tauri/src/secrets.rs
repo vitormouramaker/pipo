@@ -2,13 +2,10 @@
 //! A chave nunca é registrada em log nem enviada para a interface.
 
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 
 use keyring::Entry;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
-
-use crate::AppState;
 
 const SERVICE: &str = "com.vitormouramaker.pipo";
 const ACCOUNT: &str = "anthropic-api-key";
@@ -94,16 +91,12 @@ pub fn delete_api_key() -> Result<(), String> {
 /// Abre o seletor de arquivo e importa a chave. Retorna `false` se o usuário cancelar.
 #[tauri::command]
 pub async fn import_api_key_file(app: AppHandle) -> Result<bool, String> {
-    let state = app.state::<AppState>();
-    // O seletor tira o foco do painel; sem isso o painel se esconderia.
-    state.dialog_open.store(true, Ordering::SeqCst);
     let picked = app
         .dialog()
         .file()
         .set_title("Arquivo com a chave da Claude API")
         .add_filter("Texto", &["txt"])
         .blocking_pick_file();
-    state.dialog_open.store(false, Ordering::SeqCst);
 
     let Some(file) = picked else { return Ok(false) };
     let path = file.into_path().map_err(|e| format!("Caminho inválido: {e}"))?;
