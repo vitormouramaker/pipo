@@ -1,0 +1,16 @@
+# Segredos — nunca versionar
+api/
+*.key
+.env
+.env.*
+
+# Dependências e builds
+node_modules/
+dist/
+src-tauri/target/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipo — Prévia visual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F5FC;
+    --card: #FFFFFF;
+    --ink: #2B2140;
+    --muted: #6E6787;
+    --line: #E6E1F5;
+    --accent: #7C5CE0;
+    --chip: #EFEAFD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17141F; --card: #211D2C; --ink: #F1EEF9; --muted: #A49DBB; --line: #332D42; --accent: #B19CFF; --chip: #2C2640;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17141F; --card: #211D2C; --ink: #F1EEF9; --muted: #A49DBB; --line: #332D42; --accent: #B19CFF; --chip: #2C2640;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Nunito", system-ui, sans-serif; line-height: 1.5; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 2.2rem; margin: 0; font-weight: 800; }
+  h1 span { color: var(--accent); }
+  h2 { font-size: 1.3rem; margin: 48px 0 6px; font-weight: 800; }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  .lead { color: var(--muted); margin: 0 0 18px; }
+
+  /* Hero */
+  .hero { margin-top: 28px; background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 28px 20px; display: grid; grid-template-columns: 300px 1fr; gap: 28px; align-items: center; }
+  .stage { position: relative; display: flex; justify-content: center; }
+  .stage svg { width: 260px; height: 260px; cursor: pointer; overflow: visible; }
+  .bubble { position: relative; background: var(--chip); border-radius: 18px; padding: 16px 20px; font-size: 1.15rem; font-weight: 600; min-height: 64px; transition: opacity .25s; }
+  .bubble::before { content: ""; position: absolute; left: -10px; top: 24px; border: 10px solid transparent; border-right-color: var(--chip); border-left: 0; }
+  .hint { color: var(--muted); font-size: .9rem; margin: 10px 0 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { font: inherit; font-size: .9rem; font-weight: 600; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Animações do personagem */
+  .breathe { transform-box: fill-box; transform-origin: 50% 100%; animation: breathe 3.2s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.025,.975); } }
+  .blink { transform-box: fill-box; transform-origin: 50% 50%; animation: blink 4.5s infinite; }
+  @keyframes blink { 0%,94%,100% { transform: scaleY(1); } 96.5% { transform: scaleY(.08); } }
+  .jump { animation: jump .7s cubic-bezier(.3,.7,.4,1); transform-box: fill-box; transform-origin: 50% 100%; }
+  @keyframes jump {
+    0% { transform: translateY(0) scale(1,1); }
+    15% { transform: translateY(0) scale(1.12,.86); }
+    45% { transform: translateY(-34px) scale(.93,1.08); }
+    75% { transform: translateY(0) scale(1.1,.9); }
+    100% { transform: translateY(0) scale(1,1); }
+  }
+  .zzz { animation: float 2.6s ease-in-out infinite; }
+  @keyframes float { 0%,100% { transform: translateY(0); opacity: .55; } 50% { transform: translateY(-6px); opacity: .9; } }
+  @media (prefers-reduced-motion: reduce) { .breathe, .blink, .jump, .zzz { animation: none; } }
+
+  /* Grade de expressões */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px 14px 16px; text-align: center; }
+  .card svg { width: 140px; height: 140px; overflow: visible; }
+  .card h3 { margin: 6px 0 2px; font-size: 1.05rem; font-weight: 800; }
+  .card p { margin: 0; color: var(--muted); font-size: .85rem; }
+
+  /* Desktop simulado */
+  .desk { position: relative; border-radius: 16px; overflow: hidden; height: 360px; background: linear-gradient(135deg, #2A2F45, #1C1F2E); border: 1px solid var(--line); }
+  .win { position: absolute; left: 24px; top: 22px; right: 160px; bottom: 60px; background: #1E1E2A; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 34px 18px 18px; font-family: Consolas, monospace; font-size: 13px; color: #9AA3C7; overflow: hidden; }
+  .win::before { content: "● ● ●   main.ts — VS Code"; position: absolute; top: 0; left: 0; right: 0; height: 26px; background: #2A2A3A; color: #8088AA; font-size: 11px; padding: 6px 12px; }
+  .win .k { color: #C792EA; } .win .s { color: #C3E88D; } .win .f { color: #82AAFF; } .win .e { color: #FF6B81; }
+  .taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: rgba(20,20,30,.85); }
+  .mini { position: absolute; right: 26px; bottom: 54px; width: 92px; height: 92px; }
+  .mini svg { width: 100%; height: 100%; overflow: visible; }
+  .minibubble { position: absolute; right: 124px; bottom: 96px; max-width: 250px; background: #fff; color: #2B2140; border-radius: 14px; padding: 10px 14px; font-size: .88rem; font-weight: 600; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
+  .minibubble::after { content: ""; position: absolute; right: -8px; bottom: 14px; border: 8px solid transparent; border-left-color: #fff; border-right: 0; }
+
+  /* Cores */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .sw { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .sw .bar { height: 54px; border-radius: 10px; }
+  .sw b { display: block; margin-top: 8px; font-size: .95rem; }
+  .sw code { color: var(--muted); font-size: .78rem; }
+
+  .check { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px 22px; }
+  .check li { margin: 4px 0; }
+
+  @media (max-width: 720px) {
+    .hero { grid-template-columns: 1fr; }
+    .bubble::before { display: none; }
+    .win { right: 24px; }
+    .minibubble { right: 20px; bottom: 156px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1><span>Pipo</span> — prévia visual</h1>
+  <p class="sub">Versão 1 do personagem · bolinha intelectual com um toque de sarcasmo</p>
+
+  <section class="hero">
+    <div class="stage" id="stage"></div>
+    <div>
+      <div class="bubble" id="bubble"></div>
+      <p class="hint">Passe o mouse: os olhos acompanham. Clique no Pipo para ele pular. Ou troque a expressão:</p>
+      <div class="chips" id="chips"></div>
+    </div>
+  </section>
+
+  <h2>Expressões</h2>
+  <p class="lead">Cada estado de humor do plano (seção 6), com o gatilho que o ativa.</p>
+  <div class="grid" id="grid"></div>
+
+  <h2>No seu desktop, em tamanho real</h2>
+  <p class="lead">Cerca de 92 px, no canto da tela, por cima das outras janelas.</p>
+  <div class="desk">
+    <div class="win">
+      <div><span class="k">import</span> { startServer } <span class="k">from</span> <span class="s">"./server"</span>;</div>
+      <div>&nbsp;</div>
+      <div><span class="k">const</span> port = <span class="f">Number</span>(process.env.PORT) ?? 3000;</div>
+      <div><span class="f">startServer</span>(port);</div>
+      <div>&nbsp;</div>
+      <div class="e">error TS2345: Argument of type 'number | undefined'...</div>
+    </div>
+    <div class="minibubble">O compilador discorda de você. Ele costuma ter razão — veja a linha 3.</div>
+    <div class="mini" id="mini"></div>
+    <div class="taskbar"></div>
+  </div>
+
+  <h2>Cores por humor</h2>
+  <p class="lead">O corpo muda levemente de tom conforme o humor. A cor base é o lilás.</p>
+  <div class="swatches" id="swatches"></div>
+
+  <h2>O que avaliar</h2>
+  <div class="check">
+    <ul>
+      <li><b>Formato:</b> bolinha mais redonda, mais achatada ou mais alta?</li>
+      <li><b>Cor base:</b> manter o lilás ou testar outra (menta, pêssego, azul-céu)?</li>
+      <li><b>Olhos:</b> tamanho e brilho estão fofos o suficiente?</li>
+      <li><b>Bochechas:</b> manter, deixar mais fortes ou tirar?</li>
+      <li><b>Óculos:</b> usar sempre (reforça o lado intelectual) ou só no modo focado?</li>
+      <li><b>Expressão cética:</b> o tom do sarcasmo está no ponto?</li>
+    </ul>
+  </div>
+</main>
+
+<script>
+const INK = "#2B2140";
+const PALETTES = {
+  base:    { name: "Base (lilás)",   c: ["#F1ECFF", "#C3B1FA", "#9B80EC"] },
+  happy:   { name: "Feliz",          c: ["#FBEAFF", "#DDB0F7", "#B97EE6"] },
+  worried: { name: "Preocupado",     c: ["#E9ECFF", "#B0B8F4", "#848DE2"] },
+  sleepy:  { name: "Sonolento",      c: ["#EFEDF6", "#C2BDDD", "#9F99C6"] },
+};
+
+let uid = 0;
+const line = (d, w = 3.5) =>
+  `<path d="${d}" fill="none" stroke="${INK}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+const eye = (x, y, dx = 0, dy = 0, ry = 14) => `
+  <ellipse cx="${x + dx}" cy="${y + dy}" rx="11" ry="${ry}" fill="${INK}"/>
+  <circle cx="${x + dx + 4}" cy="${y + dy - ry * 0.36}" r="4" fill="#fff"/>
+  <circle cx="${x + dx - 3.5}" cy="${y + dy + ry * 0.36}" r="1.8" fill="#fff"/>`;
+const openEyes = (dx, dy, ry) => eye(75, 108, dx, dy, ry) + eye(125, 108, dx, dy, ry);
+const smile = line("M91 128 Q100 136 109 128");
+const star = (x, y, s) =>
+  `<path d="M${x} ${y - s} Q${x} ${y} ${x + s} ${y} Q${x} ${y} ${x} ${y + s} Q${x} ${y} ${x - s} ${y} Q${x} ${y} ${x} ${y - s}Z" fill="#FFD36E"/>`;
+
+const EXPR = [
+  { key: "idle", name: "Ocioso", trig: "Nenhum evento relevante",
+    eyes: () => openEyes(), face: smile },
+  { key: "blink", name: "Piscando", trig: "Animação natural do ocioso",
+    eyes: () => line("M64 109 Q75 116 86 109") + line("M114 109 Q125 116 136 109"), face: smile },
+  { key: "attentive", name: "Atento", trig: "Atalho acionado ou clique",
+    eyes: () => openEyes(0, 0, 15.5),
+    face: line("M66 87 Q75 82 84 87", 3) + line("M116 87 Q125 82 134 87", 3) +
+          `<ellipse cx="100" cy="131" rx="5" ry="4.5" fill="${INK}"/>` },
+  { key: "thinking", name: "Pensando", trig: "Aguardando resposta da IA",
+    eyes: () => openEyes(4, -5),
+    face: line("M114 90 Q125 84 136 89", 3) + line("M95 131 Q101 129 107 131"),
+    front: `<circle cx="152" cy="64" r="4" fill="#fff" stroke="${INK}" stroke-width="2"/>
+            <circle cx="164" cy="47" r="6" fill="#fff" stroke="${INK}" stroke-width="2"/>
+            <circle cx="182" cy="25" r="9" fill="#fff" stroke="${INK}" stroke-width="2"/>` },
+  { key: "happy", name: "Feliz", trig: "Tarefa concluída, build ok", palette: "happy",
+    eyes: () => line("M64 112 Q75 99 86 112", 4.5) + line("M114 112 Q125 99 136 112", 4.5),
+    face: `<path d="M89 125 Q100 145 111 125 Z" fill="${INK}" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>
+           <ellipse cx="100" cy="135" rx="5" ry="2.6" fill="#FF7FA3"/>`,
+    front: star(36, 62, 9) + star(168, 52, 7) + star(178, 92, 5) },
+  { key: "worried", name: "Preocupado", trig: "Build falhou, CPU alta, pouca memória", palette: "worried",
+    eyes: () => openEyes(0, 1, 13),
+    face: line("M63 96 L85 90") + line("M115 90 L137 96") +
+          line("M89 133 Q94.5 127 100 133 Q105.5 139 111 133"),
+    front: `<path d="M156 58 Q148 73 156 78 Q164 73 156 58 Z" fill="#8EC5FF" stroke="#5A93D6" stroke-width="1.5"/>` },
+  { key: "skeptical", name: "Cético", trig: "Modo sarcasmo (com moderação)",
+    eyes: () => `<path d="M64 107 A11 11 0 0 0 86 107 Z" fill="${INK}"/>${line("M61 107 L89 107")}
+                 <circle cx="79" cy="111" r="2" fill="#fff"/>` + eye(125, 108),
+    face: line("M63 99 L86 99") + line("M113 88 Q125 78 137 86") + line("M93 131 Q104 134 112 124") },
+  { key: "focused", name: "Focado", trig: "Modo trabalho ou pomodoro",
+    eyes: () => openEyes(0, 1, 10),
+    face: line("M64 84 L86 88", 3) + line("M114 88 L136 84", 3) + line("M94 131 L106 131"),
+    front: `<g fill="#fff" fill-opacity=".18" stroke="${INK}" stroke-width="3">
+              <circle cx="75" cy="108" r="19"/><circle cx="125" cy="108" r="19"/></g>
+            ${line("M94 105 Q100 100 106 105", 3)}${line("M56 104 L40 96", 3)}${line("M144 104 L160 96", 3)}` },
+  { key: "gaming", name: "Modo jogo", trig: "Jogo em tela cheia: fica quietinho",
+    eyes: () => openEyes(0, 0, 13), face: line("M91 127 Q100 135 109 127"),
+    front: `<path d="M22 112 A78 78 0 0 1 178 112" fill="none" stroke="#3B3355" stroke-width="8" stroke-linecap="round"/>
+            <rect x="10" y="94" width="22" height="38" rx="10" fill="#3B3355"/>
+            <rect x="168" y="94" width="22" height="38" rx="10" fill="#3B3355"/>
+            <path d="M22 130 Q26 152 58 150" fill="none" stroke="#3B3355" stroke-width="3.5" stroke-linecap="round"/>
+            <circle cx="61" cy="150" r="5" fill="#3B3355"/>` },
+  { key: "sleepy", name: "Dormindo", trig: "Inatividade longa ou madrugada", palette: "sleepy", squash: true,
+    eyes: () => line("M64 110 Q75 117 86 110") + line("M114 110 Q125 117 136 110"),
+    face: `<ellipse cx="100" cy="131" rx="3.5" ry="4.5" fill="${INK}"/>`,
+    front: `<g class="zzz" font-family="Nunito, sans-serif" font-weight="800" fill="${INK}">
+              <text x="146" y="52" font-size="24">Z</text><text x="168" y="34" font-size="17">z</text><text x="182" y="20" font-size="12">z</text></g>` },
+];
+
+function pipo(e, { animated = false, follow = false } = {}) {
+  const id = "pg" + uid++;
+  const [c1, c2, c3] = PALETTES[e.palette || "base"].c;
+  const cy = e.squash ? 116 : 110, ry = e.squash ? 66 : 72, shift = cy - 110;
+  return `<svg viewBox="0 0 200 200" role="img" aria-label="Pipo ${e.name}">
+    <defs><radialGradient id="${id}" cx="35%" cy="30%" r="80%">
+      <stop offset="0" stop-color="${c1}"/><stop offset=".55" stop-color="${c2}"/><stop offset="1" stop-color="${c3}"/>
+    </radialGradient></defs>
+    <ellipse cx="100" cy="188" rx="58" ry="7" fill="${INK}" opacity=".13"/>
+    <g class="${animated ? "breathe" : ""}" data-body>
+      <ellipse cx="100" cy="${cy}" rx="78" ry="${ry}" fill="url(#${id})"/>
+      <ellipse cx="68" cy="${cy - 42}" rx="18" ry="9" fill="#fff" opacity=".65" transform="rotate(-28 68 ${cy - 42})"/>
+      <circle cx="91" cy="${cy - 55}" r="3.5" fill="#fff" opacity=".6"/>
+      <g transform="translate(0 ${shift})">
+        <ellipse cx="55" cy="128" rx="12" ry="7" fill="#FF8FB1" opacity=".55"/>
+        <ellipse cx="145" cy="128" rx="12" ry="7" fill="#FF8FB1" opacity=".55"/>
+        <g ${follow ? "data-follow" : ""}><g class="${animated && e.key !== "blink" ? "blink" : ""}">${e.eyes()}</g></g>
+        ${e.face}
+        ${e.front || ""}
+      </g>
+    </g>
+  </svg>`;
+}
+
+// Hero
+const LINES = [
+  "Olá. Eu sou o Pipo. Passe o mouse, eu acompanho.",
+  "Verde. Eu nunca duvidei. Muito.",
+  "O compilador discorda de você. Ele costuma ter razão.",
+  "São 3h. Estatisticamente, esse código será reescrito amanhã.",
+  "Algo está usando 95% da CPU. Spoiler: é o Chrome.",
+  "Curiosidade: o primeiro “bug” registrado era uma mariposa de verdade, em 1947.",
+  "Vou ficar quieto. Boa partida.",
+];
+const stage = document.getElementById("stage");
+const bubble = document.getElementById("bubble");
+const chips = document.getElementById("chips");
+let current = EXPR[0];
+
+function renderHero(e) {
+  current = e;
+  stage.innerHTML = pipo(e, { animated: true, follow: true });
+  chips.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", b.dataset.key === e.key));
+}
+EXPR.forEach(e => {
+  const b = document.createElement("button");
+  b.textContent = e.name; b.dataset.key = e.key;
+  b.onclick = () => renderHero(e);
+  chips.appendChild(b);
+});
+renderHero(EXPR[0]);
+
+let li = 0;
+bubble.textContent = LINES[0];
+setInterval(() => {
+  bubble.style.opacity = 0;
+  setTimeout(() => { li = (li + 1) % LINES.length; bubble.textContent = LINES[li]; bubble.style.opacity = 1; }, 250);
+}, 4200);
+
+document.addEventListener("mousemove", ev => {
+  const svg = stage.querySelector("svg"), g = stage.querySelector("[data-follow]");
+  if (!svg || !g) return;
+  const r = svg.getBoundingClientRect();
+  const dx = ev.clientX - (r.left + r.width / 2), dy = ev.clientY - (r.top + r.height / 2);
+  const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 300);
+  g.setAttribute("transform", `translate(${(dx / d) * 5 * k} ${(dy / d) * 4 * k})`);
+});
+
+stage.addEventListener("click", () => {
+  const prev = current;
+  renderHero(EXPR.find(e => e.key === "happy"));
+  const body = stage.querySelector("[data-body]");
+  body.classList.remove("breathe"); body.classList.add("jump");
+  setTimeout(() => renderHero(prev.key === "happy" ? EXPR[0] : prev), 1300);
+});
+
+// Grade
+document.getElementById("grid").innerHTML = EXPR.map(e =>
+  `<div class="card">${pipo(e)}<h3>${e.name}</h3><p>${e.trig}</p></div>`).join("");
+
+// Desktop
+document.getElementById("mini").innerHTML = pipo(EXPR.find(e => e.key === "skeptical"), { animated: true });
+
+// Cores
+document.getElementById("swatches").innerHTML = Object.values(PALETTES).map(p =>
+  `<div class="sw"><div class="bar" style="background:linear-gradient(90deg,${p.c.join(",")})"></div>
+   <b>${p.name}</b><code>${p.c.join(" · ")}</code></div>`).join("");
+</script>
+</body>
+</html>
