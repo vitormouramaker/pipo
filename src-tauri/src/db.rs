@@ -28,6 +28,17 @@ impl Db {
                  role            TEXT NOT NULL,
                  content         TEXT NOT NULL,
                  created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
+             CREATE TABLE IF NOT EXISTS usage (
+                 id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                 conversation_id INTEGER NOT NULL,
+                 model           TEXT NOT NULL,
+                 input_tokens    INTEGER NOT NULL,
+                 cache_write     INTEGER NOT NULL,
+                 cache_read      INTEGER NOT NULL,
+                 output_tokens   INTEGER NOT NULL,
+                 cost            REAL NOT NULL,
+                 created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
              );",
         )?;
         Ok(Self { conn })
@@ -120,6 +131,77 @@ impl Db {
                 r.get(2)?,
             ))
         })?;
+        rows.collect()
+    }
+
+    /// O consumo continua registrado mesmo se a conversa for excluída.
+    pub fn add_usage(&self, conversation: i64, usage: &crate::usage::Usage) -> rusqlite::Result<()> {
+        self.conn.execute(
+            "INSERT INTO usage (conversation_id, model, input_tokens, cache_write, cache_read, output_tokens, cost)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                conversation,
+                usage.model,
+                usage.input as i64,
+                usage.cache_write as i64,
+                usage.cache_read as i64,
+                usage.output as i64,
+                usage.cost()
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// (hoje, este mês, total), em horário local.
+    pub fn usage_totals(&self) -> rusqlite::Result<(f64, f64, f64)> {
+        self.conn.query_row(
+            "SELECT
+                 COALESCE(SUM(CASE WHEN date(created_at, 'localtime') = date('now', 'localtime') THEN cost END), 0),
+                 COALESCE(SUM(CASE WHEN strftime('%Y-%m', created_at, 'localtime') = strftime('%Y-%m', 'now', 'localtime') THEN cost END), 0),
+                 COALESCE(SUM(cost), 0)
+               FROM usage",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+    }
+
+    /// Por conversa, da mais recente para a mais antiga:
+    /// (id, primeira mensagem do usuário, última data, respostas, tokens de entrada, de saída, custo).
+    #[allow(clippy::type_complexity)]
+    pub fn usage_by_conversation(&self) -> rusqlite::Result<Vec<(i64, Value, String, i64, i64, i64, f64)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT u.conversation_id,
+                    (SELECT m.content FROM messages m
+                      WHERE m.conversation_id = u.conversation_id AND m.role = 'user' ORDER BY m.id LIMIT 1),
+                    MAX(u.created_at) AS updated,
+                    COUNT(*),
+                    SUM(u.input_tokens + u.cache_write + u.cache_read),
+                    SUM(u.output_tokens),
+                    SUM(u.cost)
+               FROM usage u
+              GROUP BY u.conversation_id
+              ORDER BY updated DESC",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            let first: Option<String> = r.get(1)?;
+            Ok((
+                r.get(0)?,
+                first.and_then(|f| serde_json::from_str(&f).ok()).unwrap_or(Value::Null),
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+                r.get(6)?,
+            ))
+        })?;
+        rows.collect()
+    }
+
+    pub fn usage_by_model(&self) -> rusqlite::Result<Vec<(String, i64, f64)>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT model, COUNT(*), SUM(cost) FROM usage GROUP BY model ORDER BY SUM(cost) DESC")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?;
         rows.collect()
     }
 

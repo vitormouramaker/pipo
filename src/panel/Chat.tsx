@@ -1,8 +1,14 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, type ChatMessage, type Conversation } from "../api";
+import { sqliteDate } from "../format";
 
-type Props = { hasKey: boolean | null; onOpenSettings: () => void };
+type Props = {
+  hasKey: boolean | null;
+  draft: string | null;
+  onDraftUsed: () => void;
+  onOpenSettings: () => void;
+};
 
 // Formatação mínima: blocos ```código```, `código` em linha e **negrito**.
 function renderInline(text: string): ReactNode[] {
@@ -11,16 +17,6 @@ function renderInline(text: string): ReactNode[] {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
     return <Fragment key={i}>{part}</Fragment>;
   });
-}
-
-// Datas do SQLite vêm em UTC ("AAAA-MM-DD HH:MM:SS").
-function formatDate(utc: string): string {
-  const date = new Date(utc.replace(" ", "T") + "Z");
-  const today = new Date();
-  const sameDay = date.toDateString() === today.toDateString();
-  return sameDay
-    ? date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
 function renderText(text: string): ReactNode[] {
@@ -33,7 +29,7 @@ function renderText(text: string): ReactNode[] {
   });
 }
 
-export default function Chat({ hasKey, onOpenSettings }: Props) {
+export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -43,21 +39,47 @@ export default function Chat({ hasKey, onOpenSettings }: Props) {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const busyRef = useRef(false);
+
   useEffect(() => {
     void api.chatHistory().then(setMessages);
     inputRef.current?.focus();
-    const unlisten = listen("panel-view", () => inputRef.current?.focus());
-    return () => void unlisten.then((fn) => fn());
+    // Texto pronto vindo do menu do Pipo: pode ter chegado antes deste painel existir.
+    const takePrefill = () =>
+      void api.chatTakePrefill().then((text) => {
+        if (text) void sendText(text);
+      });
+    takePrefill();
+    const unlistenView = listen("panel-view", () => inputRef.current?.focus());
+    const unlistenPrefill = listen("chat-prefill", takePrefill);
+    return () => {
+      void unlistenView.then((fn) => fn());
+      void unlistenPrefill.then((fn) => fn());
+    };
   }, []);
+
+  useEffect(() => {
+    if (!draft) return;
+    setInput(draft);
+    onDraftUsed();
+    inputRef.current?.focus();
+  }, [draft]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, history]);
 
-  const send = async () => {
+  const send = () => {
     const text = input.trim();
     if (!text || busy) return;
     setInput("");
+    void sendText(text);
+  };
+
+  const sendText = async (text: string) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setHistory(null);
     setError(null);
     setBusy(true);
     setMessages((m) => [...m, { role: "user", text }, { role: "assistant", text: "" }]);
@@ -78,6 +100,7 @@ export default function Chat({ hasKey, onOpenSettings }: Props) {
     });
 
     setMessages((m) => (m[m.length - 1]?.text ? m : m.slice(0, -1)));
+    busyRef.current = false;
     setBusy(false);
     inputRef.current?.focus();
   };
@@ -136,7 +159,7 @@ export default function Chat({ hasKey, onOpenSettings }: Props) {
             <div key={c.id} className={`history-item${c.current ? " current" : ""}`}>
               <button className="history-open" onClick={() => void openConversation(c.id)}>
                 <span className="history-title">{c.title}</span>
-                <span className="history-date">{formatDate(c.updatedAt)}</span>
+                <span className="history-date">{sqliteDate(c.updatedAt)}</span>
               </button>
               {confirmDelete === c.id ? (
                 <button className="history-delete confirm" onClick={() => void deleteConversation(c.id)}>

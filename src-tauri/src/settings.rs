@@ -16,6 +16,12 @@ pub struct Settings {
     pub shortcut: String,
     pub pet_size: u32,
     pub autostart: bool,
+    /// Sensores (Fase 2): cada um pode ser desligado.
+    pub sense_context: bool,
+    pub game_mode: bool,
+    pub clipboard_history: bool,
+    pub hardware_alerts: bool,
+    pub sleep_when_idle: bool,
 }
 
 impl Default for Settings {
@@ -26,6 +32,11 @@ impl Default for Settings {
             shortcut: "Ctrl+Alt+Shift+Space".into(),
             pet_size: 160,
             autostart: false,
+            sense_context: true,
+            game_mode: true,
+            clipboard_history: true,
+            hardware_alerts: true,
+            sleep_when_idle: true,
         }
     }
 }
@@ -87,6 +98,10 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
         .unwrap()
         .set_setting(KEY, &json)
         .map_err(|e| format!("Não consegui salvar: {e}"))?;
+    if !settings.clipboard_history {
+        state.clipboard.lock().unwrap().clear();
+    }
+    *state.settings.lock().unwrap() = settings.clone();
     let _ = app.emit("settings-changed", &settings);
     Ok(())
 }

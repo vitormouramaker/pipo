@@ -1,53 +1,86 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type PanelView } from "../api";
+import { api, type PanelView, type Settings } from "../api";
 import { Pipo } from "../pipo/Pipo";
 import Chat from "./Chat";
+import Clipboard from "./Clipboard";
 import SettingsView from "./Settings";
+import SystemView from "./System";
+import Usage from "./Usage";
 import "./panel.css";
+
+const TABS: { view: PanelView; label: string; title?: string }[] = [
+  { view: "chat", label: "Chat" },
+  { view: "clipboard", label: "Clipboard", title: "Histórico da área de transferência" },
+  { view: "system", label: "Sistema" },
+  { view: "usage", label: "Gastos" },
+  { view: "settings", label: "⚙", title: "Configurações" },
+];
 
 export default function PanelApp() {
   const [view, setView] = useState<PanelView>("chat");
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  // Texto levado para a caixa do chat sem enviar (ex.: "Perguntar ao Pipo" no Clipboard).
+  const [draft, setDraft] = useState<string | null>(null);
 
   const refreshKey = () => void api.keyStatus().then(setHasKey);
 
   useEffect(() => {
     refreshKey();
-    const unlisten = listen<PanelView>("panel-view", (e) => {
+    void api.getSettings().then(setSettings);
+    const unlistenView = listen<PanelView>("panel-view", (e) => {
       setView(e.payload);
       refreshKey();
     });
-    return () => void unlisten.then((fn) => fn());
+    const unlistenSettings = listen<Settings>("settings-changed", (e) => setSettings(e.payload));
+    return () => {
+      void unlistenView.then((fn) => fn());
+      void unlistenSettings.then((fn) => fn());
+    };
   }, []);
 
   return (
     <div className="panel">
       <header className="panel-header" data-tauri-drag-region>
-        <div className="brand" data-tauri-drag-region>
-          <span className="brand-icon">
-            <Pipo state="idle" />
-          </span>
-          Pipo
-        </div>
+        <span className="brand-icon" data-tauri-drag-region>
+          <Pipo state="idle" />
+        </span>
         <nav className="tabs">
-          <button aria-pressed={view === "chat"} onClick={() => setView("chat")}>
-            Chat
-          </button>
-          <button aria-pressed={view === "settings"} onClick={() => setView("settings")}>
-            Configurações
-          </button>
+          {TABS.map((t) => (
+            <button key={t.view} title={t.title} aria-pressed={view === t.view} onClick={() => setView(t.view)}>
+              {t.label}
+            </button>
+          ))}
         </nav>
         <button className="icon-btn" title="Fechar" onClick={() => void api.panelHide()}>
           ✕
         </button>
       </header>
 
-      {view === "chat" ? (
-        <Chat hasKey={hasKey} onOpenSettings={() => setView("settings")} />
-      ) : (
-        <SettingsView onKeyChange={refreshKey} />
+      {view === "chat" && (
+        <Chat
+          hasKey={hasKey}
+          draft={draft}
+          onDraftUsed={() => setDraft(null)}
+          onOpenSettings={() => setView("settings")}
+        />
       )}
+      {view === "clipboard" && (
+        <Clipboard
+          enabled={settings?.clipboardHistory ?? true}
+          onAsk={(text) => {
+            setDraft(`Sobre este texto:\n\n${text}\n\n`);
+            setView("chat");
+          }}
+          onOpenSettings={() => setView("settings")}
+        />
+      )}
+      {view === "system" && <SystemView settings={settings} />}
+      {view === "usage" && (
+        <Usage onOpenConversation={(id) => void api.chatOpen(id).then(() => setView("chat"))} />
+      )}
+      {view === "settings" && <SettingsView onKeyChange={refreshKey} />}
     </div>
   );
 }

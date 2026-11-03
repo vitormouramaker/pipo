@@ -146,6 +146,47 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
         </label>
       </fieldset>
 
+      <fieldset>
+        <legend>Sensores</legend>
+        <p className="hint">Tudo é lido só neste computador. Desligue o que não quiser.</p>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={settings.senseContext}
+            onChange={(e) => update({ senseContext: e.target.checked })}
+          />
+          Perceber o app em uso (ex.: fica focado quando você programa)
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.gameMode} onChange={(e) => update({ gameMode: e.target.checked })} />
+          Modo jogo: esconder o Pipo em apps de tela cheia
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={settings.clipboardHistory}
+            onChange={(e) => update({ clipboardHistory: e.target.checked })}
+          />
+          Histórico da área de transferência
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={settings.hardwareAlerts}
+            onChange={(e) => update({ hardwareAlerts: e.target.checked })}
+          />
+          Avisar quando a CPU ou a memória ficarem no limite
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={settings.sleepWhenIdle}
+            onChange={(e) => update({ sleepWhenIdle: e.target.checked })}
+          />
+          Dormir quando o computador ficar parado
+        </label>
+      </fieldset>
+
       <div className="settings-footer">
         {status && <span className={`status ${status.kind}`}>{status.text}</span>}
         <button className="primary" onClick={() => void run(() => api.saveSettings(settings), "Configurações salvas.")}>

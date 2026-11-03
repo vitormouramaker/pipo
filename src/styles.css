@@ -55,3 +55,45 @@ body,
   .dots circle, .pulse { animation: none; }
   .eyes { transition: none; }
 }
+
+/* Menu radial: a janela cresce em volta do Pipo e os botões aparecem em círculo */
+.pet {
+  width: 100%;
+  height: 100%;
+}
+.radial-open {
+  position: relative;
+  cursor: default;
+}
+.radial-btn {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  margin: -19px 0 0 -19px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid #3a3d44;
+  background: #1f2227;
+  color: #2dd4e8;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  animation: pop 160ms ease-out both;
+}
+.radial-btn:hover {
+  background: #2a2e35;
+  border-color: #2dd4e8;
+}
+.radial-btn.suggestion {
+  color: #f5b544;
+}
+.radial-btn.suggestion:hover {
+  border-color: #f5b544;
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .radial-btn { animation: none; }
+}

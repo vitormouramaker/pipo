@@ -8,8 +8,9 @@ use futures_util::StreamExt;
 use serde::Serialize;
 use serde_json::{json, Value};
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
+use crate::usage::Usage;
 use crate::{db::Db, secrets, settings, windows, AppState};
 
 const API_URL: &str = "https://api.anthropic.com/v1/messages";
@@ -68,6 +69,19 @@ fn visible_text(content: &Value) -> String {
         .unwrap_or_default()
 }
 
+/// Título da conversa: primeira linha da primeira mensagem do usuário.
+pub fn title_of(first_message: &Value) -> String {
+    let text = visible_text(first_message);
+    let line = text.lines().next().unwrap_or("").trim();
+    let mut title: String = line.chars().take(70).collect();
+    if title.is_empty() {
+        title = "Conversa sem título".into();
+    } else if line.chars().count() > 70 {
+        title.push('…');
+    }
+    title
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationInfo {
@@ -84,6 +98,20 @@ fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
         .map(|(role, content)| ChatMessage { role, text: visible_text(&content) })
         .filter(|m| !m.text.is_empty())
         .collect())
+}
+
+/// Abre o chat e manda um texto pronto (ex.: "explicar o erro copiado").
+/// O texto fica guardado até o chat pegá-lo, porque o painel pode estar sendo criado.
+#[tauri::command]
+pub async fn chat_prefill(app: AppHandle, text: String) {
+    *app.state::<AppState>().prefill.lock().unwrap() = Some(text);
+    windows::show_panel(&app, Some("chat"));
+    let _ = app.emit_to(windows::PANEL, "chat-prefill", ());
+}
+
+#[tauri::command]
+pub fn chat_take_prefill(app: AppHandle) -> Option<String> {
+    app.state::<AppState>().prefill.lock().unwrap().take()
 }
 
 #[tauri::command]
@@ -109,16 +137,11 @@ pub fn chat_conversations(app: AppHandle) -> Result<Vec<ConversationInfo>, Strin
     let rows = db.conversations().map_err(|e| e.to_string())?;
     Ok(rows
         .into_iter()
-        .map(|(id, first, updated_at)| {
-            let text = visible_text(&first);
-            let line = text.lines().next().unwrap_or("").trim();
-            let mut title: String = line.chars().take(70).collect();
-            if title.is_empty() {
-                title = "Conversa sem título".into();
-            } else if line.chars().count() > 70 {
-                title.push('…');
-            }
-            ConversationInfo { id, title, updated_at, current: id == current }
+        .map(|(id, first, updated_at)| ConversationInfo {
+            id,
+            title: title_of(&first),
+            updated_at,
+            current: id == current,
         })
         .collect())
 }
@@ -229,9 +252,35 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
 
     let mut blocks: Vec<Value> = Vec::new();
     let mut stop_reason: Option<String> = None;
+    let mut usage = Usage { model: settings.model.clone(), ..Default::default() };
+    let streamed = read_stream(response, &mut blocks, &mut stop_reason, &mut usage, on_event).await;
+
+    // Registra o consumo mesmo se a resposta foi interrompida: os tokens já foram cobrados.
+    if !usage.is_empty() {
+        let db = state.db.lock().unwrap();
+        let _ = db.add_usage(conversation, &usage);
+    }
+    streamed?;
+
+    // A API rejeita blocos de texto vazios no histórico.
+    blocks.retain(|b| !b.is_null() && !(b["type"] == "text" && b["text"].as_str().unwrap_or("").is_empty()));
+    if !blocks.is_empty() {
+        let db = state.db.lock().unwrap();
+        db.add_message(conversation, "assistant", &Value::Array(blocks))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(stop_reason)
+}
+
+async fn read_stream(
+    response: reqwest::Response,
+    blocks: &mut Vec<Value>,
+    stop_reason: &mut Option<String>,
+    usage: &mut Usage,
+    on_event: &Channel<ChatEvent>,
+) -> Result<(), String> {
     let mut buffer: Vec<u8> = Vec::new();
     let mut stream = response.bytes_stream();
-
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("Conexão interrompida: {e}"))?;
         buffer.extend_from_slice(&chunk);
@@ -242,19 +291,11 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
             for line in String::from_utf8_lossy(&raw).lines() {
                 let Some(data) = line.strip_prefix("data: ") else { continue };
                 let Ok(event) = serde_json::from_str::<Value>(data) else { continue };
-                handle_event(&event, &mut blocks, &mut stop_reason, on_event)?;
+                handle_event(&event, blocks, stop_reason, usage, on_event)?;
             }
         }
     }
-
-    // A API rejeita blocos de texto vazios no histórico.
-    blocks.retain(|b| !b.is_null() && !(b["type"] == "text" && b["text"].as_str().unwrap_or("").is_empty()));
-    if !blocks.is_empty() {
-        let db = state.db.lock().unwrap();
-        db.add_message(conversation, "assistant", &Value::Array(blocks))
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(stop_reason)
+    Ok(())
 }
 
 fn append(block: &mut Value, field: &str, piece: &str) {
@@ -267,6 +308,7 @@ fn handle_event(
     event: &Value,
     blocks: &mut Vec<Value>,
     stop_reason: &mut Option<String>,
+    usage: &mut Usage,
     on_event: &Channel<ChatEvent>,
 ) -> Result<(), String> {
     let index = event["index"].as_u64().unwrap_or(0) as usize;
@@ -291,7 +333,15 @@ fn handle_event(
                 _ => {}
             }
         }
+        "message_start" => {
+            let message = &event["message"];
+            if let Some(model) = message["model"].as_str() {
+                usage.model = model.to_string();
+            }
+            usage.merge(&message["usage"]);
+        }
         "message_delta" => {
+            usage.merge(&event["usage"]);
             if let Some(reason) = event["delta"]["stop_reason"].as_str() {
                 *stop_reason = Some(reason.to_string());
             }
