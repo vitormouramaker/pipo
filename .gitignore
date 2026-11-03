@@ -14,3 +14,9 @@ src-tauri/target/
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Vite / logs
+dist-ssr/
+*.local
+*.log
+.idea/

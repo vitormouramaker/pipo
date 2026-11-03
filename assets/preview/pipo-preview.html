@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pipo — Prévia visual</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #F5F6F8; --card: #FFFFFF; --ink: #111317; --muted: #5F6672; --line: #E3E6EB; --accent: #0E97B5; --soft: #F0F2F5;
@@ -26,11 +26,10 @@
   h2 { font-size: 1.15rem; margin: 56px 0 4px; font-weight: 600; letter-spacing: -.01em; }
   .sub, .lead { color: var(--muted); margin: 6px 0 0; }
   .lead { margin-bottom: 20px; }
-  .mono { font-family: "JetBrains Mono", monospace; }
 
   .hero { margin-top: 28px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: 320px 1fr; }
   .stage { display: flex; align-items: center; justify-content: center; padding: 32px; border-right: 1px solid var(--line); }
-  .stage svg { width: 230px; height: 230px; cursor: pointer; overflow: visible; }
+  .stage svg { width: 240px; height: 240px; cursor: pointer; overflow: visible; }
   .panel { padding: 28px; display: flex; flex-direction: column; gap: 18px; }
   .msg { border: 1px solid var(--line); border-radius: 8px; background: var(--soft); padding: 14px 16px; }
   .msg .who { font-family: "JetBrains Mono", monospace; font-size: .72rem; letter-spacing: .1em; color: var(--accent); }
@@ -42,34 +41,33 @@
   .seg button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--card); }
   .hint { color: var(--muted); font-size: .85rem; margin: 0; }
 
-  /* Animação: sutil, sem exagero */
   .breathe { transform-box: fill-box; transform-origin: 50% 50%; animation: breathe 4s ease-in-out infinite; }
   @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.012); } }
   .blink { transform-box: fill-box; transform-origin: 50% 50%; animation: blink 5s infinite; }
   @keyframes blink { 0%,95%,100% { transform: scaleY(1); } 97% { transform: scaleY(.12); } }
-  .spin { transform-box: view-box; transform-origin: 100px 100px; animation: spin 1.6s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .pulse { animation: pulse 2.4s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
-  .ack { transform-box: view-box; transform-origin: 100px 100px; animation: ack .5s ease-out; }
-  @keyframes ack { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.18); opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .breathe, .blink, .spin, .pulse, .ack { animation: none; } }
+  .dots circle { animation: dot 1.4s ease-in-out infinite; }
+  .dots circle:nth-child(2) { animation-delay: .2s; }
+  .dots circle:nth-child(3) { animation-delay: .4s; }
+  @keyframes dot { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: .45; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .breathe, .blink, .dots circle, .pulse { animation: none; } }
 
   .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-  .card { background: var(--card); padding: 22px 16px 18px; }
-  .card svg { width: 112px; height: 112px; display: block; margin: 0 auto 14px; overflow: visible; }
-  .card .tag { font-family: "JetBrains Mono", monospace; font-size: .68rem; letter-spacing: .1em; color: var(--muted); }
-  .card h3 { margin: 2px 0 2px; font-size: .98rem; font-weight: 600; }
-  .card p { margin: 0; color: var(--muted); font-size: .83rem; }
+  .card { background: var(--card); padding: 22px 12px 20px; text-align: center; }
+  .card svg { width: 150px; height: 150px; display: block; margin: 0 auto 10px; overflow: visible; }
+  .card .tag { font-family: "JetBrains Mono", monospace; font-size: .75rem; letter-spacing: .14em; color: var(--muted); font-weight: 500; }
+  .card h3 { margin: 2px 0 0; font-size: 1.15rem; font-weight: 700; }
+  .card p { margin: 4px 0 0; color: var(--muted); font-size: .8rem; }
 
   .desk { position: relative; border-radius: 12px; overflow: hidden; height: 360px; background: #0B0D10; border: 1px solid var(--line); }
   .win { position: absolute; left: 24px; top: 22px; right: 150px; bottom: 58px; background: #15171C; border: 1px solid #23262D; border-radius: 8px; padding: 38px 18px 18px; font-family: "JetBrains Mono", monospace; font-size: 12.5px; color: #9AA1AD; overflow: hidden; }
   .win::before { content: "main.ts — VS Code"; position: absolute; top: 0; left: 0; right: 0; height: 28px; border-bottom: 1px solid #23262D; color: #6B7280; font-size: 11px; padding: 7px 14px; }
   .win .k { color: #A78BFA; } .win .s { color: #86EFAC; } .win .f { color: #7DD3FC; } .win .e { color: #F87171; }
   .taskbar { position: absolute; left: 0; right: 0; bottom: 0; height: 38px; background: #121418; border-top: 1px solid #1F2228; }
-  .mini { position: absolute; right: 30px; bottom: 56px; width: 76px; height: 76px; }
+  .mini { position: absolute; right: 28px; bottom: 54px; width: 84px; height: 84px; }
   .mini svg { width: 100%; height: 100%; overflow: visible; }
-  .minimsg { position: absolute; right: 120px; bottom: 74px; max-width: 270px; background: rgba(22,25,30,.92); border: 1px solid #2A2E36; color: #E8EAED; border-radius: 8px; padding: 10px 14px; font-size: .85rem; backdrop-filter: blur(8px); }
+  .minimsg { position: absolute; right: 124px; bottom: 74px; max-width: 270px; background: rgba(22,25,30,.92); border: 1px solid #2A2E36; color: #E8EAED; border-radius: 8px; padding: 10px 14px; font-size: .85rem; backdrop-filter: blur(8px); }
   .minimsg .who { font-family: "JetBrains Mono", monospace; font-size: .66rem; letter-spacing: .1em; color: #F5B544; display: block; margin-bottom: 2px; }
 
   .palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
@@ -79,25 +77,20 @@
   .sw b { display: block; font-size: .88rem; font-weight: 600; }
   .sw code { font-family: "JetBrains Mono", monospace; color: var(--muted); font-size: .75rem; }
 
-  .principles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-  .pr { border: 1px solid var(--line); border-radius: 10px; padding: 16px; background: var(--card); }
-  .pr b { display: block; font-weight: 600; margin-bottom: 4px; }
-  .pr span { color: var(--muted); font-size: .88rem; }
-
   @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 720px) {
     .hero { grid-template-columns: 1fr; }
     .stage { border-right: 0; border-bottom: 1px solid var(--line); }
     .win { right: 24px; }
-    .minimsg { right: 16px; bottom: 140px; }
+    .minimsg { right: 16px; bottom: 150px; }
   }
 </style>
 </head>
 <body>
 <main>
-  <div class="eyebrow">Pipo · prévia visual v2</div>
-  <h1>Minimalista, sóbrio, tecnológico.</h1>
-  <p class="sub">Uma esfera em grafite com olhos geométricos. O humor aparece pela forma dos olhos, pela cor e pelo anel de status; sem brilho, sem bochechas, sem exagero.</p>
+  <div class="eyebrow">Pipo · prévia visual v5</div>
+  <h1>Minimalista, sóbrio, intelectual.</h1>
+  <p class="sub">Corpo grafite em formato de quadrado arredondado, óculos redondos atravessando o rosto e olhos geométricos. O humor aparece nos olhos, na cor e num pequeno indicador no canto.</p>
 
   <section class="hero">
     <div class="stage" id="stage"></div>
@@ -107,11 +100,7 @@
         <label>Estado</label>
         <div class="seg" id="states"></div>
       </div>
-      <div class="controls">
-        <label>Corpo</label>
-        <div class="seg" id="bodies"></div>
-      </div>
-      <p class="hint">Mova o mouse: os olhos acompanham. Clique no Pipo para ver a confirmação de comando.</p>
+      <p class="hint">Mova o mouse: os olhos acompanham por trás das lentes. Clique no Pipo para ver a confirmação de comando.</p>
     </div>
   </section>
 
@@ -120,7 +109,7 @@
   <div class="grid" id="grid"></div>
 
   <h2>No seu desktop, em tamanho real</h2>
-  <p class="lead">Cerca de 76 px no canto da tela, por cima das outras janelas.</p>
+  <p class="lead">Cerca de 84 px no canto da tela, por cima das outras janelas.</p>
   <div class="desk">
     <div class="win">
       <div><span class="k">import</span> { startServer } <span class="k">from</span> <span class="s">"./server"</span>;</div>
@@ -138,77 +127,85 @@
   <h2>Paleta</h2>
   <p class="lead">Base neutra em grafite. A cor aparece só para comunicar estado.</p>
   <div class="palette" id="palette"></div>
-
-  <h2>Princípios visuais</h2>
-  <div class="principles">
-    <div class="pr"><b>Forma pura</b><span>Círculo e pílulas. Nenhum detalhe decorativo.</span></div>
-    <div class="pr"><b>Cor com função</b><span>Ciano é o padrão; verde, âmbar e cinza só sinalizam estado.</span></div>
-    <div class="pr"><b>Movimento mínimo</b><span>Respiração quase imperceptível, piscar raro, anel que gira só ao processar.</span></div>
-    <div class="pr"><b>Expressão pelos olhos</b><span>Sem boca. Altura, inclinação e forma dos olhos carregam o humor, inclusive o ceticismo.</span></div>
-  </div>
 </main>
 
 <script>
 const C = {
-  accent: "#22D3EE", ok: "#34D399", warn: "#F5B544", idle: "#5B6170", ring: "#3A3F4A",
+  eye: "#2DD4E8", ok: "#4ADE80", warn: "#F5B544", rest: "#9AA0A9", dots: "#8C929C",
+  frame: "#D5D9DF", frameDim: "#7D838D", top: "#2C2F35", bottom: "#1B1D21", edge: "#3A3D44",
 };
-const BODIES = {
-  graphite: { name: "Grafite", top: "#262A32", bottom: "#14161B", stroke: "#3D434E", eye: C.accent },
-  light:    { name: "Claro",   top: "#FAFBFC", bottom: "#E2E5EA", stroke: "#CDD2D9", eye: "#14161B" },
-};
+// Olhos/lentes centrados em (66,102) e (134,102)
+const EL = 66, ER = 134, EY = 102, LENS_R = 27;
+
+// Superelipse: quadrado de cantos bem arredondados
+function squircle(cx, cy, a, b, n = 3.2, steps = 120) {
+  const pts = [];
+  for (let i = 0; i < steps; i++) {
+    const t = (i / steps) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t);
+    pts.push(`${(cx + a * Math.sign(c) * Math.abs(c) ** (2 / n)).toFixed(2)} ${(cy + b * Math.sign(s) * Math.abs(s) ** (2 / n)).toFixed(2)}`);
+  }
+  return `M${pts.join(" L")}Z`;
+}
+const BODY = squircle(100, 100, 88, 74);
+const OUTLINE = squircle(100, 100, 96, 82);
 
 const pill = (x, y, w, h, color, rot = 0) =>
   `<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="${Math.min(w, h) / 2}" fill="${color}"${rot ? ` transform="rotate(${rot} ${x} ${y})"` : ""}/>`;
-const pair = (w, h, color, dx = 0, dy = 0) => pill(78 + dx, 100 + dy, w, h, color) + pill(122 + dx, 100 + dy, w, h, color);
-const ring = (color, extra = "") => `<circle cx="100" cy="100" r="88" fill="none" stroke="${color}" stroke-width="2" ${extra}/>`;
+const pair = (w, h, color) => pill(EL, EY, w, h, color) + pill(ER, EY, w, h, color);
+const arc = (x, up, color) =>
+  `<path d="M${x - 13} ${up ? EY + 6 : EY - 4} A13 13 0 0 ${up ? 1 : 0} ${x + 13} ${up ? EY + 6 : EY - 4}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round"/>`;
 
-// eye: cor padrão dos olhos para o corpo escolhido
 const STATES = [
   { key: "idle", name: "Ocioso", tag: "IDLE", trig: "Nenhum evento relevante",
-    eyes: (eye) => pair(10, 26, eye), ring: () => ring(C.ring, 'opacity=".6"') },
-  { key: "blink", name: "Piscando", tag: "BLINK", trig: "Animação natural do ocioso",
-    eyes: (eye) => pair(12, 4, eye), ring: () => ring(C.ring, 'opacity=".6"') },
+    eyes: () => pair(13, 32, C.eye) },
+  { key: "blink", name: "Piscando", tag: "BLINK", trig: "Animação natural do ocioso", noBlink: true,
+    eyes: () => pair(26, 7, C.eye) },
   { key: "attentive", name: "Atento", tag: "LISTEN", trig: "Atalho acionado ou clique",
-    eyes: (eye) => pair(11, 32, eye), ring: () => ring(C.accent) },
+    eyes: () => pair(14, 34, C.eye),
+    back: () => `<path d="${OUTLINE}" fill="none" stroke="${C.eye}" stroke-width="3.5"/>` },
   { key: "thinking", name: "Processando", tag: "THINK", trig: "Aguardando resposta da IA",
-    eyes: (eye) => pair(10, 22, eye, 5, -5),
-    ring: (anim) => ring(C.ring, 'opacity=".5"') +
-      `<g class="${anim ? "spin" : ""}"><circle cx="100" cy="100" r="88" fill="none" stroke="${C.accent}" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="110 443" transform="rotate(-90 100 100)"/></g>` },
-  { key: "done", name: "Concluído", tag: "OK", trig: "Tarefa concluída, build ok",
-    eyes: () => ["M69 105 L78 95 L87 105", "M113 105 L122 95 L131 105"]
-      .map(d => `<path d="${d}" fill="none" stroke="${C.ok}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`).join(""),
-    ring: () => ring(C.ok) },
+    eyes: () => pill(EL - 3, EY + 4, 13, 28, C.eye) + pill(ER + 7, EY - 9, 11, 20, C.eye),
+    badge: (anim) => `<g class="${anim ? "dots" : ""}" fill="${C.dots}">
+      <circle cx="150" cy="16" r="4.5"/><circle cx="165" cy="10" r="5"/><circle cx="181" cy="5" r="5.5"/></g>` },
+  { key: "done", name: "Concluído", tag: "OK", trig: "Tarefa concluída, build ok", noBlink: true,
+    eyes: () => arc(EL, true, C.ok) + arc(ER, true, C.ok),
+    badge: () => `<path d="M166 14 L174 22 L190 4" fill="none" stroke="${C.ok}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>` },
   { key: "alert", name: "Alerta", tag: "WARN", trig: "Build falhou, CPU alta, pouca memória",
-    eyes: () => pill(78, 101, 10, 24, C.warn, 14) + pill(122, 101, 10, 24, C.warn, -14),
-    ring: (anim) => `<g class="${anim ? "pulse" : ""}">${ring(C.warn, 'stroke-dasharray="4 7"')}</g>` },
+    eyes: () => pill(EL, EY, 13, 28, C.warn, 22) + pill(ER, EY, 13, 28, C.warn, -22),
+    badge: (anim) => `<circle class="${anim ? "pulse" : ""}" cx="184" cy="16" r="7.5" fill="${C.warn}"/>` },
   { key: "skeptical", name: "Cético", tag: "HMM", trig: "Modo sarcasmo, com moderação",
-    eyes: (eye) => pill(78, 106, 10, 12, eye) + pill(78, 96, 18, 3, eye) + pill(122, 99, 10, 28, eye),
-    ring: () => ring(C.ring, 'opacity=".6"') },
+    eyes: () => pill(EL, EY - 12, 24, 5, C.eye) + pill(EL, EY + 3, 14, 13, C.eye) + pill(ER, EY, 14, 34, C.eye) },
   { key: "focused", name: "Focado", tag: "FOCUS", trig: "Modo trabalho ou pomodoro",
-    eyes: (eye) => pair(24, 6, eye),
-    ring: () => ring(C.accent, 'opacity=".7"') +
-      [0, 90, 180, 270].map(a => `<line x1="100" y1="6" x2="100" y2="16" stroke="${C.accent}" stroke-width="2" stroke-linecap="round" transform="rotate(${a} 100 100)"/>`).join("") },
+    eyes: () => pair(28, 7, C.eye),
+    badge: () => `<rect x="68" y="186" width="64" height="4.5" rx="2.25" fill="${C.eye}"/>` },
   { key: "gaming", name: "Modo jogo", tag: "SILENT", trig: "Jogo em tela cheia: discreto",
-    eyes: (eye) => `<g opacity=".45">${pair(8, 8, eye)}</g>`, ring: () => "" },
-  { key: "sleep", name: "Dormindo", tag: "SLEEP", trig: "Inatividade longa ou madrugada",
-    eyes: () => pair(16, 4, C.idle),
-    ring: () => `<g font-family="JetBrains Mono, monospace" font-weight="500" fill="${C.idle}">
-                 <text x="164" y="40" font-size="24">z</text><text x="184" y="20" font-size="16">z</text></g>` },
+    dimFrame: true, eyes: () => `<circle cx="${EL}" cy="${EY}" r="5.5" fill="${C.eye}"/><circle cx="${ER}" cy="${EY}" r="5.5" fill="${C.eye}"/>` },
+  { key: "sleep", name: "Dormindo", tag: "SLEEP", trig: "Inatividade longa ou madrugada", noBlink: true,
+    eyes: () => arc(EL, false, C.rest) + arc(ER, false, C.rest),
+    badge: () => `<text x="176" y="24" font-family="Inter, sans-serif" font-weight="800" font-size="24" fill="#6B717B">Z</text>` },
 ];
 
 let uid = 0;
-function pipo(s, bodyKey = "graphite", { animated = false, follow = false } = {}) {
-  const b = BODIES[bodyKey], id = "g" + uid++;
+function pipo(s, { animated = false, follow = false } = {}) {
+  const id = "p" + uid++;
+  const frame = s.dimFrame ? C.frameDim : C.frame;
   return `<svg viewBox="0 0 200 200" role="img" aria-label="Pipo, ${s.name}">
-    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="${b.top}"/><stop offset="1" stop-color="${b.bottom}"/></linearGradient></defs>
-    <g>
-      <g data-ring>${s.ring(animated)}</g>
-      <g class="${animated ? "breathe" : ""}">
-        <circle cx="100" cy="100" r="74" fill="url(#${id})" stroke="${b.stroke}" stroke-width="1.5"/>
-        <g ${follow ? "data-follow" : ""}><g class="${animated && !["blink", "done"].includes(s.key) ? "blink" : ""}">${s.eyes(b.eye)}</g></g>
+    <defs>
+      <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${C.top}"/><stop offset="1" stop-color="${C.bottom}"/></linearGradient>
+      <clipPath id="${id}c"><circle cx="${EL}" cy="${EY}" r="${LENS_R - 2}"/><circle cx="${ER}" cy="${EY}" r="${LENS_R - 2}"/></clipPath>
+    </defs>
+    <g>${s.back ? s.back() : ""}</g>
+    <g class="${animated ? "breathe" : ""}">
+      <path d="${BODY}" fill="url(#${id}g)" stroke="${C.edge}" stroke-width="1"/>
+      <g clip-path="url(#${id}c)">
+        <g ${follow ? "data-follow" : ""}><g class="${animated && !s.noBlink ? "blink" : ""}">${s.eyes()}</g></g>
+      </g>
+      <g fill="none" stroke="${frame}" stroke-width="3.5" stroke-linecap="round">
+        <circle cx="${EL}" cy="${EY}" r="${LENS_R}"/><circle cx="${ER}" cy="${EY}" r="${LENS_R}"/>
+        <path d="M13 ${EY} H${EL - LENS_R} M${EL + LENS_R} ${EY} H${ER - LENS_R} M${ER + LENS_R} ${EY} H187"/>
       </g>
     </g>
+    ${s.badge ? s.badge(animated) : ""}
   </svg>`;
 }
 
@@ -223,22 +220,18 @@ const LINES = [
 ];
 
 const stage = document.getElementById("stage");
-let state = STATES[0], body = "graphite";
+let state = STATES[0];
 
 function render() {
-  stage.innerHTML = pipo(state, body, { animated: true, follow: true });
+  stage.innerHTML = pipo(state, { animated: true, follow: true });
   document.querySelectorAll("#states button").forEach(b => b.setAttribute("aria-pressed", b.dataset.key === state.key));
-  document.querySelectorAll("#bodies button").forEach(b => b.setAttribute("aria-pressed", b.dataset.key === body));
 }
-function buttons(el, items, onPick) {
-  items.forEach(([key, name]) => {
-    const b = document.createElement("button");
-    b.textContent = name; b.dataset.key = key; b.onclick = () => onPick(key);
-    el.appendChild(b);
-  });
-}
-buttons(document.getElementById("states"), STATES.map(s => [s.key, s.name]), k => { state = STATES.find(s => s.key === k); render(); });
-buttons(document.getElementById("bodies"), Object.entries(BODIES).map(([k, v]) => [k, v.name]), k => { body = k; render(); });
+STATES.forEach(s => {
+  const b = document.createElement("button");
+  b.textContent = s.name; b.dataset.key = s.key;
+  b.onclick = () => { state = s; render(); };
+  document.getElementById("states").appendChild(b);
+});
 render();
 
 const lineEl = document.getElementById("line");
@@ -255,29 +248,27 @@ document.addEventListener("mousemove", ev => {
   const r = svg.getBoundingClientRect();
   const dx = ev.clientX - (r.left + r.width / 2), dy = ev.clientY - (r.top + r.height / 2);
   const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 300);
-  g.setAttribute("transform", `translate(${(dx / d) * 6 * k} ${(dy / d) * 5 * k})`);
+  g.setAttribute("transform", `translate(${(dx / d) * 5 * k} ${(dy / d) * 4 * k})`);
 });
 
 stage.addEventListener("click", () => {
   const prev = state;
   state = STATES.find(s => s.key === "attentive"); render();
-  stage.querySelector("[data-ring]").insertAdjacentHTML("beforeend",
-    `<circle class="ack" cx="100" cy="100" r="88" fill="none" stroke="${C.accent}" stroke-width="3"/>`);
   setTimeout(() => { state = prev.key === "attentive" ? STATES[0] : prev; render(); }, 900);
 });
 
 document.getElementById("grid").innerHTML = STATES.map(s =>
   `<div class="card">${pipo(s)}<div class="tag">${s.tag}</div><h3>${s.name}</h3><p>${s.trig}</p></div>`).join("");
 
-document.getElementById("mini").innerHTML = pipo(STATES.find(s => s.key === "alert"), "graphite", { animated: true });
+document.getElementById("mini").innerHTML = pipo(STATES.find(s => s.key === "alert"), { animated: true });
 
 const PALETTE = [
-  ["Grafite (corpo)", "linear-gradient(180deg,#262A32,#14161B)", "#262A32 → #14161B"],
-  ["Ciano (padrão)", C.accent, C.accent],
+  ["Grafite (corpo)", `linear-gradient(180deg,${C.top},${C.bottom})`, `${C.top} → ${C.bottom}`],
+  ["Armação", C.frame, C.frame],
+  ["Ciano (olhos)", C.eye, C.eye],
   ["Verde (concluído)", C.ok, C.ok],
   ["Âmbar (alerta)", C.warn, C.warn],
-  ["Cinza (repouso)", C.idle, C.idle],
-  ["Claro (corpo opcional)", "linear-gradient(180deg,#FAFBFC,#E2E5EA)", "#FAFBFC → #E2E5EA"],
+  ["Cinza (repouso)", C.rest, C.rest],
 ];
 document.getElementById("palette").innerHTML = PALETTE.map(([n, bg, code]) =>
   `<div class="sw"><div class="chip" style="background:${bg}"></div><div class="t"><b>${n}</b><code>${code}</code></div></div>`).join("");

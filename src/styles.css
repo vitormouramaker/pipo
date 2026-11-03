@@ -1,0 +1,57 @@
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+.stage {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+}
+
+.pipo {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Movimento mínimo: piscar por timer (ver useBlink), animação contínua só nos indicadores */
+.eyes {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  transition: transform 70ms ease-in-out;
+}
+.eyes.blinking {
+  transform: scaleY(0.12);
+}
+
+.dots circle {
+  animation: dot 1.4s ease-in-out infinite;
+}
+.dots circle:nth-child(2) { animation-delay: 0.2s; }
+.dots circle:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dot {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.pulse {
+  animation: pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots circle, .pulse { animation: none; }
+  .eyes { transition: none; }
+}
