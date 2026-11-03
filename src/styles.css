@@ -10,11 +10,9 @@ body,
 }
 
 .stage {
+  position: relative;
   width: 100%;
   height: 100%;
-  display: grid;
-  place-items: center;
-  cursor: grab;
 }
 
 .pipo {
@@ -57,13 +55,11 @@ body,
 }
 
 /* Menu radial: a janela cresce em volta do Pipo e os botões aparecem em círculo */
+/* O Pipo fica no centro; a margem em volta (PET_MARGIN no Rust) recebe os botões do menu. */
 .pet {
-  width: 100%;
-  height: 100%;
-}
-.radial-open {
-  position: relative;
-  cursor: default;
+  position: absolute;
+  inset: 56px;
+  cursor: grab;
 }
 .radial-btn {
   position: absolute;

@@ -2981,6 +2981,8 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
+ "tokio",
+ "windows",
  "windows-sys 0.59.0",
 ]
 

@@ -22,6 +22,9 @@ pub struct Settings {
     pub clipboard_history: bool,
     pub hardware_alerts: bool,
     pub sleep_when_idle: bool,
+    /// Fase 3: lembrar de pausas (água, postura) a cada tantos minutos de uso.
+    pub break_reminders: bool,
+    pub break_interval_min: u32,
 }
 
 impl Default for Settings {
@@ -37,6 +40,8 @@ impl Default for Settings {
             clipboard_history: true,
             hardware_alerts: true,
             sleep_when_idle: true,
+            break_reminders: false,
+            break_interval_min: 50,
         }
     }
 }
@@ -72,7 +77,7 @@ pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<
     }
 
     if let Some(pet) = app.get_webview_window(windows::MAIN) {
-        let size = new.pet_size as f64;
+        let size = windows::window_size(new.pet_size);
         let _ = pet.set_size(LogicalSize::new(size, size));
         windows::clamp_pet(app);
     }

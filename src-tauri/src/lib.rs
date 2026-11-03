@@ -1,3 +1,4 @@
+mod actions;
 mod chat;
 mod clipboard;
 mod context;
@@ -6,10 +7,12 @@ mod hardware;
 mod secrets;
 mod sensors;
 mod settings;
+mod tools;
 mod usage;
 mod windows;
 
-use std::sync::atomic::AtomicBool;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::Mutex;
 
 use tauri::{Manager, PhysicalPosition, PhysicalSize};
@@ -23,10 +26,18 @@ pub struct AppState {
     pub sense: Mutex<sensors::SenseState>,
     pub hardware: Mutex<hardware::Hardware>,
     pub clipboard: Mutex<clipboard::ClipboardHistory>,
-    /// Posição e tamanho originais do Pipo enquanto o menu radial está aberto.
-    pub radial: Mutex<Option<(PhysicalPosition<i32>, PhysicalSize<u32>)>>,
+    pub radial_open: AtomicBool,
+    /// Posição, tamanho e escala da janela do Pipo (atualizados a cada mudança).
+    pub pet_frame: Mutex<Option<(PhysicalPosition<i32>, PhysicalSize<u32>, f64)>>,
     /// Texto pronto esperando o chat abrir.
     pub prefill: Mutex<Option<String>>,
+    /// Fase 3: tarefas em segundo plano, foco (pomodoro/pausas) e OCR.
+    pub jobs: Mutex<actions::jobs::Jobs>,
+    pub focus: Mutex<actions::focus::FocusState>,
+    pub ocr_busy: AtomicBool,
+    /// Ações do chat esperando o usuário permitir ou negar.
+    pub confirms: Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>,
+    pub confirm_seq: AtomicU64,
     /// O Pipo está sendo arrastado.
     pub dragging: AtomicBool,
     /// O chat está gerando uma resposta: o Pipo fica em "processando".
@@ -72,8 +83,14 @@ pub fn run() {
                 sense: Mutex::new(sensors::SenseState { base: "idle", ..Default::default() }),
                 hardware: Mutex::new(hardware::Hardware::new()),
                 clipboard: Mutex::new(clipboard::ClipboardHistory::default()),
-                radial: Mutex::new(None),
+                radial_open: AtomicBool::new(false),
+                pet_frame: Mutex::new(None),
                 prefill: Mutex::new(None),
+                jobs: Mutex::new(Default::default()),
+                focus: Mutex::new(Default::default()),
+                ocr_busy: AtomicBool::new(false),
+                confirms: Mutex::new(HashMap::new()),
+                confirm_seq: AtomicU64::new(0),
                 dragging: AtomicBool::new(false),
                 busy: AtomicBool::new(false),
             });
@@ -84,6 +101,8 @@ pub fn run() {
                 eprintln!("{e}");
             }
             windows::clamp_pet(app.handle());
+            windows::track_pet_frame(app.handle());
+            windows::start_hit_test(app.handle().clone());
             sensors::start(app.handle().clone());
             Ok(())
         })
@@ -96,6 +115,38 @@ pub fn run() {
             chat::chat_delete,
             chat::chat_prefill,
             chat::chat_take_prefill,
+            chat::chat_confirm,
+            actions::projects::projects_recent,
+            actions::projects::project_details,
+            actions::projects::project_open,
+            actions::projects::project_terminal,
+            actions::jobs::jobs_list,
+            actions::jobs::job_start,
+            actions::jobs::job_stop,
+            actions::jobs::jobs_clear,
+            actions::git::git_changes,
+            actions::git::git_commit,
+            actions::ports::ports_list,
+            actions::ports::process_kill,
+            actions::docker::docker_list,
+            actions::docker::docker_action,
+            actions::games::games_list,
+            actions::games::game_launch,
+            actions::games::game_favorite,
+            actions::routines::routines_list,
+            actions::routines::routines_save,
+            actions::routines::routine_run,
+            actions::files::recent_files,
+            actions::files::recent_open,
+            actions::notes::notes_list,
+            actions::notes::note_add,
+            actions::notes::note_delete,
+            actions::focus::focus_status,
+            actions::focus::reminder_add,
+            actions::focus::reminder_delete,
+            actions::focus::pomodoro_start,
+            actions::focus::pomodoro_stop,
+            actions::ocr::ocr_start,
             clipboard::clipboard_list,
             clipboard::clipboard_copy,
             clipboard::clipboard_remove,

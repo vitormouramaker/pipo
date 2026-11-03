@@ -11,18 +11,59 @@ export type Settings = {
   clipboardHistory: boolean;
   hardwareAlerts: boolean;
   sleepWhenIdle: boolean;
+  breakReminders: boolean;
+  breakIntervalMin: number;
 };
 
-export type ChatMessage = { role: "user" | "assistant"; text: string };
+export type Project = { name: string; path: string; editor: string };
+export type ProjectInfo = {
+  runner: string | null;
+  scripts: { name: string; detail: string; command: string }[];
+  git: boolean;
+};
+export type Job = {
+  id: number;
+  project: string;
+  command: string;
+  status: "running" | "ok" | "failed" | "stopped";
+  exitCode: number | null;
+  startedAt: string;
+  durationSecs: number | null;
+  output: string[];
+};
+export type GitChanges = { staged: boolean; status: string; diff: string; truncated: boolean };
+export type Port = { port: number; pid: number; process: string; address: string };
+export type Container = { id: string; name: string; image: string; state: string; status: string; ports: string };
+export type Game = { id: string; name: string; launcher: string; favorite: boolean };
+export type RoutineStep = { kind: "app" | "url" | "folder" | "project"; target: string };
+export type Routine = { id: string; name: string; steps: RoutineStep[] };
+export type RecentFile = { name: string; path: string; folder: boolean; modified: string };
+export type Note = { id: number; text: string; createdAt: string };
+export type FocusStatus = {
+  pomodoro: { phase: "focus" | "break"; remainingSecs: number; cycle: number; focusMin: number; breakMin: number } | null;
+  reminders: { id: number; text: string; due: string }[];
+  breaksEnabled: boolean;
+  breakIntervalMin: number;
+  nextBreakSecs: number | null;
+};
+
+export type ChatMessage = {
+  role: "user" | "assistant" | "tool" | "confirm";
+  text: string;
+  confirmId?: string;
+  decision?: "approved" | "denied";
+};
 
 export type Conversation = { id: number; title: string; updatedAt: string; current: boolean };
 
 export type ChatEvent =
   | { type: "delta"; text: string }
+  | { type: "tool"; label: string }
+  | { type: "confirm"; id: string; question: string }
   | { type: "done"; stopReason: string | null }
   | { type: "error"; message: string };
 
-export type PanelView = "chat" | "clipboard" | "system" | "usage" | "settings";
+export type PanelView = "chat" | "actions" | "clipboard" | "system" | "usage" | "settings";
 
 export type UsageSummary = {
   today: number;
@@ -72,7 +113,6 @@ export type SenseStatus = {
 
 export type RadialLayout = {
   petSize: number;
-  margin: number;
   radius: number;
   angles: number[];
   suggestion: { label: string; prompt: string } | null;
@@ -86,6 +126,37 @@ export const api = {
   chatDelete: (id: number) => invoke<void>("chat_delete", { id }),
   chatPrefill: (text: string) => invoke<void>("chat_prefill", { text }),
   chatTakePrefill: () => invoke<string | null>("chat_take_prefill"),
+  chatConfirm: (id: string, approved: boolean) => invoke<void>("chat_confirm", { id, approved }),
+  projectsRecent: () => invoke<Project[]>("projects_recent"),
+  projectDetails: (path: string) => invoke<ProjectInfo>("project_details", { path }),
+  projectOpen: (path: string) => invoke<void>("project_open", { path }),
+  projectTerminal: (path: string, script?: string) => invoke<void>("project_terminal", { path, script }),
+  jobsList: () => invoke<Job[]>("jobs_list"),
+  jobStart: (path: string, script: string) => invoke<number>("job_start", { path, script }),
+  jobStop: (id: number) => invoke<void>("job_stop", { id }),
+  jobsClear: () => invoke<void>("jobs_clear"),
+  gitChanges: (path: string) => invoke<GitChanges>("git_changes", { path }),
+  portsList: () => invoke<Port[]>("ports_list"),
+  processKill: (pid: number) => invoke<void>("process_kill", { pid }),
+  dockerList: () => invoke<Container[]>("docker_list"),
+  dockerAction: (id: string, action: "start" | "stop" | "restart") => invoke<void>("docker_action", { id, action }),
+  gamesList: () => invoke<Game[]>("games_list"),
+  gameLaunch: (id: string) => invoke<void>("game_launch", { id }),
+  gameFavorite: (id: string, favorite: boolean) => invoke<void>("game_favorite", { id, favorite }),
+  routinesList: () => invoke<Routine[]>("routines_list"),
+  routinesSave: (routines: Routine[]) => invoke<void>("routines_save", { routines }),
+  routineRun: (id: string) => invoke<string[]>("routine_run", { id }),
+  recentFiles: (query?: string) => invoke<RecentFile[]>("recent_files", { query }),
+  recentOpen: (path: string) => invoke<void>("recent_open", { path }),
+  notesList: (query?: string) => invoke<Note[]>("notes_list", { query }),
+  noteAdd: (text: string) => invoke<number>("note_add", { text }),
+  noteDelete: (id: number) => invoke<void>("note_delete", { id }),
+  focusStatus: () => invoke<FocusStatus>("focus_status"),
+  reminderAdd: (text: string, minutes?: number, at?: string) => invoke<string>("reminder_add", { text, minutes, at }),
+  reminderDelete: (id: number) => invoke<void>("reminder_delete", { id }),
+  pomodoroStart: (focusMin: number, breakMin: number) => invoke<void>("pomodoro_start", { focusMin, breakMin }),
+  pomodoroStop: () => invoke<void>("pomodoro_stop"),
+  ocrStart: () => invoke<void>("ocr_start"),
   chatSend: (text: string, onEvent: (e: ChatEvent) => void) => {
     const channel = new Channel<ChatEvent>();
     channel.onmessage = onEvent;

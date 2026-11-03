@@ -6,6 +6,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use serde::Serialize;
 use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
 };
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
@@ -15,8 +16,8 @@ use crate::{clipboard, AppState};
 pub const MAIN: &str = "main";
 pub const PANEL: &str = "panel";
 
-const PANEL_WIDTH: f64 = 440.0;
-const PANEL_HEIGHT: f64 = 600.0;
+const PANEL_WIDTH: f64 = 480.0;
+const PANEL_HEIGHT: f64 = 640.0;
 const PANEL_GAP: f64 = 12.0;
 
 /// Mesmos argumentos da janela principal (tauri.conf.json): janelas com argumentos
@@ -55,11 +56,14 @@ fn panel(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 /// Posiciona o painel ao lado do Pipo, dentro da área útil do monitor.
 fn place_panel(app: &AppHandle, panel: &WebviewWindow) {
     let Some(pet) = app.get_webview_window(MAIN) else { return };
-    let (Ok(pet_pos), Ok(pet_size), Ok(size), Ok(Some(monitor))) =
+    let (Ok(window_pos), Ok(window_size), Ok(size), Ok(Some(monitor))) =
         (pet.outer_position(), pet.outer_size(), panel.outer_size(), pet.current_monitor())
     else {
         return;
     };
+    let margin = (PET_MARGIN * monitor.scale_factor()) as i32;
+    let pet_pos = PhysicalPosition::new(window_pos.x + margin, window_pos.y + margin);
+    let pet_size = PhysicalSize::new(window_size.width - 2 * margin as u32, window_size.height - 2 * margin as u32);
     let area = monitor.work_area();
     let gap = (PANEL_GAP * monitor.scale_factor()) as i32;
     let (w, h) = (size.width as i32, size.height as i32);
@@ -75,10 +79,25 @@ fn place_panel(app: &AppHandle, panel: &WebviewWindow) {
     let _ = panel.set_position(PhysicalPosition::new(x, y));
 }
 
-// Margens transparentes da janela em volta do corpo do Pipo (viewBox 200×200:
-// corpo de x 12–188 e y 26–174). Elas podem sair da tela; o corpo, não.
+/// Margem transparente fixa (px lógicos) em volta do Pipo, onde aparecem os botões
+/// do menu radial. A janela nunca muda de tamanho ao abrir o menu: só o CSS anima.
+pub const PET_MARGIN: f64 = 56.0;
+
+// Dentro do quadrado do Pipo (viewBox 200×200) o corpo ocupa x 12–188 e y 26–174.
 const BODY_INSET_X: f64 = 12.0 / 200.0;
 const BODY_INSET_Y: f64 = 26.0 / 200.0;
+
+/// Lado da janela para um Pipo de `pet_size` px lógicos.
+pub fn window_size(pet_size: u32) -> f64 {
+    pet_size as f64 + 2.0 * PET_MARGIN
+}
+
+/// Distâncias (px físicos) entre a borda da janela e o corpo visível do Pipo.
+fn body_insets(size: PhysicalSize<u32>, scale: f64) -> (f64, f64) {
+    let margin = PET_MARGIN * scale;
+    let body = size.width as f64 - 2.0 * margin;
+    (margin + body * BODY_INSET_X, margin + body * BODY_INSET_Y)
+}
 
 /// Move o Pipo para (x, y) sem deixar o corpo passar das bordas da área útil do monitor.
 fn move_pet_clamped(app: &AppHandle, x: i32, y: i32, cursor: Option<PhysicalPosition<f64>>) {
@@ -92,8 +111,8 @@ fn move_pet_clamped(app: &AppHandle, x: i32, y: i32, cursor: Option<PhysicalPosi
 
     let area = monitor.work_area();
     let (w, h) = (size.width as i32, size.height as i32);
-    let inset_x = (size.width as f64 * BODY_INSET_X) as i32;
-    let inset_y = (size.height as f64 * BODY_INSET_Y) as i32;
+    let (inset_x, inset_y) = body_insets(size, pet.scale_factor().unwrap_or(1.0));
+    let (inset_x, inset_y) = (inset_x as i32, inset_y as i32);
     let (left, top) = (area.position.x, area.position.y);
     let (right, bottom) = (left + area.size.width as i32, top + area.size.height as i32);
 
@@ -104,9 +123,6 @@ fn move_pet_clamped(app: &AppHandle, x: i32, y: i32, cursor: Option<PhysicalPosi
 
 /// Recoloca o Pipo dentro da tela (ex.: após mudar de tamanho ou trocar de monitor).
 pub fn clamp_pet(app: &AppHandle) {
-    if app.state::<AppState>().radial.lock().unwrap().is_some() {
-        return;
-    }
     if let Some(Ok(pos)) = app.get_webview_window(MAIN).map(|w| w.outer_position()) {
         move_pet_clamped(app, pos.x, pos.y, None);
     }
@@ -238,7 +254,7 @@ pub fn panel_hide(app: AppHandle) {
 #[tauri::command]
 pub fn pet_drag_start(app: AppHandle) {
     let state = app.state::<AppState>();
-    if state.radial.lock().unwrap().is_some() || state.dragging.swap(true, Ordering::SeqCst) {
+    if state.radial_open.load(Ordering::SeqCst) || state.dragging.swap(true, Ordering::SeqCst) {
         return;
     }
     let start = app
@@ -281,12 +297,71 @@ fn primary_button_down() -> bool {
     false
 }
 
-// ---------- Menu radial ----------
-// A janela do Pipo cresce em volta dele para caber os botões e volta ao tamanho
-// normal ao fechar. Assim o menu não precisa de mais um WebView.
+#[cfg(windows)]
+fn cursor_point() -> Option<(f64, f64)> {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let mut point = POINT { x: 0, y: 0 };
+    (unsafe { GetCursorPos(&mut point) } != 0).then_some((point.x as f64, point.y as f64))
+}
 
-/// Espaço extra (px lógicos) em cada lado da janela enquanto o menu está aberto.
-const RADIAL_MARGIN: f64 = 56.0;
+#[cfg(not(windows))]
+fn cursor_point() -> Option<(f64, f64)> {
+    None
+}
+
+/// Guarda posição, tamanho e escala da janela do Pipo a cada mudança, para o teste
+/// de clique não precisar perguntar à thread principal 25 vezes por segundo.
+pub fn track_pet_frame(app: &AppHandle) {
+    let Some(pet) = app.get_webview_window(MAIN) else { return };
+    let (Ok(pos), Ok(size), Ok(scale)) = (pet.outer_position(), pet.outer_size(), pet.scale_factor()) else { return };
+    *app.state::<AppState>().pet_frame.lock().unwrap() = Some((pos, size, scale));
+    let handle = app.clone();
+    pet.on_window_event(move |event| {
+        let state = handle.state::<AppState>();
+        let mut frame = state.pet_frame.lock().unwrap();
+        let Some((pos, size, scale)) = frame.as_mut() else { return };
+        match event {
+            WindowEvent::Moved(p) => *pos = *p,
+            WindowEvent::Resized(s) => *size = *s,
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => *scale = *scale_factor,
+            _ => {}
+        }
+    });
+}
+
+/// A margem transparente não pode bloquear cliques nos apps de trás: a janela só
+/// recebe o mouse com o cursor sobre o corpo do Pipo, durante o arrasto ou com o menu aberto.
+pub fn start_hit_test(app: AppHandle) {
+    std::thread::spawn(move || {
+        let mut interactive: Option<bool> = None;
+        loop {
+            std::thread::sleep(Duration::from_millis(40));
+            let state = app.state::<AppState>();
+            let Some((pos, size, scale)) = *state.pet_frame.lock().unwrap() else { continue };
+            let want = state.radial_open.load(Ordering::SeqCst)
+                || state.dragging.load(Ordering::SeqCst)
+                || cursor_point().is_some_and(|(x, y)| {
+                    let (ix, iy) = body_insets(size, scale);
+                    x >= pos.x as f64 + ix
+                        && x <= pos.x as f64 + size.width as f64 - ix
+                        && y >= pos.y as f64 + iy
+                        && y <= pos.y as f64 + size.height as f64 - iy
+                });
+            if interactive != Some(want) {
+                if let Some(pet) = app.get_webview_window(MAIN) {
+                    if pet.set_ignore_cursor_events(!want).is_ok() {
+                        interactive = Some(want);
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ---------- Menu radial ----------
+// Os botões aparecem na margem fixa da janela (PET_MARGIN); nada é redimensionado.
+
 /// Distância dos botões ao corpo do Pipo e raio de cada botão.
 const RADIAL_GAP: f64 = 24.0;
 const BUTTON_RADIUS: f64 = 19.0;
@@ -301,7 +376,6 @@ pub struct Suggestion {
 #[serde(rename_all = "camelCase")]
 pub struct RadialLayout {
     pet_size: f64,
-    margin: f64,
     radius: f64,
     /// Ângulos (graus, 0 = direita, 90 = baixo) em que um botão cabe na tela.
     angles: Vec<f64>,
@@ -331,10 +405,8 @@ fn suggestion(app: &AppHandle) -> Option<Suggestion> {
 }
 
 fn close_radial(app: &AppHandle) {
-    let original = app.state::<AppState>().radial.lock().unwrap().take();
-    if let (Some((pos, size)), Some(pet)) = (original, app.get_webview_window(MAIN)) {
-        let _ = pet.set_size(size);
-        let _ = pet.set_position(pos);
+    if app.state::<AppState>().radial_open.swap(false, Ordering::SeqCst) {
+        let _ = app.emit_to(MAIN, "radial-close", ());
     }
 }
 
@@ -342,24 +414,11 @@ fn close_radial(app: &AppHandle) {
 pub fn radial_open(app: AppHandle) -> Result<RadialLayout, String> {
     let pet = app.get_webview_window(MAIN).ok_or("Janela do Pipo não encontrada.")?;
     let scale = pet.scale_factor().map_err(|e| e.to_string())?;
-    let (pos, size) = {
-        let state = app.state::<AppState>();
-        let mut radial = state.radial.lock().unwrap();
-        match *radial {
-            Some(original) => original,
-            None => {
-                let pos = pet.outer_position().map_err(|e| e.to_string())?;
-                let size = pet.outer_size().map_err(|e| e.to_string())?;
-                let margin = (RADIAL_MARGIN * scale).round() as i32;
-                *radial = Some((pos, size));
-                let _ = pet.set_position(PhysicalPosition::new(pos.x - margin, pos.y - margin));
-                let _ = pet.set_size(PhysicalSize::new(size.width + 2 * margin as u32, size.height + 2 * margin as u32));
-                (pos, size)
-            }
-        }
-    };
+    let pos = pet.outer_position().map_err(|e| e.to_string())?;
+    let size = pet.outer_size().map_err(|e| e.to_string())?;
+    app.state::<AppState>().radial_open.store(true, Ordering::SeqCst);
 
-    let pet_size = size.width as f64 / scale;
+    let pet_size = size.width as f64 / scale - 2.0 * PET_MARGIN;
     let radius = pet_size / 2.0 + RADIAL_GAP;
     let center = (pos.x as f64 + size.width as f64 / 2.0, pos.y as f64 + size.height as f64 / 2.0);
     let monitor = app
@@ -382,7 +441,7 @@ pub fn radial_open(app: AppHandle) -> Result<RadialLayout, String> {
         })
         .collect();
 
-    Ok(RadialLayout { pet_size, margin: RADIAL_MARGIN, radius, angles, suggestion: suggestion(&app) })
+    Ok(RadialLayout { pet_size, radius, angles, suggestion: suggestion(&app) })
 }
 
 #[tauri::command]

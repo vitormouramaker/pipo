@@ -8,6 +8,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::context::{self, ActiveApp, Category};
+use crate::actions::focus;
 use crate::{clipboard, windows, AppState};
 
 /// Sem mexer no computador por este tempo, o Pipo dorme.
@@ -112,7 +113,9 @@ pub fn start(app: AppHandle) {
                     "gaming"
                 } else if settings.sleep_when_idle && idle >= SLEEP_AFTER {
                     "sleep"
-                } else if settings.sense_context && dev_since.is_some_and(|t| t.elapsed() >= FOCUS_AFTER) {
+                } else if focus::pomodoro_focusing(&app)
+                    || settings.sense_context && dev_since.is_some_and(|t| t.elapsed() >= FOCUS_AFTER)
+                {
                     "focused"
                 } else {
                     "idle"
@@ -159,6 +162,12 @@ pub fn start(app: AppHandle) {
                     }
                 }
             }
+
+            let (idle, gaming) = {
+                let sense = state.sense.lock().unwrap();
+                (sense.idle, sense.gaming)
+            };
+            focus::tick(&app, idle, gaming);
 
             tick += 1;
             std::thread::sleep(Duration::from_secs(1));

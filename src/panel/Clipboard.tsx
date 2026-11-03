@@ -2,9 +2,21 @@ import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, type ClipItem } from "../api";
 
-type Props = { enabled: boolean; onAsk: (text: string) => void; onOpenSettings: () => void };
+type Props = {
+  enabled: boolean;
+  onAsk: (text: string) => void;
+  onRun: (prompt: string) => void;
+  onOpenSettings: () => void;
+};
 
-export default function Clipboard({ enabled, onAsk, onOpenSettings }: Props) {
+// Ações rápidas com o texto copiado: vão direto para o chat.
+const QUICK: { label: string; prompt: (t: string) => string }[] = [
+  { label: "Resumir", prompt: (t) => `Resuma em tópicos curtos:\n\n${t}` },
+  { label: "Traduzir", prompt: (t) => `Traduza para o português do Brasil (ou para o inglês, se já estiver em português):\n\n${t}` },
+  { label: "Revisar", prompt: (t) => `Revise a ortografia, a gramática e a clareza, e mostre a versão corrigida:\n\n${t}` },
+];
+
+export default function Clipboard({ enabled, onAsk, onRun, onOpenSettings }: Props) {
   const [items, setItems] = useState<ClipItem[]>([]);
   const [copied, setCopied] = useState<number | null>(null);
 
@@ -57,8 +69,13 @@ export default function Clipboard({ enabled, onAsk, onOpenSettings }: Props) {
               >
                 {copied === item.id ? "Copiado ✓" : "Copiar"}
               </button>
+              {QUICK.map((q) => (
+                <button key={q.label} className="link" onClick={() => onRun(q.prompt(item.text))}>
+                  {q.label}
+                </button>
+              ))}
               <button className="link" onClick={() => onAsk(item.text)}>
-                Perguntar ao Pipo
+                Perguntar
               </button>
               <button className="link muted" onClick={() => void api.clipboardRemove(item.id).then(refresh)}>
                 Excluir

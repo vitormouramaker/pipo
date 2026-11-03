@@ -39,9 +39,25 @@ impl Db {
                  output_tokens   INTEGER NOT NULL,
                  cost            REAL NOT NULL,
                  created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
+             CREATE TABLE IF NOT EXISTS notes (
+                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                 text       TEXT NOT NULL,
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
+             CREATE TABLE IF NOT EXISTS reminders (
+                 id     INTEGER PRIMARY KEY AUTOINCREMENT,
+                 text   TEXT NOT NULL,
+                 due_at TEXT NOT NULL,
+                 done   INTEGER NOT NULL DEFAULT 0
              );",
         )?;
         Ok(Self { conn })
+    }
+
+    /// Acesso direto para os módulos de ações (notas, lembretes).
+    pub fn conn(&self) -> &Connection {
+        &self.conn
     }
 
     pub fn get_setting(&self, key: &str) -> Option<String> {

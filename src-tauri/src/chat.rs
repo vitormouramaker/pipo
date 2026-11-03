@@ -1,4 +1,4 @@
-//! Chat com a Claude API via HTTP + SSE (Rust não tem SDK oficial).
+//! Chat com a Claude API via HTTP + SSE (Rust não tem SDK oficial), com ferramentas.
 //! O histórico é guardado e reenviado sem edições, com os blocos exatamente como vieram.
 
 use std::sync::atomic::Ordering;
@@ -11,17 +11,25 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::usage::Usage;
-use crate::{db::Db, secrets, settings, windows, AppState};
+use crate::{db::Db, secrets, settings, tools, windows, AppState};
 
 const API_URL: &str = "https://api.anthropic.com/v1/messages";
 const API_VERSION: &str = "2026-10-21";
 const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
 const MAX_TOKENS: u32 = 32000;
+/// Rodadas de ferramenta por mensagem do usuário, para não entrar em laço.
+const MAX_ROUNDS: usize = 10;
+/// Tempo para o usuário confirmar uma ação antes de ela ser recusada.
+const CONFIRM_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 #[derive(Clone, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum ChatEvent {
     Delta { text: String },
+    /// O Pipo está usando uma ferramenta.
+    Tool { label: String },
+    /// Ação com efeito esperando o usuário permitir ou negar.
+    Confirm { id: String, question: String },
     Done { stop_reason: Option<String> },
     Error { message: String },
 }
@@ -48,8 +56,11 @@ fn system_prompt(sarcasm: u8) -> String {
          nesses casos, seja direto e acolhedor.\n\n\
          O usuário desenvolve software e aplicativos, trabalha com documentos, joga, assiste lives e \
          acompanha atualidades. Responda em português do Brasil, de forma curta e direta; use listas e \
-         blocos de código só quando ajudarem. Por enquanto você não acessa arquivos, apps nem a internet \
-         do computador; se pedirem algo que dependa disso, diga que o recurso chega nas próximas versões.\n\n\
+         blocos de código só quando ajudarem.\n\n\
+         Você tem ferramentas para agir no computador: projetos e scripts, Git, portas, Docker, jogos, \
+         rotinas, arquivos recentes, notas, lembretes e pomodoro. Quando o pedido depender delas, use-as \
+         em vez de explicar como o usuário faria. Ações que mudam algo pedem a confirmação do usuário \
+         automaticamente; não peça permissão antes, só chame a ferramenta. Você não tem acesso à internet.\n\n\
          Data de hoje: {today}."
     )
 }
@@ -91,13 +102,23 @@ pub struct ConversationInfo {
     current: bool,
 }
 
+/// Histórico para a tela: texto de cada mensagem e uma linha para cada ferramenta usada.
 fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
     let messages = db.messages(conversation).map_err(|e| e.to_string())?;
-    Ok(messages
-        .into_iter()
-        .map(|(role, content)| ChatMessage { role, text: visible_text(&content) })
-        .filter(|m| !m.text.is_empty())
-        .collect())
+    let mut out = Vec::new();
+    for (role, content) in messages {
+        let text = visible_text(&content);
+        if !text.is_empty() {
+            out.push(ChatMessage { role: role.clone(), text });
+        }
+        if role == "assistant" {
+            for block in content.as_array().into_iter().flatten().filter(|b| b["type"] == "tool_use") {
+                let label = tools::label(block["name"].as_str().unwrap_or(""), &block["input"]);
+                out.push(ChatMessage { role: "tool".into(), text: label });
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Abre o chat e manda um texto pronto (ex.: "explicar o erro copiado").
@@ -161,6 +182,14 @@ pub fn chat_delete(app: AppHandle, id: i64) -> Result<(), String> {
     db.delete_conversation(id).map_err(|e| e.to_string())
 }
 
+/// Resposta do usuário a um pedido de confirmação.
+#[tauri::command]
+pub fn chat_confirm(app: AppHandle, id: String, approved: bool) {
+    if let Some(sender) = app.state::<AppState>().confirms.lock().unwrap().remove(&id) {
+        let _ = sender.send(approved);
+    }
+}
+
 #[tauri::command]
 pub async fn chat_send(app: AppHandle, text: String, on_event: Channel<ChatEvent>) -> Result<(), String> {
     let state = app.state::<AppState>();
@@ -188,88 +217,148 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
     let key = secrets::get().ok_or("Configure a chave da Claude API nas Configurações.")?;
     let state = app.state::<AppState>();
 
-    let (settings, conversation, history) = {
+    let (settings, conversation) = {
         let db = state.db.lock().unwrap();
         let settings = settings::load(&db);
         let conversation = db.current_conversation().map_err(|e| e.to_string())?;
         db.add_message(conversation, "user", &json!([{ "type": "text", "text": text }]))
             .map_err(|e| e.to_string())?;
-        let history = db.messages(conversation).map_err(|e| e.to_string())?;
-        (settings, conversation, history)
+        (settings, conversation)
     };
-
-    let messages: Vec<Value> = history
-        .into_iter()
-        .map(|(role, content)| json!({ "role": role, "content": content }))
-        .collect();
-
-    let mut body = json!({
-        "model": settings.model,
-        "max_tokens": MAX_TOKENS,
-        "stream": true,
-        "cache_control": { "type": "ephemeral" },
-        "output_config": { "effort": "low" },
-        "system": system_prompt(settings.sarcasm),
-        "messages": messages,
-    });
 
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(15))
         .build()
         .map_err(|e| e.to_string())?;
-    let mut request = client
-        .post(API_URL)
-        .header("x-api-key", key)
-        .header("anthropic-version", API_VERSION)
-        .header("content-type", "application/json");
-    // O Haiku não tem fallback no servidor; Sonnet e Opus usam o roteamento padrão em caso de recusa.
-    if !settings.model.contains("haiku") {
-        body["fallbacks"] = json!("default");
-        request = request.header("anthropic-beta", FALLBACK_BETA);
-    }
 
-    let response = request
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Sem conexão com a Claude API: {e}"))?;
+    for _ in 0..MAX_ROUNDS {
+        let history = state.db.lock().unwrap().messages(conversation).map_err(|e| e.to_string())?;
+        let messages: Vec<Value> = history
+            .into_iter()
+            .map(|(role, content)| json!({ "role": role, "content": content }))
+            .collect();
 
-    let status = response.status();
-    if !status.is_success() {
-        let detail = response
-            .json::<Value>()
-            .await
-            .ok()
-            .and_then(|v| v["error"]["message"].as_str().map(String::from))
-            .unwrap_or_default();
-        return Err(match status.as_u16() {
-            401 => "Chave da API inválida. Confira nas Configurações.".into(),
-            429 => "Limite de uso da API atingido. Tente de novo em instantes.".into(),
-            529 => "A Claude API está sobrecarregada. Tente de novo em instantes.".into(),
-            code => format!("Erro {code} da Claude API. {detail}"),
+        let mut body = json!({
+            "model": settings.model,
+            "max_tokens": MAX_TOKENS,
+            "stream": true,
+            "cache_control": { "type": "ephemeral" },
+            "output_config": { "effort": "low" },
+            "system": system_prompt(settings.sarcasm),
+            "tools": tools::definitions(),
+            "messages": messages,
         });
-    }
+        let mut request = client
+            .post(API_URL)
+            .header("x-api-key", &key)
+            .header("anthropic-version", API_VERSION)
+            .header("content-type", "application/json");
+        // O Haiku não tem fallback no servidor; Sonnet e Opus usam o roteamento padrão em caso de recusa.
+        if !settings.model.contains("haiku") {
+            body["fallbacks"] = json!("default");
+            request = request.header("anthropic-beta", FALLBACK_BETA);
+        }
 
-    let mut blocks: Vec<Value> = Vec::new();
-    let mut stop_reason: Option<String> = None;
-    let mut usage = Usage { model: settings.model.clone(), ..Default::default() };
-    let streamed = read_stream(response, &mut blocks, &mut stop_reason, &mut usage, on_event).await;
+        let response = request
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("Sem conexão com a Claude API: {e}"))?;
 
-    // Registra o consumo mesmo se a resposta foi interrompida: os tokens já foram cobrados.
-    if !usage.is_empty() {
+        let status = response.status();
+        if !status.is_success() {
+            let detail = response
+                .json::<Value>()
+                .await
+                .ok()
+                .and_then(|v| v["error"]["message"].as_str().map(String::from))
+                .unwrap_or_default();
+            return Err(match status.as_u16() {
+                401 => "Chave da API inválida. Confira nas Configurações.".into(),
+                429 => "Limite de uso da API atingido. Tente de novo em instantes.".into(),
+                529 => "A Claude API está sobrecarregada. Tente de novo em instantes.".into(),
+                code => format!("Erro {code} da Claude API. {detail}"),
+            });
+        }
+
+        let mut blocks: Vec<Value> = Vec::new();
+        let mut stop_reason: Option<String> = None;
+        let mut usage = Usage { model: settings.model.clone(), ..Default::default() };
+        let streamed = read_stream(response, &mut blocks, &mut stop_reason, &mut usage, on_event).await;
+
+        // Registra o consumo mesmo se a resposta foi interrompida: os tokens já foram cobrados.
+        if !usage.is_empty() {
+            let db = state.db.lock().unwrap();
+            let _ = db.add_usage(conversation, &usage);
+        }
+        streamed?;
+
+        // Campos internos de montagem não vão para o histórico; a API rejeita blocos de texto vazios.
+        let invalid: Vec<String> = blocks
+            .iter()
+            .filter(|b| b.get("_invalid").is_some())
+            .filter_map(|b| b["id"].as_str().map(String::from))
+            .collect();
+        for block in blocks.iter_mut() {
+            if let Some(obj) = block.as_object_mut() {
+                obj.remove("_partial");
+                obj.remove("_invalid");
+            }
+        }
+        blocks.retain(|b| !b.is_null() && !(b["type"] == "text" && b["text"].as_str().unwrap_or("").is_empty()));
+        if !blocks.is_empty() {
+            let db = state.db.lock().unwrap();
+            db.add_message(conversation, "assistant", &Value::Array(blocks.clone()))
+                .map_err(|e| e.to_string())?;
+        }
+
+        if stop_reason.as_deref() != Some("tool_use") {
+            return Ok(stop_reason);
+        }
+
+        // Roda as ferramentas pedidas e devolve todos os resultados numa única mensagem.
+        let mut results = Vec::new();
+        for block in blocks.iter().filter(|b| b["type"] == "tool_use") {
+            let id = block["id"].as_str().unwrap_or("").to_string();
+            let name = block["name"].as_str().unwrap_or("").to_string();
+            let input = block["input"].clone();
+            let (content, is_error) = if invalid.contains(&id) {
+                ("INVALID_JSON: a entrada da ferramenta veio incompleta. Tente de novo.".to_string(), true)
+            } else {
+                let _ = on_event.send(ChatEvent::Tool { label: tools::label(&name, &input) });
+                match run_tool(app, &name, &input, on_event).await {
+                    Ok(out) => (out, false),
+                    Err(e) => (e, true),
+                }
+            };
+            results.push(json!({ "type": "tool_result", "tool_use_id": id, "content": content, "is_error": is_error }));
+        }
         let db = state.db.lock().unwrap();
-        let _ = db.add_usage(conversation, &usage);
+        db.add_message(conversation, "user", &Value::Array(results)).map_err(|e| e.to_string())?;
     }
-    streamed?;
+    Err("O Pipo usou ferramentas demais nessa resposta e parou por segurança.".into())
+}
 
-    // A API rejeita blocos de texto vazios no histórico.
-    blocks.retain(|b| !b.is_null() && !(b["type"] == "text" && b["text"].as_str().unwrap_or("").is_empty()));
-    if !blocks.is_empty() {
-        let db = state.db.lock().unwrap();
-        db.add_message(conversation, "assistant", &Value::Array(blocks))
-            .map_err(|e| e.to_string())?;
+/// Pede confirmação quando a ação tem efeito e executa fora da thread principal.
+async fn run_tool(app: &AppHandle, name: &str, input: &Value, on_event: &Channel<ChatEvent>) -> Result<String, String> {
+    if tools::needs_confirmation(name) {
+        let state = app.state::<AppState>();
+        let id = format!("c{}", state.confirm_seq.fetch_add(1, Ordering::SeqCst));
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        state.confirms.lock().unwrap().insert(id.clone(), sender);
+        windows::set_pet_state(app, "attentive");
+        let _ = on_event.send(ChatEvent::Confirm { id: id.clone(), question: tools::confirmation(name, input) });
+        let approved = tokio::time::timeout(CONFIRM_TIMEOUT, receiver).await.ok().and_then(|r| r.ok()).unwrap_or(false);
+        state.confirms.lock().unwrap().remove(&id);
+        windows::set_pet_state(app, "thinking");
+        if !approved {
+            return Ok("O usuário não autorizou essa ação. Não tente de novo sem ele pedir.".into());
+        }
     }
-    Ok(stop_reason)
+    let (app, name, input) = (app.clone(), name.to_string(), input.clone());
+    tauri::async_runtime::spawn_blocking(move || tools::execute(&app, &name, &input))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 async fn read_stream(
@@ -330,7 +419,21 @@ fn handle_event(
                 }
                 "thinking_delta" => append(block, "thinking", delta["thinking"].as_str().unwrap_or("")),
                 "signature_delta" => block["signature"] = delta["signature"].clone(),
+                // Entrada de ferramenta chega em pedaços de JSON; é montada no fim do bloco.
+                "input_json_delta" => append(block, "_partial", delta["partial_json"].as_str().unwrap_or("")),
                 _ => {}
+            }
+        }
+        "content_block_stop" => {
+            let Some(block) = blocks.get_mut(index) else { return Ok(()) };
+            if block["type"] == "tool_use" {
+                let partial = block["_partial"].as_str().unwrap_or("").trim().to_string();
+                if !partial.is_empty() {
+                    match serde_json::from_str::<Value>(&partial) {
+                        Ok(input) if input.is_object() => block["input"] = input,
+                        _ => block["_invalid"] = json!(true),
+                    }
+                }
             }
         }
         "message_start" => {

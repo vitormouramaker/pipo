@@ -1,0 +1,223 @@
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { api, type Game, type RecentFile, type Routine, type RoutineStep } from "../../api";
+
+const STEP_LABEL: Record<RoutineStep["kind"], string> = {
+  app: "Programa",
+  url: "Link",
+  folder: "Pasta",
+  project: "Projeto (editor)",
+};
+const STEP_HINT: Record<RoutineStep["kind"], string> = {
+  app: "C:\\caminho\\programa.exe ou atalho .lnk",
+  url: "https://…",
+  folder: "C:\\caminho\\da\\pasta",
+  project: "C:\\caminho\\do\\projeto",
+};
+
+function ReadScreen() {
+  const [state, setState] = useState<"idle" | "waiting" | "done">("idle");
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unlisten = listen<{ text?: string; error?: string }>("ocr-result", (e) => {
+      setState("done");
+      setText(e.payload.text ?? "");
+      setError(e.payload.error ?? null);
+    });
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+
+  const start = () => {
+    setError(null);
+    setText("");
+    void api
+      .ocrStart()
+      .then(() => setState("waiting"))
+      .catch((e) => setError(String(e)));
+  };
+
+  return (
+    <div className="block">
+      <h4>Ler texto da tela</h4>
+      <div className="inline-form">
+        <button className="primary" disabled={state === "waiting"} onClick={start}>
+          {state === "waiting" ? "Selecione a área…" : "Recortar e ler texto"}
+        </button>
+        <span className="hint">Usa o OCR do Windows, sem internet. O texto vai para a área de transferência.</span>
+      </div>
+      {error && <p className="hint">{error}</p>}
+      {text && <pre className="output selectable">{text}</pre>}
+    </div>
+  );
+}
+
+function Games() {
+  const [games, setGames] = useState<Game[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const refresh = () => void api.gamesList().then(setGames);
+  useEffect(refresh, []);
+
+  return (
+    <div className="block">
+      <h4>Jogos</h4>
+      {games === null && <p className="hint">Procurando jogos…</p>}
+      {games?.length === 0 && <p className="hint">Nenhum jogo da Steam, Epic ou Riot encontrado.</p>}
+      {error && <p className="hint">{error}</p>}
+      <div className="table">
+        {games?.map((g) => (
+          <div key={g.id} className="trow">
+            <button className={`star${g.favorite ? " on" : ""}`} title="Favorito" onClick={() => void api.gameFavorite(g.id, !g.favorite).then(refresh)}>
+              ★
+            </button>
+            <span className="grow">{g.name}</span>
+            <span className="row-meta">{g.launcher}</span>
+            <button className="link" onClick={() => void api.gameLaunch(g.id).catch((e) => setError(String(e)))}>
+              ▶ Jogar
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RoutineEditor({ routine, onSave, onCancel }: { routine: Routine; onSave: (r: Routine) => void; onCancel: () => void }) {
+  const [draft, setDraft] = useState<Routine>(routine);
+  const setStep = (i: number, patch: Partial<RoutineStep>) =>
+    setDraft({ ...draft, steps: draft.steps.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
+
+  return (
+    <div className="row-body editor">
+      <input placeholder="Nome da rotina (ex.: Modo trabalho)" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+      {draft.steps.map((s, i) => (
+        <div key={i} className="inline-form">
+          <select value={s.kind} onChange={(e) => setStep(i, { kind: e.target.value as RoutineStep["kind"] })}>
+            {Object.entries(STEP_LABEL).map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <input className="grow" placeholder={STEP_HINT[s.kind]} value={s.target} onChange={(e) => setStep(i, { target: e.target.value })} />
+          <button className="link muted" onClick={() => setDraft({ ...draft, steps: draft.steps.filter((_, j) => j !== i) })}>
+            ✕
+          </button>
+        </div>
+      ))}
+      <div className="btns">
+        <button onClick={() => setDraft({ ...draft, steps: [...draft.steps, { kind: "app", target: "" }] })}>+ Passo</button>
+        <span className="grow" />
+        <button className="link muted" onClick={onCancel}>
+          Cancelar
+        </button>
+        <button className="primary" disabled={!draft.name.trim()} onClick={() => onSave({ ...draft, steps: draft.steps.filter((s) => s.target.trim()) })}>
+          Salvar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Routines() {
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  useEffect(() => {
+    void api.routinesList().then(setRoutines);
+  }, []);
+
+  const persist = (next: Routine[]) => {
+    setRoutines(next);
+    void api.routinesSave(next);
+  };
+
+  const run = (r: Routine) =>
+    void api
+      .routineRun(r.id)
+      .then((errors) => setMessage(errors.length ? `Com falhas: ${errors.join("; ")}` : `${r.name}: pronto.`))
+      .catch((e) => setMessage(String(e)));
+
+  const fresh: Routine = { id: `r${Date.now()}`, name: "", steps: [{ kind: "app", target: "" }] };
+
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>Rotinas</h4>
+        <button className="link" onClick={() => { setRoutines([...routines, fresh]); setEditing(fresh.id); }}>
+          + Nova rotina
+        </button>
+      </div>
+      {routines.length === 0 && <p className="hint">Crie uma rotina para abrir vários apps, links e projetos de uma vez.</p>}
+      {routines.map((r) => (
+        <div key={r.id} className={`row-card${editing === r.id ? " open" : ""}`}>
+          {editing === r.id ? (
+            <RoutineEditor
+              routine={r}
+              onCancel={() => {
+                setEditing(null);
+                setRoutines(routines.filter((x) => x.name.trim() || x.id !== r.id));
+              }}
+              onSave={(saved) => {
+                persist(routines.map((x) => (x.id === saved.id ? saved : x)));
+                setEditing(null);
+              }}
+            />
+          ) : (
+            <div className="row-head static">
+              <span className="row-title">{r.name}</span>
+              <span className="row-meta">{r.steps.length} passos</span>
+              <button className="link" onClick={() => run(r)}>
+                ▶ Rodar
+              </button>
+              <button className="link muted" onClick={() => setEditing(r.id)}>
+                Editar
+              </button>
+              <button className="link muted" onClick={() => persist(routines.filter((x) => x.id !== r.id))}>
+                Excluir
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+      {message && <p className="hint">{message}</p>}
+    </div>
+  );
+}
+
+function RecentFiles() {
+  const [files, setFiles] = useState<RecentFile[]>([]);
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => void api.recentFiles(query || undefined).then(setFiles), 150);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  return (
+    <div className="block">
+      <h4>Arquivos recentes</h4>
+      <input className="search" placeholder="Buscar pelo nome" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <div className="table">
+        {files.slice(0, 25).map((f) => (
+          <button key={f.path} className="trow clickable" onClick={() => void api.recentOpen(f.path)}>
+            <span>{f.folder ? "📁" : "📄"}</span>
+            <span className="grow">{f.name}</span>
+            <span className="row-meta">{f.modified}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function Shortcuts() {
+  return (
+    <>
+      <ReadScreen />
+      <Games />
+      <Routines />
+      <RecentFiles />
+    </>
+  );
+}

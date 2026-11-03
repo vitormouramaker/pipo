@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, type PanelView, type Settings } from "../api";
 import { Pipo } from "../pipo/Pipo";
+import Actions from "./actions/Actions";
 import Chat from "./Chat";
 import Clipboard from "./Clipboard";
 import SettingsView from "./Settings";
@@ -11,6 +12,7 @@ import "./panel.css";
 
 const TABS: { view: PanelView; label: string; title?: string }[] = [
   { view: "chat", label: "Chat" },
+  { view: "actions", label: "Ações" },
   { view: "clipboard", label: "Clipboard", title: "Histórico da área de transferência" },
   { view: "system", label: "Sistema" },
   { view: "usage", label: "Gastos" },
@@ -66,6 +68,7 @@ export default function PanelApp() {
           onOpenSettings={() => setView("settings")}
         />
       )}
+      {view === "actions" && <Actions onAsk={(prompt) => void api.chatPrefill(prompt)} />}
       {view === "clipboard" && (
         <Clipboard
           enabled={settings?.clipboardHistory ?? true}
@@ -73,6 +76,7 @@ export default function PanelApp() {
             setDraft(`Sobre este texto:\n\n${text}\n\n`);
             setView("chat");
           }}
+          onRun={(prompt) => void api.chatPrefill(prompt)}
           onOpenSettings={() => setView("settings")}
         />
       )}

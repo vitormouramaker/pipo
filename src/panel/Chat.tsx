@@ -84,25 +84,38 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     setBusy(true);
     setMessages((m) => [...m, { role: "user", text }, { role: "assistant", text: "" }]);
 
-    const appendToLast = (piece: string) =>
+    // A resposta pode alternar texto e uso de ferramentas: cada trecho de texto vira um balão.
+    const appendText = (piece: string) =>
       setMessages((m) => {
-        const copy = m.slice();
-        const last = copy[copy.length - 1];
-        copy[copy.length - 1] = { ...last, text: last.text + piece };
-        return copy;
+        const last = m[m.length - 1];
+        if (last?.role !== "assistant") return [...m, { role: "assistant", text: piece }];
+        return [...m.slice(0, -1), { ...last, text: last.text + piece }];
+      });
+    const pushStep = (step: ChatMessage) =>
+      setMessages((m) => {
+        const last = m[m.length - 1];
+        const base = last?.role === "assistant" && !last.text ? m.slice(0, -1) : m;
+        return [...base, step, { role: "assistant", text: "" }];
       });
 
     await api.chatSend(text, (event) => {
-      if (event.type === "delta") appendToLast(event.text);
+      if (event.type === "delta") appendText(event.text);
+      else if (event.type === "tool") pushStep({ role: "tool", text: event.label });
+      else if (event.type === "confirm") pushStep({ role: "confirm", text: event.question, confirmId: event.id });
       else if (event.type === "error") setError(event.message);
       else if (event.stopReason === "refusal") setError("O Pipo não pode responder a esse pedido.");
       else if (event.stopReason === "max_tokens") setError("A resposta foi cortada por ser longa demais.");
     });
 
-    setMessages((m) => (m[m.length - 1]?.text ? m : m.slice(0, -1)));
+    setMessages((m) => m.filter((msg, i) => msg.role !== "assistant" || msg.text || i < m.length - 1));
     busyRef.current = false;
     setBusy(false);
     inputRef.current?.focus();
+  };
+
+  const decide = (id: string, approved: boolean) => {
+    void api.chatConfirm(id, approved);
+    setMessages((m) => m.map((msg) => (msg.confirmId === id ? { ...msg, decision: approved ? "approved" : "denied" } : msg)));
   };
 
   const newConversation = async () => {
@@ -178,14 +191,46 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
           {messages.length === 0 && (
             <div className="empty">
               <p className="empty-title">Olá. Sou o Pipo.</p>
-              <p>Pergunte o que quiser: código, documentos, jogos ou o que estiver acontecendo no mundo.</p>
+              <p>
+                Pergunte o que quiser ou peça uma ação: “roda os testes do projeto”, “o que está usando a porta 3000?”,
+                “me lembra em 20 minutos de alongar”.
+              </p>
             </div>
           )}
-          {messages.map((m, i) => (
-            <div key={i} className={`msg ${m.role}`}>
-              {m.text ? renderText(m.text) : <span className="typing">pensando…</span>}
-            </div>
-          ))}
+          {messages.map((m, i) => {
+            if (m.role === "tool") {
+              return (
+                <div key={i} className="msg tool">
+                  ⚙ {m.text}
+                </div>
+              );
+            }
+            if (m.role === "confirm") {
+              return (
+                <div key={i} className="msg confirm">
+                  <span className="confirm-title">O Pipo quer fazer uma ação</span>
+                  <p>{m.text}</p>
+                  {m.decision ? (
+                    <span className={`confirm-result ${m.decision}`}>
+                      {m.decision === "approved" ? "Permitido" : "Negado"}
+                    </span>
+                  ) : (
+                    <div className="confirm-actions">
+                      <button className="primary" onClick={() => decide(m.confirmId!, true)}>
+                        Permitir
+                      </button>
+                      <button onClick={() => decide(m.confirmId!, false)}>Negar</button>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div key={i} className={`msg ${m.role}`}>
+                {m.text ? renderText(m.text) : <span className="typing">pensando…</span>}
+              </div>
+            );
+          })}
           {error && <div className="msg error">{error}</div>}
         </div>
       )}

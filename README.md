@@ -2,7 +2,7 @@
 
 Bichinho virtual de desktop para Windows 11. Um personagem minimalista e tecnológico, intelectual e com um leve toque de sarcasmo, que flutua na tela e ajuda no dia a dia com atalhos, dicas e tarefas: desenvolvimento, documentos, jogos, lives e notícias.
 
-> Projeto pessoal. Fases 1 (MVP) e 2 (sensores) concluídas: Pipo flutuante, chat com a Claude API, gastos por conversa, modo jogo, hardware, área de transferência e humor reativo. Próxima etapa: Fase 3 (ações).
+> Projeto pessoal. Fases 1 (MVP), 2 (sensores) e 3 (ações) concluídas: Pipo flutuante, chat com a Claude API que age no computador (com confirmação), gastos por conversa, modo jogo, hardware, área de transferência, projetos, scripts, Git, portas, Docker, jogos, rotinas, notas, lembretes, pomodoro e OCR. Próxima etapa: Fase 4 (mundo externo).
 
 ## Prévia
 
@@ -35,8 +35,12 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
 
 **Abas do painel:**
 
-- **Chat**: conversa com a IA, com histórico.
-- **Clipboard**: últimos textos copiados (só em memória; senhas e tokens são ignorados).
+- **Chat**: conversa com a IA, com histórico. O Pipo usa ferramentas para agir (rodar scripts, ver portas, commit, lembretes…); tudo o que muda algo no computador pede **Permitir/Negar** antes.
+- **Ações**:
+  - **Dev**: projetos recentes do VS Code/Cursor (abrir, terminal, scripts no terminal ou em segundo plano com aviso ao terminar, mensagem de commit pela IA), tarefas em execução, portas em uso (com encerrar) e containers do Docker.
+  - **Foco**: pomodoro, lembretes, pausas para água e postura e notas rápidas.
+  - **Atalhos**: ler texto da tela (OCR do Windows, offline), jogos da Steam/Epic/Riot com favoritos, rotinas (abrir vários apps, links e projetos de uma vez) e arquivos recentes.
+- **Clipboard**: últimos textos copiados (só em memória; senhas e tokens são ignorados), com Resumir, Traduzir e Revisar.
 - **Sistema**: app em uso, humor do Pipo, CPU, memória, GPU NVIDIA e os processos que mais consomem.
 - **Gastos**: custo estimado de hoje, do mês e de cada conversa, por modelo.
 - **⚙ Configurações**: chave, modelo, sarcasmo, atalho, tamanho e cada sensor pode ser ligado ou desligado.
@@ -61,6 +65,8 @@ src-tauri/        backend (Rust) e configuração do app
   src/context.rs  app em primeiro plano, tela cheia e ociosidade
   src/hardware.rs CPU, memória, processos e GPU
   src/clipboard.rs histórico da área de transferência
+  src/tools.rs    ferramentas que a IA pode usar no chat
+  src/actions/    projetos, tarefas, Git, portas, Docker, jogos, rotinas, arquivos, notas, foco e OCR
   src/secrets.rs  chave no Gerenciador de Credenciais
   src/windows.rs  janelas, bandeja e atalhos
 assets/           prévia visual e ícone

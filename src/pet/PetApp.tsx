@@ -78,9 +78,11 @@ export default function PetApp() {
       if (e.payload === "clear") setOverride(null);
       else if (isState(e.payload)) setOverride(e.payload);
     });
+    const unlistenRadial = listen("radial-close", () => setRadial(null));
     return () => {
       void unlistenBase.then((fn) => fn());
       void unlistenState.then((fn) => fn());
+      void unlistenRadial.then((fn) => fn());
     };
   }, []);
 
@@ -129,15 +131,18 @@ export default function PetApp() {
   return (
     <main
       className={radial ? "stage radial-open" : "stage"}
-      title={radial ? undefined : "Clique para o menu · arraste para mover · botão direito para mais opções"}
       onContextMenu={(e) => {
         e.preventDefault();
         if (!radial) void showContextMenu();
       }}
+      onPointerDown={(e) => {
+        // Clique na margem transparente (fora do Pipo e dos botões) fecha o menu.
+        if (radial && e.target === e.currentTarget) closeRadial();
+      }}
     >
       <div
         className="pet"
-        style={radial ? { width: radial.petSize, height: radial.petSize } : undefined}
+        title={radial ? undefined : "Clique para o menu · arraste para mover · botão direito para mais opções"}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           // Coordenadas de tela: a janela se move durante o arrasto.
