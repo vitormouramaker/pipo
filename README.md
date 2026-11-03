@@ -2,7 +2,7 @@
 
 Bichinho virtual de desktop para Windows 11. Um personagem minimalista e tecnológico, intelectual e com um leve toque de sarcasmo, que flutua na tela e ajuda no dia a dia com atalhos, dicas e tarefas: desenvolvimento, documentos, jogos, lives e notícias.
 
-> Projeto pessoal. Fases 1 (MVP), 2 (sensores) e 3 (ações) concluídas: Pipo flutuante, chat com a Claude API que age no computador (com confirmação), gastos por conversa, modo jogo, hardware, área de transferência, projetos, scripts, Git, portas, Docker, jogos, rotinas, notas, lembretes, pomodoro e OCR. Próxima etapa: Fase 4 (mundo externo).
+> Projeto pessoal. Fases 1 (MVP), 2 (sensores) e 3 (ações) concluídas: Pipo flutuante, chat com a Claude API que age no computador (com confirmação), gastos por conversa, modo jogo, hardware, área de transferência, projetos, scripts, Git, portas, Docker, jogos, rotinas, notas, lembretes, pomodoro e OCR. Fase 4 (mundo externo) concluída: pesquisa na web com fontes, briefing diário e avisos de lives. Próxima etapa: Fase 5 (voz, XP e evolução).
 
 ## Prévia
 
@@ -35,7 +35,8 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
 
 **Abas do painel:**
 
-- **Chat**: conversa com a IA, com histórico. O Pipo usa ferramentas para agir (rodar scripts, ver portas, commit, lembretes…); tudo o que muda algo no computador pede **Permitir/Negar** antes.
+- **Chat**: conversa com a IA, com histórico. Pesquisa na web quando a pergunta depende de informação atual, com as fontes clicáveis.
+- **Hoje**: briefing do dia (clima, notícias dos seus temas e lembretes; pode montar sozinho no horário), lives da Twitch e do YouTube com aviso quando entram ao vivo, e pesquisa rápida. O Pipo usa ferramentas para agir (rodar scripts, ver portas, commit, lembretes…); tudo o que muda algo no computador pede **Permitir/Negar** antes.
 - **Ações**:
   - **Dev**: projetos recentes do VS Code/Cursor (abrir, terminal, scripts no terminal ou em segundo plano com aviso ao terminar, mensagem de commit pela IA), tarefas em execução, portas em uso (com encerrar) e containers do Docker.
   - **Foco**: pomodoro, lembretes, pausas para água e postura e notas rápidas.
@@ -67,6 +68,7 @@ src-tauri/        backend (Rust) e configuração do app
   src/clipboard.rs histórico da área de transferência
   src/tools.rs    ferramentas que a IA pode usar no chat
   src/actions/    projetos, tarefas, Git, portas, Docker, jogos, rotinas, arquivos, notas, foco e OCR
+  src/world/      lives (Twitch/YouTube) e briefing diário
   src/secrets.rs  chave no Gerenciador de Credenciais
   src/windows.rs  janelas, bandeja e atalhos
 assets/           prévia visual e ícone

@@ -1,7 +1,7 @@
 //! Chat com a Claude API via HTTP + SSE (Rust não tem SDK oficial), com ferramentas.
 //! O histórico é guardado e reenviado sem edições, com os blocos exatamente como vieram.
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -13,9 +13,11 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::usage::Usage;
 use crate::{db::Db, secrets, settings, tools, windows, AppState};
 
-const API_URL: &str = "https://api.anthropic.com/v1/messages";
-const API_VERSION: &str = "2026-10-21";
-const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
+pub const API_URL: &str = "https://api.anthropic.com/v1/messages";
+pub const API_VERSION: &str = "2026-10-21";
+pub const FALLBACK_BETA: &str = "server-side-fallback-2026-07-01";
+/// Se a API recusar as ferramentas de web para o modelo escolhido, o chat segue sem elas.
+static WEB_UNSUPPORTED: AtomicBool = AtomicBool::new(false);
 const MAX_TOKENS: u32 = 32000;
 /// Rodadas de ferramenta por mensagem do usuário, para não entrar em laço.
 const MAX_ROUNDS: usize = 10;
@@ -30,14 +32,59 @@ pub enum ChatEvent {
     Tool { label: String },
     /// Ação com efeito esperando o usuário permitir ou negar.
     Confirm { id: String, question: String },
+    /// Fonte citada na resposta (busca na web).
+    Source { title: String, url: String },
     Done { stop_reason: Option<String> },
     Error { message: String },
+}
+
+#[derive(Clone, Serialize)]
+pub struct Source {
+    pub title: String,
+    pub url: String,
 }
 
 #[derive(Serialize)]
 pub struct ChatMessage {
     role: String,
     text: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    sources: Vec<Source>,
+}
+
+/// Fontes citadas nos blocos de texto, sem repetir o mesmo link.
+pub fn sources_of(content: &Value) -> Vec<Source> {
+    let mut seen = std::collections::HashSet::new();
+    content
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|b| b["type"] == "text")
+        .flat_map(|b| b["citations"].as_array().cloned().unwrap_or_default())
+        .filter_map(|c| {
+            let url = c["url"].as_str()?.to_string();
+            let title = c["title"].as_str().filter(|t| !t.is_empty()).unwrap_or(&url).to_string();
+            seen.insert(url.clone()).then_some(Source { title, url })
+        })
+        .collect()
+}
+
+/// Ferramentas de busca da própria Claude API. O Haiku usa a versão básica;
+/// Sonnet e Opus, a versão com filtragem dinâmica dos resultados.
+pub fn web_tools(model: &str, city: &str, max_searches: u32) -> Vec<Value> {
+    let (search, fetch) = if model.contains("haiku") {
+        ("web_search_20250305", "web_fetch_20250910")
+    } else {
+        ("web_search_20260209", "web_fetch_20260209")
+    };
+    let mut location = json!({ "type": "approximate", "country": "BR", "timezone": "America/Sao_Paulo" });
+    if !city.trim().is_empty() {
+        location["city"] = json!(city.trim());
+    }
+    vec![
+        json!({ "type": search, "name": "web_search", "max_uses": max_searches, "user_location": location }),
+        json!({ "type": fetch, "name": "web_fetch", "max_uses": 3 }),
+    ]
 }
 
 fn system_prompt(sarcasm: u8) -> String {
@@ -60,7 +107,10 @@ fn system_prompt(sarcasm: u8) -> String {
          Você tem ferramentas para agir no computador: projetos e scripts, Git, portas, Docker, jogos, \
          rotinas, arquivos recentes, notas, lembretes e pomodoro. Quando o pedido depender delas, use-as \
          em vez de explicar como o usuário faria. Ações que mudam algo pedem a confirmação do usuário \
-         automaticamente; não peça permissão antes, só chame a ferramenta. Você não tem acesso à internet.\n\n\
+         automaticamente; não peça permissão antes, só chame a ferramenta.\n\n\
+         Quando a busca na web estiver disponível, use-a para notícias, fatos recentes, preços, placares e \
+         qualquer coisa que possa ter mudado depois do seu treinamento; responda com base no que encontrou. \
+         Para conhecimento estável, responda sem buscar, porque cada busca tem custo.\n\n\
          Data de hoje: {today}."
     )
 }
@@ -109,12 +159,17 @@ fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
     for (role, content) in messages {
         let text = visible_text(&content);
         if !text.is_empty() {
-            out.push(ChatMessage { role: role.clone(), text });
+            let sources = if role == "assistant" { sources_of(&content) } else { Vec::new() };
+            out.push(ChatMessage { role: role.clone(), text, sources });
         }
         if role == "assistant" {
-            for block in content.as_array().into_iter().flatten().filter(|b| b["type"] == "tool_use") {
-                let label = tools::label(block["name"].as_str().unwrap_or(""), &block["input"]);
-                out.push(ChatMessage { role: "tool".into(), text: label });
+            for block in content.as_array().into_iter().flatten() {
+                let label = match block["type"].as_str() {
+                    Some("tool_use") => tools::label(block["name"].as_str().unwrap_or(""), &block["input"]),
+                    Some("server_tool_use") => web_label(block),
+                    _ => continue,
+                };
+                out.push(ChatMessage { role: "tool".into(), text: label, sources: Vec::new() });
             }
         }
     }
@@ -238,6 +293,11 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
             .map(|(role, content)| json!({ "role": role, "content": content }))
             .collect();
 
+        let mut all_tools = tools::definitions().as_array().cloned().unwrap_or_default();
+        let web = settings.web_search && !WEB_UNSUPPORTED.load(Ordering::SeqCst);
+        if web {
+            all_tools.extend(web_tools(&settings.model, &settings.briefing_city, 5));
+        }
         let mut body = json!({
             "model": settings.model,
             "max_tokens": MAX_TOKENS,
@@ -245,7 +305,7 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
             "cache_control": { "type": "ephemeral" },
             "output_config": { "effort": "low" },
             "system": system_prompt(settings.sarcasm),
-            "tools": tools::definitions(),
+            "tools": all_tools,
             "messages": messages,
         });
         let mut request = client
@@ -273,6 +333,11 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
                 .ok()
                 .and_then(|v| v["error"]["message"].as_str().map(String::from))
                 .unwrap_or_default();
+            // Modelo sem suporte às ferramentas de web: tenta de novo sem elas.
+            if status.as_u16() == 400 && web && (detail.contains("web_search") || detail.contains("web_fetch")) {
+                WEB_UNSUPPORTED.store(true, Ordering::SeqCst);
+                continue;
+            }
             return Err(match status.as_u16() {
                 401 => "Chave da API inválida. Confira nas Configurações.".into(),
                 429 => "Limite de uso da API atingido. Tente de novo em instantes.".into(),
@@ -296,7 +361,7 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
         // Campos internos de montagem não vão para o histórico; a API rejeita blocos de texto vazios.
         let invalid: Vec<String> = blocks
             .iter()
-            .filter(|b| b.get("_invalid").is_some())
+            .filter(|b| b["type"] == "tool_use" && b.get("_invalid").is_some())
             .filter_map(|b| b["id"].as_str().map(String::from))
             .collect();
         for block in blocks.iter_mut() {
@@ -312,6 +377,10 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
                 .map_err(|e| e.to_string())?;
         }
 
+        // A busca na web pausou no meio: reenviar o histórico (sem mensagem nova) faz a API continuar.
+        if stop_reason.as_deref() == Some("pause_turn") {
+            continue;
+        }
         if stop_reason.as_deref() != Some("tool_use") {
             return Ok(stop_reason);
         }
@@ -387,6 +456,15 @@ async fn read_stream(
     Ok(())
 }
 
+/// Linha mostrada no chat quando o Claude usa a busca ou lê uma página.
+fn web_label(block: &Value) -> String {
+    match block["name"].as_str() {
+        Some("web_search") => format!("Pesquisando na web: {}", block["input"]["query"].as_str().unwrap_or("…")),
+        Some("web_fetch") => format!("Lendo {}", block["input"]["url"].as_str().unwrap_or("a página")),
+        _ => "Usando a web".into(),
+    }
+}
+
 fn append(block: &mut Value, field: &str, piece: &str) {
     let mut current = block[field].as_str().unwrap_or("").to_string();
     current.push_str(piece);
@@ -421,12 +499,25 @@ fn handle_event(
                 "signature_delta" => block["signature"] = delta["signature"].clone(),
                 // Entrada de ferramenta chega em pedaços de JSON; é montada no fim do bloco.
                 "input_json_delta" => append(block, "_partial", delta["partial_json"].as_str().unwrap_or("")),
+                "citations_delta" => {
+                    let citation = delta["citation"].clone();
+                    if let (Some(url), title) = (citation["url"].as_str(), citation["title"].as_str()) {
+                        let _ = on_event.send(ChatEvent::Source {
+                            title: title.filter(|t| !t.is_empty()).unwrap_or(url).to_string(),
+                            url: url.to_string(),
+                        });
+                    }
+                    match block["citations"].as_array_mut() {
+                        Some(list) => list.push(citation),
+                        None => block["citations"] = json!([citation]),
+                    }
+                }
                 _ => {}
             }
         }
         "content_block_stop" => {
             let Some(block) = blocks.get_mut(index) else { return Ok(()) };
-            if block["type"] == "tool_use" {
+            if block["type"] == "tool_use" || block["type"] == "server_tool_use" {
                 let partial = block["_partial"].as_str().unwrap_or("").trim().to_string();
                 if !partial.is_empty() {
                     match serde_json::from_str::<Value>(&partial) {
@@ -434,6 +525,9 @@ fn handle_event(
                         _ => block["_invalid"] = json!(true),
                     }
                 }
+            }
+            if block["type"] == "server_tool_use" {
+                let _ = on_event.send(ChatEvent::Tool { label: web_label(block) });
             }
         }
         "message_start" => {

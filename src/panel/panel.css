@@ -238,6 +238,18 @@
 .note { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 .note p { flex: 1; margin: 0; white-space: pre-wrap; user-select: text; font-size: 13px; }
 
+/* Hoje */
+.briefing-text h5 { margin: 10px 0 4px; font-size: 13px; color: var(--accent); font-weight: 600; text-transform: none; }
+.briefing-text h5:first-child { margin-top: 0; }
+.briefing-text p { margin: 2px 0; font-size: 13.5px; user-select: text; }
+.briefing-text p.li { padding-left: 4px; }
+.sources { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 8px; font-size: 12px; color: var(--muted); white-space: normal; }
+.panel button.link.source { font-size: 12px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot.live { background: #f87171; box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.25); }
+.live-name { font-weight: 600; flex-shrink: 0; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-title { color: var(--muted); }
+.settings .hint, .actions .hint { white-space: normal; }
+
 /* Botões */
 .panel button.primary, .settings button {
   border: 1px solid var(--line); background: var(--surface-2); border-radius: 7px;

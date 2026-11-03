@@ -168,6 +168,9 @@ pub fn start(app: AppHandle) {
                 (sense.idle, sense.gaming)
             };
             focus::tick(&app, idle, gaming);
+            if tick % 60 == 30 {
+                crate::world::briefing::maybe_run(&app, idle, gaming);
+            }
 
             tick += 1;
             std::thread::sleep(Duration::from_secs(1));

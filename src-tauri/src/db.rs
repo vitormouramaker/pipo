@@ -40,6 +40,13 @@ impl Db {
                  cost            REAL NOT NULL,
                  created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
              );
+             CREATE TABLE IF NOT EXISTS briefings (
+                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                 day        TEXT NOT NULL,
+                 content    TEXT NOT NULL,
+                 sources    TEXT NOT NULL,
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
              CREATE TABLE IF NOT EXISTS notes (
                  id         INTEGER PRIMARY KEY AUTOINCREMENT,
                  text       TEXT NOT NULL,
@@ -52,6 +59,8 @@ impl Db {
                  done   INTEGER NOT NULL DEFAULT 0
              );",
         )?;
+        // Colunas acrescentadas depois da primeira versão (o erro de coluna repetida é esperado).
+        let _ = conn.execute("ALTER TABLE usage ADD COLUMN web_searches INTEGER NOT NULL DEFAULT 0", []);
         Ok(Self { conn })
     }
 
@@ -153,8 +162,8 @@ impl Db {
     /// O consumo continua registrado mesmo se a conversa for excluída.
     pub fn add_usage(&self, conversation: i64, usage: &crate::usage::Usage) -> rusqlite::Result<()> {
         self.conn.execute(
-            "INSERT INTO usage (conversation_id, model, input_tokens, cache_write, cache_read, output_tokens, cost)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO usage (conversation_id, model, input_tokens, cache_write, cache_read, output_tokens, cost, web_searches)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 conversation,
                 usage.model,
@@ -162,7 +171,8 @@ impl Db {
                 usage.cache_write as i64,
                 usage.cache_read as i64,
                 usage.output as i64,
-                usage.cost()
+                usage.cost(),
+                usage.web_searches as i64
             ],
         )?;
         Ok(())

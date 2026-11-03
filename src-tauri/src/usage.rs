@@ -14,6 +14,7 @@ pub struct Usage {
     pub cache_write: u64,
     pub cache_read: u64,
     pub output: u64,
+    pub web_searches: u64,
 }
 
 impl Usage {
@@ -28,14 +29,18 @@ impl Usage {
         take("cache_creation_input_tokens", &mut self.cache_write);
         take("cache_read_input_tokens", &mut self.cache_read);
         take("output_tokens", &mut self.output);
+        if let Some(v) = usage["server_tool_use"]["web_search_requests"].as_u64() {
+            self.web_searches = v;
+        }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.input + self.cache_write + self.cache_read + self.output == 0
+        self.input + self.cache_write + self.cache_read + self.output + self.web_searches == 0
     }
 
     /// Custo estimado em dólares, pela tabela de preços por milhão de tokens
     /// (out/2026). Gravação de cache custa 1,25× a entrada; leitura, o preço de cache.
+    /// Cada busca na web custa US$ 0,01 (US$ 10 por mil).
     pub fn cost(&self) -> f64 {
         let prompt = self.input + self.cache_write + self.cache_read;
         let (input, output, cache_read) = if self.model.contains("opus") {
@@ -52,6 +57,7 @@ impl Usage {
             + self.cache_read as f64 * cache_read
             + self.output as f64 * output)
             / 1_000_000.0
+            + self.web_searches as f64 * 0.01
     }
 }
 
@@ -96,7 +102,10 @@ pub fn usage_summary(app: AppHandle) -> Result<UsageSummary, String> {
         .into_iter()
         .map(|(id, first, updated_at, requests, input_tokens, output_tokens, cost)| ConversationCost {
             id,
-            title: crate::chat::title_of(&first),
+            title: match id {
+                crate::world::briefing::USAGE_ID => "Briefing diário".to_string(),
+                _ => crate::chat::title_of(&first),
+            },
             updated_at,
             requests,
             input_tokens,

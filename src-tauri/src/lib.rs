@@ -10,6 +10,7 @@ mod settings;
 mod tools;
 mod usage;
 mod windows;
+mod world;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64};
@@ -38,6 +39,8 @@ pub struct AppState {
     /// Ações do chat esperando o usuário permitir ou negar.
     pub confirms: Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>,
     pub confirm_seq: AtomicU64,
+    /// Fase 4: situação de cada canal acompanhado (ao vivo ou não).
+    pub lives: Mutex<HashMap<String, world::lives::LiveStatus>>,
     /// O Pipo está sendo arrastado.
     pub dragging: AtomicBool,
     /// O chat está gerando uma resposta: o Pipo fica em "processando".
@@ -91,6 +94,7 @@ pub fn run() {
                 ocr_busy: AtomicBool::new(false),
                 confirms: Mutex::new(HashMap::new()),
                 confirm_seq: AtomicU64::new(0),
+                lives: Mutex::new(HashMap::new()),
                 dragging: AtomicBool::new(false),
                 busy: AtomicBool::new(false),
             });
@@ -104,6 +108,7 @@ pub fn run() {
             windows::track_pet_frame(app.handle());
             windows::start_hit_test(app.handle().clone());
             sensors::start(app.handle().clone());
+            world::lives::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -147,6 +152,14 @@ pub fn run() {
             actions::focus::pomodoro_start,
             actions::focus::pomodoro_stop,
             actions::ocr::ocr_start,
+            world::open_url,
+            world::lives::lives_list,
+            world::lives::live_add,
+            world::lives::live_remove,
+            world::lives::lives_refresh,
+            world::briefing::briefing_latest,
+            world::briefing::briefing_generate,
+            world::briefing::briefing_running,
             clipboard::clipboard_list,
             clipboard::clipboard_copy,
             clipboard::clipboard_remove,

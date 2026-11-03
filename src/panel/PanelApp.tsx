@@ -7,11 +7,13 @@ import Chat from "./Chat";
 import Clipboard from "./Clipboard";
 import SettingsView from "./Settings";
 import SystemView from "./System";
+import Today from "./Today";
 import Usage from "./Usage";
 import "./panel.css";
 
 const TABS: { view: PanelView; label: string; title?: string }[] = [
   { view: "chat", label: "Chat" },
+  { view: "today", label: "Hoje" },
   { view: "actions", label: "Ações" },
   { view: "clipboard", label: "Clipboard", title: "Histórico da área de transferência" },
   { view: "system", label: "Sistema" },
@@ -68,6 +70,7 @@ export default function PanelApp() {
           onOpenSettings={() => setView("settings")}
         />
       )}
+      {view === "today" && <Today onAsk={(prompt) => void api.chatPrefill(prompt)} />}
       {view === "actions" && <Actions onAsk={(prompt) => void api.chatPrefill(prompt)} />}
       {view === "clipboard" && (
         <Clipboard

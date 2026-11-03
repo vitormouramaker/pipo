@@ -13,6 +13,24 @@ export type Settings = {
   sleepWhenIdle: boolean;
   breakReminders: boolean;
   breakIntervalMin: number;
+  webSearch: boolean;
+  briefingEnabled: boolean;
+  briefingTime: string;
+  briefingTopics: string;
+  briefingCity: string;
+};
+
+export type Source = { title: string; url: string };
+export type Briefing = { day: string; content: string; sources: Source[]; createdAt: string };
+export type LiveChannel = {
+  key: string;
+  platform: "twitch" | "youtube";
+  handle: string;
+  url: string;
+  live: boolean | null;
+  title: string | null;
+  checkedAt: string | null;
+  error: string | null;
 };
 
 export type Project = { name: string; path: string; editor: string };
@@ -52,6 +70,7 @@ export type ChatMessage = {
   text: string;
   confirmId?: string;
   decision?: "approved" | "denied";
+  sources?: { title: string; url: string }[];
 };
 
 export type Conversation = { id: number; title: string; updatedAt: string; current: boolean };
@@ -60,10 +79,11 @@ export type ChatEvent =
   | { type: "delta"; text: string }
   | { type: "tool"; label: string }
   | { type: "confirm"; id: string; question: string }
+  | { type: "source"; title: string; url: string }
   | { type: "done"; stopReason: string | null }
   | { type: "error"; message: string };
 
-export type PanelView = "chat" | "actions" | "clipboard" | "system" | "usage" | "settings";
+export type PanelView = "chat" | "today" | "actions" | "clipboard" | "system" | "usage" | "settings";
 
 export type UsageSummary = {
   today: number;
@@ -157,6 +177,14 @@ export const api = {
   pomodoroStart: (focusMin: number, breakMin: number) => invoke<void>("pomodoro_start", { focusMin, breakMin }),
   pomodoroStop: () => invoke<void>("pomodoro_stop"),
   ocrStart: () => invoke<void>("ocr_start"),
+  openUrl: (url: string) => invoke<void>("open_url", { url }),
+  livesList: () => invoke<LiveChannel[]>("lives_list"),
+  liveAdd: (platform: string, input: string) => invoke<void>("live_add", { platform, input }),
+  liveRemove: (key: string) => invoke<void>("live_remove", { key }),
+  livesRefresh: () => invoke<void>("lives_refresh"),
+  briefingLatest: () => invoke<Briefing | null>("briefing_latest"),
+  briefingGenerate: () => invoke<Briefing>("briefing_generate"),
+  briefingRunning: () => invoke<boolean>("briefing_running"),
   chatSend: (text: string, onEvent: (e: ChatEvent) => void) => {
     const channel = new Channel<ChatEvent>();
     channel.onmessage = onEvent;

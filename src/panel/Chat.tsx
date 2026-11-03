@@ -91,6 +91,15 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
         if (last?.role !== "assistant") return [...m, { role: "assistant", text: piece }];
         return [...m.slice(0, -1), { ...last, text: last.text + piece }];
       });
+    // Fontes citadas ficam no último balão de texto da resposta.
+    const addSource = (source: { title: string; url: string }) =>
+      setMessages((m) => {
+        const i = m.map((msg) => msg.role).lastIndexOf("assistant");
+        if (i < 0 || m[i].sources?.some((s) => s.url === source.url)) return m;
+        const copy = m.slice();
+        copy[i] = { ...m[i], sources: [...(m[i].sources ?? []), source] };
+        return copy;
+      });
     const pushStep = (step: ChatMessage) =>
       setMessages((m) => {
         const last = m[m.length - 1];
@@ -102,6 +111,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
       if (event.type === "delta") appendText(event.text);
       else if (event.type === "tool") pushStep({ role: "tool", text: event.label });
       else if (event.type === "confirm") pushStep({ role: "confirm", text: event.question, confirmId: event.id });
+      else if (event.type === "source") addSource({ title: event.title, url: event.url });
       else if (event.type === "error") setError(event.message);
       else if (event.stopReason === "refusal") setError("O Pipo não pode responder a esse pedido.");
       else if (event.stopReason === "max_tokens") setError("A resposta foi cortada por ser longa demais.");
@@ -228,6 +238,16 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
             return (
               <div key={i} className={`msg ${m.role}`}>
                 {m.text ? renderText(m.text) : <span className="typing">pensando…</span>}
+                {m.sources && m.sources.length > 0 && (
+                  <div className="sources">
+                    <span>Fontes:</span>
+                    {m.sources.slice(0, 8).map((s, n) => (
+                      <button key={s.url} className="link source" title={s.url} onClick={() => void api.openUrl(s.url)}>
+                        [{n + 1}] {s.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

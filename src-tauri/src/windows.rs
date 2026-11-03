@@ -16,7 +16,7 @@ use crate::{clipboard, AppState};
 pub const MAIN: &str = "main";
 pub const PANEL: &str = "panel";
 
-const PANEL_WIDTH: f64 = 480.0;
+const PANEL_WIDTH: f64 = 500.0;
 const PANEL_HEIGHT: f64 = 640.0;
 const PANEL_GAP: f64 = 12.0;
 

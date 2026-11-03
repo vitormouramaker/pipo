@@ -25,6 +25,14 @@ pub struct Settings {
     /// Fase 3: lembrar de pausas (água, postura) a cada tantos minutos de uso.
     pub break_reminders: bool,
     pub break_interval_min: u32,
+    /// Fase 4: busca na web no chat e briefing diário.
+    pub web_search: bool,
+    pub briefing_enabled: bool,
+    /// "HH:MM"
+    pub briefing_time: String,
+    pub briefing_topics: String,
+    /// Cidade para o clima do briefing (vazio = sem clima).
+    pub briefing_city: String,
 }
 
 impl Default for Settings {
@@ -42,6 +50,11 @@ impl Default for Settings {
             sleep_when_idle: true,
             break_reminders: false,
             break_interval_min: 50,
+            web_search: true,
+            briefing_enabled: false,
+            briefing_time: "08:00".into(),
+            briefing_topics: "tecnologia, games, inteligência artificial".into(),
+            briefing_city: String::new(),
         }
     }
 }

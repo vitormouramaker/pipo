@@ -121,6 +121,15 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
       </fieldset>
 
       <fieldset>
+        <legend>Internet</legend>
+        <label className="check">
+          <input type="checkbox" checked={settings.webSearch} onChange={(e) => update({ webSearch: e.target.checked })} />
+          Deixar o Pipo pesquisar na web no chat
+        </label>
+        <p className="hint">Cada busca custa cerca de US$ 0,01 e aparece em Gastos. O Pipo só pesquisa quando a pergunta depende de informação atual.</p>
+      </fieldset>
+
+      <fieldset>
         <legend>Comportamento</legend>
         <label>
           Atalho global
