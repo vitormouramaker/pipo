@@ -52,6 +52,14 @@ function Pomodoro({ status }: { status: FocusStatus | null }) {
   );
 }
 
+const REPEAT_LABEL: Record<string, string> = {
+  none: "Não repetir",
+  daily: "Todo dia",
+  weekdays: "Dias úteis",
+  weekly: "Toda semana",
+  monthly: "Todo mês",
+};
+
 function Reminders({ status }: { status: FocusStatus | null }) {
   const [text, setText] = useState("");
   const [mode, setMode] = useState<"minutes" | "time" | "date">("minutes");
@@ -63,12 +71,13 @@ function Reminders({ status }: { status: FocusStatus | null }) {
     return `${d.toLocaleDateString("sv-SE")}T09:00`;
   });
   const [message, setMessage] = useState<string | null>(null);
+  const [repeat, setRepeat] = useState("none");
 
   const add = () => {
     const call =
       mode === "minutes"
-        ? api.reminderAdd(text, Number(minutes))
-        : api.reminderAdd(text, undefined, mode === "time" ? time : date);
+        ? api.reminderAdd(text, Number(minutes), undefined, repeat)
+        : api.reminderAdd(text, undefined, mode === "time" ? time : date, repeat);
     void call
       .then((due) => {
         setText("");
@@ -112,13 +121,23 @@ function Reminders({ status }: { status: FocusStatus | null }) {
         )}
         {mode === "time" && <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />}
         {mode === "date" && <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />}
+        <select value={repeat} onChange={(e) => setRepeat(e.target.value)} title="Repetir">
+          {Object.entries(REPEAT_LABEL).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
       <p className="hint">Também dá para pedir no chat, por exemplo: "me lembra de pagar a conta dia 10 às 9h".</p>
       {message && <p className="hint">{message}</p>}
       {status?.reminders.map((r) => (
         <div key={r.id} className="trow">
           <span className="mono">{r.due}</span>
-          <span className="grow">{r.text}</span>
+          <span className="grow">
+            {r.text}
+            {r.repeat !== "none" && <span className="row-meta"> ↻ {REPEAT_LABEL[r.repeat]?.toLowerCase()}</span>}
+          </span>
           <button className="link muted" onClick={() => void api.reminderDelete(r.id)}>
             Excluir
           </button>

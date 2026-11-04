@@ -77,7 +77,12 @@ pub fn definitions() -> Value {
         tool(
             "add_reminder",
             "Cria um lembrete que aparece como aviso do Pipo. Informe minutes (daqui a quantos minutos) ou at: horário \"HH:MM\" (hoje ou amanhã) ou data e hora \"AAAA-MM-DD HH:MM\".",
-            json!({ "text": { "type": "string" }, "minutes": { "type": "integer" }, "at": { "type": "string", "description": "HH:MM ou AAAA-MM-DD HH:MM" } }),
+            json!({
+                "text": { "type": "string" },
+                "minutes": { "type": "integer" },
+                "at": { "type": "string", "description": "HH:MM ou AAAA-MM-DD HH:MM" },
+                "repeat": { "type": "string", "enum": ["none", "daily", "weekdays", "weekly", "monthly"], "description": "repetir: todo dia, dias úteis, toda semana ou todo mês" }
+            }),
             &["text"],
         ),
         tool("list_reminders", "Lembretes pendentes.", json!({}), &[]),
@@ -340,9 +345,10 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
                 text: String,
                 minutes: Option<i64>,
                 at: Option<String>,
+                repeat: Option<String>,
             }
             let i: In = parse(input)?;
-            focus::add_reminder(app, &i.text, i.minutes, i.at.as_deref()).map(|due| format!("Lembrete marcado para {due}."))
+            focus::add_reminder(app, &i.text, i.minutes, i.at.as_deref(), i.repeat.as_deref()).map(|due| format!("Lembrete marcado para {due}."))
         }
         "list_reminders" => to_json(focus::reminders(app)),
         "remember" => crate::proactive::remember(app, input["text"].as_str().unwrap_or("")),

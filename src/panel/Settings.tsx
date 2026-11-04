@@ -8,6 +8,46 @@ const VOICE_MODELS = [
   { value: "small", label: "Mais preciso (466 MB, mais lento)" },
 ] as const;
 
+/** Endereço da Google Agenda: salva e testa ali mesmo, com o resultado ao lado do botão. */
+function CalendarField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const test = () => {
+    setBusy(true);
+    setResult(null);
+    void api
+      .settingsUpdate({ calendarUrl: value.trim() })
+      .then(() => api.calendarRefresh())
+      .then((n) =>
+        setResult({ ok: true, text: value.trim() ? `Agenda conectada: ${n} compromisso(s) hoje e amanhã.` : "Agenda desligada." }),
+      )
+      .catch((e) => setResult({ ok: false, text: String(e) }))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div className="calendar-field">
+      <span className="field-label">Google Agenda (endereço secreto no formato iCal)</span>
+      <input
+        type="password"
+        placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+        value={value}
+        onChange={(e) => {
+          setResult(null);
+          onChange(e.target.value.trim());
+        }}
+        onKeyDown={(e) => e.key === "Enter" && test()}
+        autoComplete="off"
+      />
+      <div className="row">
+        <button className="primary" disabled={busy} onClick={test}>
+          {busy ? "Conectando…" : "Conectar e testar"}
+        </button>
+        {result && <span className={result.ok ? "status ok" : "status error"}>{result.text}</span>}
+      </div>
+    </div>
+  );
+}
+
 function MemorySettings() {
   const [items, setItems] = useState<Memory[]>([]);
   useEffect(() => {
@@ -392,31 +432,7 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
 
       <fieldset>
         <legend>Integrações</legend>
-        <label>
-          Google Agenda (endereço secreto no formato iCal)
-          <div className="inline-form">
-            <input
-              className="grow"
-              type="password"
-              placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
-              value={settings.calendarUrl}
-              onChange={(e) => update({ calendarUrl: e.target.value.trim() })}
-              autoComplete="off"
-            />
-            <button
-              onClick={() => {
-                setStatus(null);
-                void api
-                  .settingsUpdate({ calendarUrl: settings.calendarUrl })
-                  .then(() => api.calendarRefresh())
-                  .then((n) => setStatus({ kind: "ok", text: `Agenda ligada: ${n} compromisso(s) hoje e amanhã.` }))
-                  .catch((e) => setStatus({ kind: "error", text: String(e) }));
-              }}
-            >
-              Testar
-            </button>
-          </div>
-        </label>
+        <CalendarField value={settings.calendarUrl} onChange={(calendarUrl) => update({ calendarUrl })} />
         <p className="hint">
           Na Google Agenda (computador): Configurações → sua agenda → "Integrar agenda" → copie o "Endereço secreto no
           formato iCal". O Pipo só lê; esse link dá acesso à sua agenda, então não compartilhe.
@@ -425,7 +441,10 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           <input type="checkbox" checked={settings.githubNotify} onChange={(e) => update({ githubNotify: e.target.checked })} />
           Avisar quando a CI dos meus projetos terminar e quando pedirem minha revisão no GitHub
         </label>
-        <p className="hint">Usa o GitHub CLI (gh) que já está logado neste computador. A música é controlada pelo próprio Windows.</p>
+        <p className="hint">
+          Usa o GitHub CLI (gh) deste computador, com todas as contas logadas nele (ex.: trabalho e pessoal). Para incluir
+          outra conta, rode <code>gh auth login</code> no terminal. A música é controlada pelo próprio Windows.
+        </p>
       </fieldset>
 
       <VoiceSettings settings={settings} update={update} />

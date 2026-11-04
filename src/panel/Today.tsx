@@ -360,7 +360,7 @@ function Github() {
   return (
     <div className="block">
       <div className="block-head">
-        <h4>GitHub{gh.login ? ` · ${gh.login}` : ""}</h4>
+        <h4>GitHub{gh.accounts.length ? ` · ${gh.accounts.join(", ")}` : ""}</h4>
         <button
           className="link muted"
           disabled={busy}

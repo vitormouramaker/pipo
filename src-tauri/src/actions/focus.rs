@@ -42,6 +42,41 @@ pub struct Reminder {
     pub text: String,
     /// Horário local "HH:MM" (com a data se não for hoje).
     pub due: String,
+    /// "none", "daily", "weekdays", "weekly" ou "monthly".
+    pub repeat: String,
+}
+
+pub const REPEATS: &[&str] = &["none", "daily", "weekdays", "weekly", "monthly"];
+
+/// Próxima ocorrência de um lembrete que se repete, depois de `now`.
+pub fn next_due(due: chrono::DateTime<chrono::Local>, repeat: &str, now: chrono::DateTime<chrono::Local>) -> Option<chrono::DateTime<chrono::Local>> {
+    use chrono::{Datelike, Duration, TimeZone, Weekday};
+    let step = |d: chrono::DateTime<chrono::Local>| -> Option<chrono::DateTime<chrono::Local>> {
+        match repeat {
+            "daily" => Some(d + Duration::days(1)),
+            "weekly" => Some(d + Duration::days(7)),
+            "weekdays" => {
+                let mut n = d + Duration::days(1);
+                while matches!(n.weekday(), Weekday::Sat | Weekday::Sun) {
+                    n += Duration::days(1);
+                }
+                Some(n)
+            }
+            "monthly" => {
+                // Mesmo dia no mês seguinte (ou o último dia, se o mês for mais curto).
+                let (y, m) = if d.month() == 12 { (d.year() + 1, 1) } else { (d.year(), d.month() + 1) };
+                let last = (28..=31).rev().find(|day| chrono::NaiveDate::from_ymd_opt(y, m, *day).is_some())?;
+                let date = chrono::NaiveDate::from_ymd_opt(y, m, d.day().min(last))?;
+                chrono::Local.from_local_datetime(&date.and_time(d.time())).earliest()
+            }
+            _ => None,
+        }
+    };
+    let mut next = step(due)?;
+    while next <= now {
+        next = step(next)?;
+    }
+    Some(next)
 }
 
 #[derive(Serialize)]
@@ -94,7 +129,11 @@ fn parse_date_time(text: &str, now: chrono::DateTime<chrono::Local>) -> Option<c
 
 /// Agenda um lembrete daqui a `minutes` minutos, no horário "HH:MM" (hoje ou amanhã)
 /// ou numa data e hora específicas.
-pub fn add_reminder(app: &AppHandle, text: &str, minutes: Option<i64>, at: Option<&str>) -> Result<String, String> {
+pub fn add_reminder(app: &AppHandle, text: &str, minutes: Option<i64>, at: Option<&str>, repeat: Option<&str>) -> Result<String, String> {
+    let repeat = repeat.unwrap_or("none");
+    if !REPEATS.contains(&repeat) {
+        return Err("Repetição inválida (use daily, weekdays, weekly ou monthly).".into());
+    }
     let text = text.trim();
     if text.is_empty() {
         return Err("O lembrete está vazio.".into());
@@ -123,7 +162,7 @@ pub fn add_reminder(app: &AppHandle, text: &str, minutes: Option<i64>, at: Optio
     let state = app.state::<AppState>();
     let db = state.db.lock().unwrap();
     db.conn()
-        .execute("INSERT INTO reminders (text, due_at) VALUES (?1, ?2)", params![text, utc])
+        .execute("INSERT INTO reminders (text, due_at, repeat) VALUES (?1, ?2, ?3)", params![text, utc, repeat])
         .map_err(|e| e.to_string())?;
     let _ = app.emit("focus-changed", ());
     Ok(if due.year_ce() == now.year_ce() { due.format("%d/%m %H:%M") } else { due.format("%d/%m/%Y %H:%M") }.to_string())
@@ -145,12 +184,12 @@ fn local_due(utc: &str) -> String {
 pub fn reminders(app: &AppHandle) -> Vec<Reminder> {
     let state = app.state::<AppState>();
     let db = state.db.lock().unwrap();
-    let Ok(mut stmt) = db.conn().prepare("SELECT id, text, due_at FROM reminders WHERE done = 0 ORDER BY due_at") else {
+    let Ok(mut stmt) = db.conn().prepare("SELECT id, text, due_at, repeat FROM reminders WHERE done = 0 ORDER BY due_at") else {
         return Vec::new();
     };
     stmt.query_map([], |r| {
         let due: String = r.get(2)?;
-        Ok(Reminder { id: r.get(0)?, text: r.get(1)?, due: local_due(&due) })
+        Ok(Reminder { id: r.get(0)?, text: r.get(1)?, due: local_due(&due), repeat: r.get(3)? })
     })
     .map(|rows| rows.flatten().collect())
     .unwrap_or_default()
@@ -219,15 +258,31 @@ pub fn tick(app: &AppHandle, idle: u64, gaming: bool) {
     if check {
         let due: Vec<(i64, String)> = {
             let db = state.db.lock().unwrap();
-            let rows: Vec<(i64, String)> = db
+            let rows: Vec<(i64, String, String, String)> = db
                 .conn()
-                .prepare("SELECT id, text FROM reminders WHERE done = 0 AND due_at <= datetime('now')")
-                .and_then(|mut stmt| stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).map(|r| r.flatten().collect()))
+                .prepare("SELECT id, text, due_at, repeat FROM reminders WHERE done = 0 AND due_at <= datetime('now')")
+                .and_then(|mut stmt| {
+                    stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))).map(|r| r.flatten().collect())
+                })
                 .unwrap_or_default();
-            for (id, _) in &rows {
-                let _ = db.conn().execute("UPDATE reminders SET done = 1 WHERE id = ?1", params![id]);
+            let now = chrono::Local::now();
+            for (id, _, due_at, repeat) in &rows {
+                // Os que se repetem passam para a próxima vez; os outros ficam feitos.
+                let next = chrono::NaiveDateTime::parse_from_str(due_at, "%Y-%m-%d %H:%M:%S")
+                    .ok()
+                    .map(|n| n.and_utc().with_timezone(&chrono::Local))
+                    .and_then(|d| next_due(d, repeat, now));
+                match next {
+                    Some(n) => {
+                        let utc = n.with_timezone(&chrono::Utc).format("%Y-%m-%d %H:%M:%S").to_string();
+                        let _ = db.conn().execute("UPDATE reminders SET due_at = ?1 WHERE id = ?2", params![utc, id]);
+                    }
+                    None => {
+                        let _ = db.conn().execute("UPDATE reminders SET done = 1 WHERE id = ?1", params![id]);
+                    }
+                }
             }
-            rows
+            rows.into_iter().map(|(id, text, _, _)| (id, text)).collect()
         };
         for (_, text) in &due {
             notify(app, "reminder", "Lembrete", text);
@@ -303,8 +358,8 @@ pub fn focus_status(app: AppHandle) -> FocusStatus {
 }
 
 #[tauri::command]
-pub fn reminder_add(app: AppHandle, text: String, minutes: Option<i64>, at: Option<String>) -> Result<String, String> {
-    add_reminder(&app, &text, minutes, at.as_deref())
+pub fn reminder_add(app: AppHandle, text: String, minutes: Option<i64>, at: Option<String>, repeat: Option<String>) -> Result<String, String> {
+    add_reminder(&app, &text, minutes, at.as_deref(), repeat.as_deref())
 }
 
 #[tauri::command]
@@ -339,5 +394,29 @@ mod tests {
         // Data deste ano que já passou vai para o ano que vem.
         assert_eq!(fmt("10/01 08:00").as_deref(), Some("2027-01-10 08:00"));
         assert!(fmt("amanhã").is_none());
+    }
+}
+
+#[cfg(test)]
+mod repeat_tests {
+    use super::next_due;
+    use chrono::TimeZone;
+
+    #[test]
+    fn proxima_vez_dos_lembretes_que_se_repetem() {
+        let at = |y, m, d, h| chrono::Local.with_ymd_and_hms(y, m, d, h, 0, 0).unwrap();
+        let fmt = |d: chrono::DateTime<chrono::Local>| d.format("%Y-%m-%d %H:%M").to_string();
+        // Quarta 4/11 às 9h; agora 4/11 às 9h01.
+        let due = at(2026, 11, 4, 9);
+        let now = at(2026, 11, 4, 9) + chrono::Duration::minutes(1);
+        assert_eq!(fmt(next_due(due, "daily", now).unwrap()), "2026-11-05 09:00");
+        assert_eq!(fmt(next_due(due, "weekly", now).unwrap()), "2026-11-11 09:00");
+        // Sexta → segunda (pula o fim de semana).
+        assert_eq!(fmt(next_due(at(2026, 11, 6, 9), "weekdays", at(2026, 11, 6, 10)).unwrap()), "2026-11-09 09:00");
+        // 31/01 → 28/02 (fevereiro mais curto).
+        assert_eq!(fmt(next_due(at(2027, 1, 31, 9), "monthly", at(2027, 1, 31, 10)).unwrap()), "2027-02-28 09:00");
+        // O PC ficou desligado 3 dias: pula para a próxima depois de agora.
+        assert_eq!(fmt(next_due(due, "daily", at(2026, 11, 7, 12)).unwrap()), "2026-11-08 09:00");
+        assert!(next_due(due, "none", now).is_none());
     }
 }

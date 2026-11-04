@@ -87,6 +87,8 @@ impl Db {
         )?;
         // Colunas acrescentadas depois da primeira versão (o erro de coluna repetida é esperado).
         let _ = conn.execute("ALTER TABLE usage ADD COLUMN web_searches INTEGER NOT NULL DEFAULT 0", []);
+        // Lembretes que se repetem: none, daily, weekdays, weekly, monthly.
+        let _ = conn.execute("ALTER TABLE reminders ADD COLUMN repeat TEXT NOT NULL DEFAULT 'none'", []);
         Ok(Self { conn })
     }
 

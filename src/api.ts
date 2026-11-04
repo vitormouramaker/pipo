@@ -77,9 +77,9 @@ export type DaySummary = {
 export type Memory = { id: number; text: string; createdAt: string };
 export type CalendarEvent = { title: string; start: string; end: string; time: string; allDay: boolean; location: string; link: string | null };
 export type CalendarStatus = { configured: boolean; today: CalendarEvent[]; tomorrow: CalendarEvent[]; error: string | null; checkedAt: string | null };
-export type Pr = { repo: string; number: number; title: string; url: string };
+export type Pr = { account: string; repo: string; number: number; title: string; url: string };
 export type CiRun = { repo: string; id: number; status: string; conclusion: string; title: string; url: string; branch: string; workflow: string };
-export type GithubStatus = { available: boolean; login: string | null; prs: Pr[]; reviews: Pr[]; runs: CiRun[]; error: string | null; checkedAt: string | null };
+export type GithubStatus = { available: boolean; login: string | null; accounts: string[]; prs: Pr[]; reviews: Pr[]; runs: CiRun[]; error: string | null; checkedAt: string | null };
 export type NowPlaying = { available: boolean; title: string; artist: string; app: string; playing: boolean };
 export type UpdateStatus = {
   current: string;
@@ -136,7 +136,7 @@ export type RecentFile = { name: string; path: string; folder: boolean; modified
 export type Note = { id: number; text: string; createdAt: string };
 export type FocusStatus = {
   pomodoro: { phase: "focus" | "break"; remainingSecs: number; cycle: number; focusMin: number; breakMin: number } | null;
-  reminders: { id: number; text: string; due: string }[];
+  reminders: { id: number; text: string; due: string; repeat: string }[];
   breaksEnabled: boolean;
   breakIntervalMin: number;
   nextBreakSecs: number | null;
@@ -249,7 +249,7 @@ export const api = {
   noteAdd: (text: string) => invoke<number>("note_add", { text }),
   noteDelete: (id: number) => invoke<void>("note_delete", { id }),
   focusStatus: () => invoke<FocusStatus>("focus_status"),
-  reminderAdd: (text: string, minutes?: number, at?: string) => invoke<string>("reminder_add", { text, minutes, at }),
+  reminderAdd: (text: string, minutes?: number, at?: string, repeat?: string) => invoke<string>("reminder_add", { text, minutes, at, repeat }),
   reminderDelete: (id: number) => invoke<void>("reminder_delete", { id }),
   pomodoroStart: (focusMin: number, breakMin: number) => invoke<void>("pomodoro_start", { focusMin, breakMin }),
   pomodoroStop: () => invoke<void>("pomodoro_stop"),

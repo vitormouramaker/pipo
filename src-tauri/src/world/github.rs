@@ -1,4 +1,6 @@
 //! Fase 6.4: GitHub pelo `gh` que já está logado no computador (o Pipo não guarda token).
+//! Vale para todas as contas logadas no `gh` (ex.: a do trabalho e a pessoal): cada consulta
+//! usa o token da conta certa, sem trocar a conta ativa do usuário.
 //! A cada 5 minutos: PRs abertos do usuário, revisões pedidas a ele e a última execução
 //! de CI dos repositórios dos projetos recentes. Avisa quando a CI termina e quando
 //! pedem uma revisão.
@@ -17,6 +19,8 @@ use crate::{toast, AppState};
 #[derive(Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Pr {
+    /// Conta do GitHub em que o PR apareceu.
+    account: String,
     repo: String,
     number: i64,
     title: String,
@@ -47,6 +51,7 @@ pub struct CiRun {
 pub struct GithubStatus {
     available: bool,
     login: Option<String>,
+    accounts: Vec<String>,
     prs: Vec<Pr>,
     reviews: Vec<Pr>,
     runs: Vec<CiRun>,
@@ -69,6 +74,39 @@ fn gh(args: &[&str]) -> Result<String, String> {
     run("gh", args, None)
 }
 
+/// Contas logadas no `gh` (a ativa primeiro).
+fn accounts() -> Vec<String> {
+    let out = crate::actions::command("gh").args(["auth", "status", "--hostname", "github.com"]).output();
+    let Ok(out) = out else { return Vec::new() };
+    let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
+    let mut list: Vec<(bool, String)> = Vec::new();
+    for line in text.lines() {
+        if let Some(rest) = line.split("account ").nth(1).filter(|_| line.contains("Logged in to")) {
+            let name = rest.split_whitespace().next().unwrap_or("").to_string();
+            if !name.is_empty() {
+                list.push((false, name));
+            }
+        } else if line.contains("Active account: true") {
+            if let Some(last) = list.last_mut() {
+                last.0 = true;
+            }
+        }
+    }
+    list.sort_by_key(|(active, _)| !*active);
+    list.into_iter().map(|(_, n)| n).collect()
+}
+
+/// Roda o `gh` como uma conta específica (pelo token dela, sem mudar a conta ativa).
+fn gh_as(account: &str, args: &[&str]) -> Result<String, String> {
+    let token = gh(&["auth", "token", "--user", account])?.trim().to_string();
+    let out = crate::actions::command("gh").args(args).env("GH_TOKEN", token).output().map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
+}
+
 /// "owner/repo" do remoto origin de um projeto, se for do GitHub.
 fn github_repo(path: &str) -> Option<String> {
     let config = std::fs::read_to_string(std::path::Path::new(path).join(".git").join("config")).ok()?;
@@ -84,12 +122,13 @@ fn github_repo(path: &str) -> Option<String> {
     (repo.split('/').count() == 2).then(|| repo.to_string())
 }
 
-fn prs(query_flag: &str) -> Result<Vec<Pr>, String> {
-    let out = gh(&["search", "prs", query_flag, "--state=open", "--json", "number,title,repository,url", "--limit", "10"])?;
+fn prs(account: &str, query_flag: &str) -> Result<Vec<Pr>, String> {
+    let out = gh_as(account, &["search", "prs", query_flag, "--state=open", "--json", "number,title,repository,url", "--limit", "10"])?;
     let list: Vec<Value> = serde_json::from_str(&out).map_err(|e| e.to_string())?;
     Ok(list
         .into_iter()
         .map(|v| Pr {
+            account: account.to_string(),
             repo: v["repository"]["nameWithOwner"].as_str().unwrap_or("").to_string(),
             number: v["number"].as_i64().unwrap_or(0),
             title: v["title"].as_str().unwrap_or("").to_string(),
@@ -99,40 +138,69 @@ fn prs(query_flag: &str) -> Result<Vec<Pr>, String> {
 }
 
 fn collect() -> GithubStatus {
-    let login = match gh(&["api", "user", "--jq", ".login"]) {
-        Ok(l) => l.trim().to_string(),
-        Err(_) => {
-            return GithubStatus {
-                available: false,
-                error: Some("O GitHub CLI (gh) não está instalado ou logado.".into()),
-                ..Default::default()
+    let accounts = accounts();
+    let Some(login) = accounts.first().cloned() else {
+        return GithubStatus {
+            available: false,
+            error: Some("O GitHub CLI (gh) não está instalado ou logado.".into()),
+            ..Default::default()
+        };
+    };
+    // Até 6 dos projetos recentes do editor e até 3 com push recente de cada conta.
+    let mut repos: Vec<String> = projects::recent_projects().iter().filter_map(|p| github_repo(&p.path)).take(6).collect();
+    // Mais os repositórios de cada conta com push nos últimos 3 dias (ex.: projetos fora do VS Code).
+    let since = (chrono::Utc::now() - chrono::Duration::days(3)).to_rfc3339();
+    for account in &accounts {
+        if let Ok(out) = gh_as(account, &["repo", "list", account, "--limit", "5", "--json", "nameWithOwner,pushedAt"]) {
+            let list: Vec<Value> = serde_json::from_str(&out).unwrap_or_default();
+            for r in list.into_iter().take(3) {
+                if r["pushedAt"].as_str().is_some_and(|t| t >= since.as_str()) {
+                    if let Some(name) = r["nameWithOwner"].as_str() {
+                        repos.push(name.to_string());
+                    }
+                }
             }
         }
-    };
-    let mut repos: Vec<String> = projects::recent_projects().iter().filter_map(|p| github_repo(&p.path)).collect();
-    repos.dedup();
-    repos.truncate(8);
+    }
+    let mut seen = std::collections::HashSet::new();
+    repos.retain(|r| seen.insert(r.to_lowercase()));
+    repos.truncate(12);
     let runs = repos
         .iter()
         .filter_map(|repo| {
-            let out = gh(&[
-                "run", "list", "-R", repo, "--limit", "1", "--json",
+            // Tenta primeiro a conta dona do repositório, depois as outras (repos privados).
+            let owner = repo.split('/').next().unwrap_or("");
+            let mut order: Vec<&String> = accounts.iter().filter(|a| a.eq_ignore_ascii_case(owner)).collect();
+            order.extend(accounts.iter().filter(|a| !a.eq_ignore_ascii_case(owner)));
+            let args = [
+                "run", "list", "-R", repo.as_str(), "--limit", "1", "--json",
                 "databaseId,status,conclusion,displayTitle,url,headBranch,workflowName",
-            ])
-            .ok()?;
+            ];
+            let out = order.iter().find_map(|a| gh_as(a, &args).ok())?;
             let mut list: Vec<CiRun> = serde_json::from_str(&out).ok()?;
             let mut run = list.pop()?;
             run.repo = repo.clone();
             Some(run)
         })
         .collect();
-    let (prs_mine, reviews) = (prs("--author=@me"), prs("--review-requested=@me"));
+    let (mut prs_mine, mut reviews, mut errors) = (Vec::new(), Vec::new(), Vec::new());
+    for account in &accounts {
+        match prs(account, "--author=@me") {
+            Ok(list) => prs_mine.extend(list),
+            Err(e) => errors.push(format!("{account}: {e}")),
+        }
+        match prs(account, "--review-requested=@me") {
+            Ok(list) => reviews.extend(list),
+            Err(e) => errors.push(format!("{account}: {e}")),
+        }
+    }
     GithubStatus {
         available: true,
         login: Some(login),
-        error: prs_mine.as_ref().err().or(reviews.as_ref().err()).cloned(),
-        prs: prs_mine.unwrap_or_default(),
-        reviews: reviews.unwrap_or_default(),
+        accounts: accounts.clone(),
+        error: (!errors.is_empty()).then(|| errors.join(" · ")),
+        prs: prs_mine,
+        reviews,
         runs,
         checked_at: Some(crate::actions::now_hm()),
     }
@@ -227,7 +295,7 @@ mod live {
     #[ignore = "usa o gh logado neste computador"]
     fn consulta_o_github() {
         let s = super::collect();
-        println!("gh: disponível={} login={:?} prs={} revisões={} ci={:?} erro={:?}", s.available, s.login, s.prs.len(), s.reviews.len(),
+        println!("gh: disponível={} contas={:?} prs={} revisões={} ci={:?} erro={:?}", s.available, s.accounts, s.prs.len(), s.reviews.len(),
             s.runs.iter().map(|r| format!("{}:{}/{}", r.repo, r.status, r.conclusion)).collect::<Vec<_>>(), s.error);
     }
 }

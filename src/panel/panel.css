@@ -397,3 +397,8 @@
 .dot.ci-ok { background: var(--ok); }
 .dot.ci-fail { background: var(--danger); box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2); }
 .dot.ci-running { background: var(--warn); }
+
+/* Campo da agenda nas Configurações */
+.calendar-field { display: grid; gap: 6px; }
+.calendar-field .field-label { color: var(--muted); font-size: 13px; }
+.calendar-field .row { align-items: center; flex-wrap: wrap; }

@@ -64,7 +64,8 @@ fn panel(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 }
 
 fn panel_moved(app: &AppHandle, p: PhysicalPosition<i32>) {
-    if PANEL_EXPANDED.load(Ordering::SeqCst) {
+    // Expandido ou com o Pipo em ilha (grudada na borda), o painel anda sozinho.
+    if PANEL_EXPANDED.load(Ordering::SeqCst) || island::active() {
         return;
     }
     let state = app.state::<AppState>();
@@ -141,6 +142,16 @@ pub fn beside_pet(app: &AppHandle, w: i32, h: i32, align_bottom: bool) -> Option
     let x = if bx0 - w - gap >= left { bx0 - w - gap } else { bx1 + gap };
     let y = if align_bottom { by1 - h } else { by0 };
     Some(clamp(x, y))
+}
+
+/// A ilha mudou de borda: o painel aberto vai para o lado de dentro da nova posição.
+pub fn replace_panel(app: &AppHandle) {
+    if PANEL_EXPANDED.load(Ordering::SeqCst) {
+        return;
+    }
+    if let Some(panel) = app.get_webview_window(PANEL).filter(|w| w.is_visible().unwrap_or(false)) {
+        place_panel(app, &panel);
+    }
 }
 
 /// Posiciona o painel ao lado do Pipo, dentro da área útil do monitor.
@@ -565,7 +576,7 @@ pub fn start_hit_test(app: AppHandle) {
             let state = app.state::<AppState>();
             let Some((pos, size, scale)) = *state.pet_frame.lock().unwrap() else { continue };
             if island::active() {
-                let over = cursor_point().is_some_and(|c| island::hit(&app, pos, scale, c));
+                let over = cursor_point().is_some_and(|c| island::hit(&app, pos, size, scale, c));
                 if !state.dragging.load(Ordering::SeqCst) {
                     island::set_hover(&app, over);
                 }

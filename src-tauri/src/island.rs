@@ -43,6 +43,11 @@ fn dims(edge: &str) -> (f64, f64) {
 /// Retângulo da pílula dentro da janela (px lógicos: x, y, largura, altura), igual ao Island.tsx.
 fn pill(edge: &str, big: bool) -> [f64; 4] {
     let (ww, wh) = dims(edge);
+    pill_in(edge, big, ww, wh)
+}
+
+/// O mesmo, numa janela de `ww`×`wh` px lógicos (o tamanho real dela, que é o que a tela usa).
+fn pill_in(edge: &str, big: bool, ww: f64, wh: f64) -> [f64; 4] {
     let vertical = matches!(edge, "left" | "right");
     let k = scale();
     let (w, h) = match (vertical, big) {
@@ -271,6 +276,7 @@ pub fn preview(app: &AppHandle, edge: &str, cursor: PhysicalPosition<f64>) {
 /// Soltou o mouse com a ilha na borda: ela fica ali (salva) e brilha para ser notada.
 pub fn commit(app: &AppHandle) {
     let Some((edge, pos)) = LIVE.lock().unwrap().clone() else { return };
+    windows::replace_panel(app);
     save(app, |s| {
         s.island = true;
         s.island_edge = edge.clone();
@@ -302,8 +308,9 @@ pub fn undock_at(app: &AppHandle, cursor: PhysicalPosition<f64>) -> Option<Physi
 }
 
 /// O cursor está sobre a pílula? (com folga quando ela já está expandida)
-pub fn hit(app: &AppHandle, pos: PhysicalPosition<i32>, scale: f64, cursor: (f64, f64)) -> bool {
-    let r = pill(&edge_of(app), HOVER.load(Ordering::SeqCst));
+pub fn hit(app: &AppHandle, pos: PhysicalPosition<i32>, size: tauri::PhysicalSize<u32>, scale: f64, cursor: (f64, f64)) -> bool {
+    let (ww, wh) = (size.width as f64 / scale, size.height as f64 / scale);
+    let r = pill_in(&edge_of(app), HOVER.load(Ordering::SeqCst), ww, wh);
     let (x, y) = ((cursor.0 - pos.x as f64) / scale, (cursor.1 - pos.y as f64) / scale);
     x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3]
 }

@@ -17,7 +17,8 @@ const CLICK_TOLERANCE = 4;
  *  (o island.rs calcula o mesmo para saber quando o mouse está em cima). */
 function rect(edge: Edge, [w, h]: readonly [number, number], k: number): [number, number, number, number] {
   const vertical = edge === "left" || edge === "right";
-  const [ww, wh] = times(vertical ? WINDOW.v : WINDOW.h, k);
+  // Tamanho real da janela (o Rust usa o mesmo para saber se o mouse está em cima).
+  const [ww, wh] = window.innerWidth > 0 ? [window.innerWidth, window.innerHeight] : times(vertical ? WINDOW.v : WINDOW.h, k);
   const x = edge.endsWith("left") ? 0 : edge.endsWith("right") ? ww - w : (ww - w) / 2;
   const y = edge.startsWith("top") ? 0 : edge.startsWith("bottom") ? wh - h : (wh - h) / 2;
   return [x, y, w, h];
@@ -30,6 +31,13 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
 export default function Island({ edge, state, scale = 1 }: { edge: Edge; state: PipoState; scale?: number }) {
   const vertical = edge === "left" || edge === "right";
   const [hover, setHover] = useState(false);
+  // Redesenha quando a janela muda de tamanho (troca de borda, escala).
+  const [, setSize] = useState(0);
+  useEffect(() => {
+    const onResize = () => setSize((n) => n + 1);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   // Brilho rápido ao virar ilha, para ela não sumir em fundos escuros.
   const [glow, setGlow] = useState(true);
   const [info, setInfo] = useState(clock());
