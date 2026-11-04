@@ -187,7 +187,6 @@ pub fn run() {
             menu::menu_hide,
             island::island_toggle,
             island::island_status,
-            island::island_hit,
             windows::panel_expand,
             windows::panel_is_expanded,
             voice::voice_status,

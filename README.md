@@ -39,7 +39,7 @@ npm run tauri build   # gera os instaladores em src-tauri/target/release/bundle/
 - **Ctrl + Alt + Shift + V**: fala com o Pipo (também pelo 🎙 do chat ou pelo menu dele). Ele ouve até você fazer uma pausa, transcreve no próprio computador e responde em voz alta.
 - **Ícone do Pipo no topo do painel**: nível, evolução, acessórios e conquistas.
 - **Arrastar**: move o Pipo, que para nas bordas da tela (e passa para outro monitor); a posição é lembrada. Com o painel aberto, Pipo e painel andam juntos (arrastando qualquer um dos dois). Ao ser arrastado, o Pipo se inclina, estica com a velocidade e balança como gelatina quando você solta.
-- **Modo ilha**: no menu do Pipo (ou na bandeja), ele encolhe para uma pílula discreta grudada na borda da tela, como a ilha dinâmica do iPhone. Arraste para qualquer borda; ao passar o mouse ela expande e mostra a hora ou o pomodoro; clique para o chat; o botão dentro dela traz o Pipo de volta.
+- **Modo ilha**: no menu do Pipo (ou na bandeja), ele encolhe para uma pílula discreta grudada na borda da tela, como a ilha dinâmica do iPhone. Arraste para qualquer borda ou canto; ao passar o mouse ela expande e mostra a hora ou o pomodoro; clique para o chat; o botão dentro dela traz o Pipo de volta.
 - **Botão direito no Pipo**: menu com a cara do Pipo, sempre ao lado dele (chat, falar, modo ilha, evolução, configurações, ocultar e sair). O **ícone na bandeja** tem as mesmas opções no menu do Windows.
 - **Avisos**: lembretes, lives, pomodoro, níveis e alertas aparecem como balões do próprio Pipo ao lado dele, sem roubar o foco (nem de um jogo). Clique no balão para abrir a live ou a aba certa.
 - **X** no canto do painel: fecha o painel. O botão ao lado expande o painel para a tela toda (e volta).

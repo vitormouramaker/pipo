@@ -269,7 +269,6 @@ export const api = {
   menuHide: () => invoke<void>("menu_hide"),
   islandToggle: () => invoke<void>("island_toggle"),
   islandStatus: () => invoke<{ active: boolean; edge: string }>("island_status"),
-  islandHit: (small: number[], big: number[]) => invoke<void>("island_hit", { small, big }),
   toastTake: () => invoke<Toast[]>("toast_take"),
   toastLayout: (height: number) => invoke<void>("toast_layout", { height }),
   toastOpen: (url: string | null, view: string | null) => invoke<void>("toast_open", { url, view }),

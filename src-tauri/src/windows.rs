@@ -129,7 +129,7 @@ pub fn beside_pet(app: &AppHandle, w: i32, h: i32, align_bottom: bool) -> Option
         return Some(match edge.as_str() {
             "left" => clamp(x1 + gap, cy - h / 2),
             "right" => clamp(x0 - w - gap, cy - h / 2),
-            "bottom" => clamp(cx - w / 2, y0 - h - gap),
+            e if e.starts_with("bottom") => clamp(cx - w / 2, y0 - h - gap),
             _ => clamp(cx - w / 2, y1 + gap),
         });
     }
@@ -512,7 +512,7 @@ pub fn start_hit_test(app: AppHandle) {
             let state = app.state::<AppState>();
             let Some((pos, size, scale)) = *state.pet_frame.lock().unwrap() else { continue };
             if island::active() {
-                let over = cursor_point().is_some_and(|c| island::hit(pos, scale, c));
+                let over = cursor_point().is_some_and(|c| island::hit(&app, pos, scale, c));
                 if !state.dragging.load(Ordering::SeqCst) {
                     island::set_hover(&app, over);
                 }

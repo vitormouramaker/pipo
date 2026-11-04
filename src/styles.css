@@ -210,6 +210,11 @@ body,
 .island.bottom { border-bottom: 0; border-radius: 16px 16px 0 0; }
 .island.left { border-left: 0; border-radius: 0 16px 16px 0; flex-direction: column; }
 .island.right { border-right: 0; border-radius: 16px 0 0 16px; flex-direction: column; }
+/* Nos cantos: encaixada nas duas bordas, só o canto de dentro arredondado. */
+.island.top-left { border-top: 0; border-left: 0; border-radius: 0 0 18px 0; }
+.island.top-right { border-top: 0; border-right: 0; border-radius: 0 0 0 18px; }
+.island.bottom-left { border-bottom: 0; border-left: 0; border-radius: 0 18px 0 0; }
+.island.bottom-right { border-bottom: 0; border-right: 0; border-radius: 18px 0 0 0; }
 .island.hover { border-color: #3a3f47; }
 .island-eyes {
   display: flex;
