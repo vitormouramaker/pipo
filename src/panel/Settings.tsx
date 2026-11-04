@@ -1,3 +1,4 @@
+import SettingsNav from "./SettingsNav";
 import { EmailSettings, LolSettings, ModesSettings, TelegramSettings } from "./settings7";
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
@@ -271,6 +272,10 @@ function VoiceSettings({ settings, update }: { settings: Settings; update: (patc
         <input value={settings.voiceShortcut} onChange={(e) => update({ voiceShortcut: e.target.value })} />
       </label>
       <label>
+        Atalho para encontrar o Pipo (ele pulsa na tela)
+        <input value={settings.findShortcut} onChange={(e) => update({ findShortcut: e.target.value })} />
+      </label>
+      <label>
         Atalho para perguntar sobre a tela
         <input value={settings.screenShortcut} onChange={(e) => update({ screenShortcut: e.target.value })} />
       </label>
@@ -301,6 +306,7 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
   const [status, setStatus] = useState<Status>(null);
   // Mudanças esperando para salvar (texto digitado espera uma pausa curta).
   const pending = useRef<Partial<Settings>>({});
+  const rootRef = useRef<HTMLElement>(null);
   const timer = useRef(0);
 
   const refreshKey = () =>
@@ -344,7 +350,8 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
   };
 
   return (
-    <section className="settings">
+    <section className="settings" ref={rootRef}>
+      <SettingsNav root={rootRef} />
       <fieldset>
         <legend>Chave da Claude API</legend>
         <p className="hint">

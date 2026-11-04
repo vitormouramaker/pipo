@@ -101,15 +101,17 @@ pub fn run() {
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
-                    let (voice, screen) = {
+                    let (voice, screen, find) = {
                         let s = app.state::<AppState>().settings.lock().unwrap().clone();
-                        (s.voice_shortcut, s.screen_shortcut)
+                        (s.voice_shortcut, s.screen_shortcut, s.find_shortcut)
                     };
                     let is = |text: &str| text.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|v| v == *shortcut);
                     if is(&voice) {
                         voice::toggle(app);
                     } else if is(&screen) {
                         let _ = actions::screen::start(app);
+                    } else if is(&find) {
+                        windows::find_pet(app);
                     } else {
                         windows::toggle_panel(app);
                     }
@@ -250,6 +252,7 @@ pub fn run() {
             actions::downloads::downloads_trash,
             documents::chat_take_attachments,
             documents::attachment_preview,
+            documents::chat_attachments_count,
             updater::update_status,
             updater::update_check,
             updater::update_install,
@@ -314,6 +317,7 @@ pub fn run() {
             windows::panel_open,
             windows::panel_hide,
             windows::pet_toggle,
+            windows::pet_find,
             windows::pet_drag_start,
             windows::radial_open,
             windows::radial_close,

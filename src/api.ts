@@ -21,6 +21,7 @@ export type Settings = {
   voiceModel: "base" | "small";
   voiceShortcut: string;
   screenShortcut: string;
+  findShortcut: string;
   speakReplies: boolean;
   voiceName: string;
   voiceEngine: "natural" | "windows";
@@ -311,6 +312,7 @@ export const api = {
   chatAttach: (paths: string[], openChat = true) => invoke<AttachResult[]>("chat_attach", { paths, openChat }),
   chatTakeAttachments: () => invoke<Attachment[]>("chat_take_attachments"),
   attachmentPreview: (path: string) => invoke<string>("attachment_preview", { path }),
+  chatAttachmentsCount: (count: number) => invoke<void>("chat_attachments_count", { count }),
   usageSummary: () => invoke<UsageSummary>("usage_summary"),
   clipboardList: () => invoke<ClipItem[]>("clipboard_list"),
   clipboardCopy: (id: number) => invoke<void>("clipboard_copy", { id }),
@@ -339,6 +341,7 @@ export const api = {
   voiceDownload: (model?: string) => invoke<void>("voice_download", { model }),
   voiceToggle: () => invoke<void>("voice_toggle"),
   screenAsk: () => invoke<void>("screen_ask"),
+  petFind: () => invoke<void>("pet_find"),
   downloadsPlan: () => invoke<DownloadsPlan>("downloads_plan"),
   downloadsOrganize: () => invoke<number>("downloads_organize"),
   downloadsUndo: () => invoke<number>("downloads_undo"),

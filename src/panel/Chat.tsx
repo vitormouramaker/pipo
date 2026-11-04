@@ -32,6 +32,9 @@ function renderText(text: string): ReactNode[] {
   });
 }
 
+/** Igual a MAX_ATTACHMENTS no Rust (documents.rs). */
+const MAX_ATTACHMENTS = 5;
+
 export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -89,7 +92,14 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
       void api.chatTakeAttachments().then((fresh) => {
         if (!fresh.length) return;
         sfx.done();
-        setAttachments((a) => [...a, ...fresh.filter((f) => !a.some((x) => x.path === f.path))].slice(0, 5));
+        setAttachments((a) => {
+          const all = [...a, ...fresh.filter((f) => !a.some((x) => x.path === f.path))];
+          if (all.length > MAX_ATTACHMENTS) {
+            setError(`Limite de ${MAX_ATTACHMENTS} anexos por mensagem: ${all.length - MAX_ATTACHMENTS} ficou(aram) de fora. Envie ou tire um anexo antes de adicionar outro.`);
+            sfx.error();
+          }
+          return all.slice(0, MAX_ATTACHMENTS);
+        });
         inputRef.current?.focus();
       });
     takeAttachments();
@@ -104,6 +114,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
   }, []);
 
   useEffect(() => {
+    void api.chatAttachmentsCount(attachments.length);
     for (const a of attachments) {
       if (a.kind !== "image" || previews[a.path]) continue;
       void api

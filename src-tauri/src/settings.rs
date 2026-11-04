@@ -40,6 +40,8 @@ pub struct Settings {
     pub voice_shortcut: String,
     /// Fase 7.1: atalho para recortar a tela e perguntar sobre ela.
     pub screen_shortcut: String,
+    /// Atalho para o Pipo pulsar na tela (quando você perde ele de vista).
+    pub find_shortcut: String,
     /// Ler em voz alta as respostas de comandos de voz.
     pub speak_replies: bool,
     /// Nome da voz do Windows ("" = primeira voz em português).
@@ -112,6 +114,7 @@ impl Default for Settings {
             voice_model: "base".into(),
             voice_shortcut: "Ctrl+Alt+Shift+V".into(),
             screen_shortcut: "Ctrl+Alt+Shift+S".into(),
+            find_shortcut: "Ctrl+Alt+Shift+P".into(),
             speak_replies: true,
             voice_name: String::new(),
             voice_engine: "natural".into(),
@@ -165,12 +168,16 @@ fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
         gs.register(s.screen_shortcut.as_str())
             .map_err(|e| format!("Atalho da tela inválido ou em uso por outro app ({}): {e}", s.screen_shortcut))?;
     }
+    if !s.find_shortcut.trim().is_empty() {
+        gs.register(s.find_shortcut.as_str())
+            .map_err(|e| format!("Atalho para encontrar o Pipo inválido ou em uso por outro app ({}): {e}", s.find_shortcut))?;
+    }
     Ok(())
 }
 
 /// Aplica as configurações no sistema. Na inicialização `old` é `None`.
 pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<(), String> {
-    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut) {
+    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut || o.find_shortcut != new.find_shortcut) {
         if let Err(e) = register_shortcuts(app, new) {
             if let Some(o) = old {
                 let _ = register_shortcuts(app, o);

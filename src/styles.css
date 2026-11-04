@@ -306,8 +306,8 @@ body,
 /* Gosma descolando da borda (pet/Goo.tsx) */
 .goo-fx {
   position: absolute;
-  left: -56px;
-  top: -56px;
+  left: 0;
+  top: 0;
   pointer-events: none;
   overflow: visible;
 }
@@ -334,4 +334,37 @@ body,
 }
 @media (prefers-reduced-motion: reduce) {
   .island { animation: none; }
+}
+
+/* "Cadê o Pipo?": três ondas ciano saindo do corpo e um brilho nele (mesmas cores da ilha). */
+.find-fx {
+  position: absolute;
+  inset: 56px;
+  pointer-events: none;
+}
+.find-fx span {
+  position: absolute;
+  inset: 4%;
+  border-radius: 44%;
+  border: 2px solid rgba(45, 212, 232, 0.9);
+  box-shadow: 0 0 14px rgba(45, 212, 232, 0.55);
+  opacity: 0;
+  animation: find-wave 1.15s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.find-fx span:nth-child(2) { animation-delay: 0.4s; }
+.find-fx span:nth-child(3) { animation-delay: 0.8s; }
+@keyframes find-wave {
+  0% { transform: scale(0.9); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.stage.finding .pet .pipo { animation: find-glow 1.9s ease-out both; }
+@keyframes find-glow {
+  0%, 100% { filter: none; }
+  20%, 60% { filter: drop-shadow(0 0 10px rgba(45, 212, 232, 0.9)); }
+  40%, 80% { filter: drop-shadow(0 0 3px rgba(45, 212, 232, 0.35)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .find-fx span { animation: none; opacity: 1; }
+  .stage.finding .pet .pipo { animation: none; filter: drop-shadow(0 0 8px rgba(45, 212, 232, 0.9)); }
 }

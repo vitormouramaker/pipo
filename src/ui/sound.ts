@@ -226,6 +226,13 @@ export const sfx = {
       tone(g, t + 0.1, { f: 520, f2: 260, d: 0.14, v: 0.16, lp: 1100, rev: 0.2 });
       breath(g, t + 0.02, 300, 900, 0.1, 0.05);
     }),
+  /** "Estou aqui!": dois sinos subindo, o segundo com eco. */
+  find: () =>
+    play((g, t) => {
+      bell(g, t, 76, 0.5, 0.07);
+      bell(g, t + 0.14, 83, 0.9, 0.06);
+      bell(g, t + 0.42, 83, 0.9, 0.035);
+    }),
   /** Pipo encolhendo para a ilha / voltando dela. */
   shrink: () => play((g, t) => tone(g, t, { f: 520, f2: 260, w: "triangle", d: 0.22, v: 0.22, lp: 1400 })),
   grow: () => play((g, t) => tone(g, t, { f: 260, f2: 520, w: "triangle", d: 0.22, v: 0.22, lp: 1400 })),

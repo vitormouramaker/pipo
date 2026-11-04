@@ -51,6 +51,8 @@ export default function PetApp() {
   const [islandScale, setIslandScale] = useState(1);
   // Gosma descolando da borda que a ilha acabou de deixar.
   const [goo, setGoo] = useState<{ edge: Edge; key: number } | null>(null);
+  // "Cadê o Pipo?": ondas ciano em volta dele (atalho ou bandeja).
+  const [find, setFind] = useState<number | null>(null);
 
   const press = useRef<{ x: number; y: number } | null>(null);
   const petRef = useRef<HTMLDivElement>(null);
@@ -113,10 +115,18 @@ export default function PetApp() {
       else if (isState(e.payload)) setOverride(e.payload);
     });
     const unlistenRadial = listen("radial-close", () => closeRadial());
+    const unlistenFind = listen("pipo-find", () => {
+      const key = Date.now();
+      setFind(key);
+      sfx.find();
+      physics.bump();
+      window.setTimeout(() => setFind((f) => (f === key ? null : f)), 2300);
+    });
     return () => {
       void unlistenBase.then((fn) => fn());
       void unlistenState.then((fn) => fn());
       void unlistenRadial.then((fn) => fn());
+      void unlistenFind.then((fn) => fn());
     };
   }, []);
 
@@ -192,7 +202,7 @@ export default function PetApp() {
 
   return (
     <main
-      className={radial ? "stage radial-open" : "stage"}
+      className={`stage${radial ? " radial-open" : ""}${find ? " finding" : ""}`}
       onContextMenu={(e) => {
         e.preventDefault();
         if (radial) closeRadial();
@@ -203,10 +213,18 @@ export default function PetApp() {
         if (radial && e.target === e.currentTarget) closeRadial();
       }}
     >
+      {/* Fora do .pet: as gotas ficam para trás enquanto o Pipo dá o tranco. */}
+      {goo && <Goo key={goo.key} edge={goo.edge} size={(settings?.petSize ?? 160) + 112} />}
+      {find && (
+        <div className="find-fx" key={find} aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+      )}
       <div
         ref={petRef}
         className="pet"
-        title={radial ? undefined : "Clique para o menu · arraste para mover · botão direito para mais opções"}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           // Coordenadas de tela: a janela se move durante o arrasto.
@@ -233,7 +251,6 @@ export default function PetApp() {
             });
         }}
       >
-        {goo && <Goo key={goo.key} edge={goo.edge} size={(settings?.petSize ?? 160) + 112} />}
         <Pipo
           state={state}
           gaze={state === "sleep" || state === "gaming" ? [0, 0] : gaze}

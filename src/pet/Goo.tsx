@@ -19,7 +19,7 @@ const DIRS: Record<Edge, [number, number]> = {
 
 const COUNT = 28;
 const LIFE = 1050; // ms
-const GRAVITY = 640; // px/s²
+const GRAVITY = 520; // px/s²
 const DRAG = 1.3; // 1/s
 
 type Drop = { x: number; y: number; vx: number; vy: number; r: number; r0: number; life: number; born: number };
@@ -48,7 +48,7 @@ export default function Goo({ edge, size }: { edge: Edge; size: number }) {
       const thick = 1 - Math.abs(spread) * 0.55;
       // Ficam para trás (na direção da borda), abrindo em leque; os pingos menores voam mais.
       const r0 = rand(3.5, 9.5) * thick * Math.max(0.7, size / 272);
-      const speed = rand(140, 380) * (1.25 - r0 / 14);
+      const speed = rand(110, 280) * (1.25 - r0 / 14);
       const fan = a + rand(-0.35, 0.35);
       drops.push({
         x: c + Math.cos(a) * dist,
@@ -105,6 +105,9 @@ export default function Goo({ edge, size }: { edge: Edge; size: number }) {
         d.y += d.vy * dt;
         // Incha um pouquinho ao se soltar e depois "evapora".
         d.r = d.r0 * (k < 0.12 ? 1 + k : k < 0.5 ? 1.12 : 1.12 * Math.pow(1 - (k - 0.5) / 0.5, 1.2));
+        // A janela acaba logo ali: perto da borda dela a gota evapora antes de ser cortada.
+        const edge = Math.min(d.x, d.y, size - d.x, size - d.y) - 6;
+        d.r *= Math.max(0, Math.min(1, edge / (d.r0 * 2.2)));
         nodes[i].setAttribute("cx", d.x.toFixed(1));
         nodes[i].setAttribute("cy", d.y.toFixed(1));
         nodes[i].setAttribute("r", Math.max(0, d.r).toFixed(2));

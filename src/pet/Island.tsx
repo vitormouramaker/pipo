@@ -46,6 +46,7 @@ export default function Island({ edge, state, scale = 1 }: { edge: Edge; state: 
   useEffect(() => {
     const unlisten = listen<boolean>("island-hover", (e) => setHover(e.payload));
     const unlistenGlow = listen("island-glow", () => {
+      sfx.find();
       setGlow(false);
       requestAnimationFrame(() => setGlow(true));
     });

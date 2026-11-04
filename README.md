@@ -41,6 +41,7 @@ O jeito certo de usar no dia a dia é instalado, como qualquer app: rode `src-ta
 - **Clique no Pipo**: abre o menu radial (chat, área de transferência, sistema, gastos, configurações, ocultar). Quando você copia um erro ou um texto longo, aparece também um atalho para o Pipo explicar ou resumir.
 - **Ctrl + Alt + Shift + Espaço**: abre e fecha o chat.
 - **Ctrl + Alt + Shift + S**: recorte qualquer parte da tela e pergunte ao Pipo sobre ela (erro, gráfico, print de conversa); o print aparece em miniatura no chat (clique para ver inteiro).
+- **Ctrl + Alt + Shift + P**: perdeu o Pipo de vista? Ele pulsa em ciano na tela (e aparece, se estava escondido). Também pela bandeja: "Encontrar o Pipo".
 - **Ctrl + Alt + Shift + V**: fala com o Pipo (também pelo 🎙 do chat ou pelo menu dele). Ele ouve até você fazer uma pausa, transcreve no próprio computador e responde em voz alta, com uma **voz natural** (Piper, voz neural que roda no PC, baixada uma vez em ⚙ → Voz). Para ele parar de falar: "Parar de falar" no chat, Esc, clique no Pipo ou o atalho de voz.
 - **Ícone do Pipo no topo do painel**: nível, evolução, acessórios e conquistas.
 - **Arrastar**: move o Pipo, que para nas bordas da tela (e passa para outro monitor); a posição é lembrada. Com o painel aberto, Pipo e painel andam juntos (arrastando qualquer um dos dois). Ao ser arrastado, o Pipo se inclina, estica com a velocidade e balança como gelatina quando você solta.

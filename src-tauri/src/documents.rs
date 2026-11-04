@@ -378,6 +378,20 @@ pub async fn chat_attach(app: AppHandle, paths: Vec<String>, open_chat: Option<b
     results
 }
 
+/// Quantos anexos estão na caixa de mensagem do chat agora (o chat avisa a cada mudança).
+pub static IN_CHAT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+#[tauri::command]
+pub fn chat_attachments_count(count: usize) {
+    IN_CHAT.store(count, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Já tem o máximo de anexos esperando para ir numa mensagem?
+pub fn attachments_full(app: &AppHandle) -> bool {
+    let pending = app.state::<AppState>().attachments.lock().unwrap().len();
+    IN_CHAT.load(std::sync::atomic::Ordering::SeqCst) + pending >= MAX_ATTACHMENTS
+}
+
 /// O chat pega os anexos que chegaram pelo Pipo (o painel pode ter acabado de abrir).
 #[tauri::command]
 pub fn chat_take_attachments(app: AppHandle) -> Vec<Attachment> {

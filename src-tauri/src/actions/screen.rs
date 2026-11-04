@@ -35,6 +35,19 @@ fn save_png(app: &AppHandle, image: &arboard::ImageData) -> Result<std::path::Pa
 /// Abre o recorte; a imagem recortada vai para o chat como anexo.
 pub fn start(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<AppState>();
+    if crate::documents::attachments_full(app) {
+        let limit = crate::documents::MAX_ATTACHMENTS;
+        windows::set_pet_state(app, "alert");
+        windows::show_panel(app, Some("chat"));
+        crate::toast::notify(
+            app,
+            "error",
+            &format!("Limite de {limit} anexos por mensagem"),
+            "Envie a mensagem ou tire um anexo (no ✕) para recortar outro print.",
+            Some("view:chat"),
+        );
+        return Err(format!("Limite de {limit} anexos por mensagem."));
+    }
     if state.ocr_busy.swap(true, Ordering::SeqCst) {
         return Err("Já estou esperando um recorte.".into());
     }

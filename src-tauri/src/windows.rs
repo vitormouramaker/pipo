@@ -334,8 +334,29 @@ pub fn quit(app: &AppHandle) {
     app.exit(0);
 }
 
+/// "Cadê o Pipo?": mostra o Pipo (se estiver escondido), traz para a frente e faz ele
+/// pulsar em ciano, como ao virar ilha.
+pub fn find_pet(app: &AppHandle) {
+    crate::sensors::user_wants_pet(app);
+    if let Some(pet) = app.get_webview_window(MAIN) {
+        if !pet.is_visible().unwrap_or(false) {
+            let _ = pet.show();
+            clamp_pet(app);
+        }
+        let _ = pet.set_always_on_top(true);
+    }
+    let event = if island::active() { "island-glow" } else { "pipo-find" };
+    let _ = app.emit_to(MAIN, event, ());
+}
+
+#[tauri::command]
+pub fn pet_find(app: AppHandle) {
+    find_pet(&app);
+}
+
 fn handle_menu(app: &AppHandle, id: &str) {
     match id {
+        "find" => find_pet(app),
         "toggle_pet" => toggle_pet(app),
         "island" => {
             if island::active() {
@@ -357,6 +378,7 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
         &[
             &MenuItem::with_id(app, "chat", "Abrir chat", true, None::<&str>)?,
             &MenuItem::with_id(app, "settings", "Configurações", true, None::<&str>)?,
+            &MenuItem::with_id(app, "find", "Encontrar o Pipo", true, None::<&str>)?,
             &MenuItem::with_id(app, "toggle_pet", "Mostrar/ocultar Pipo", true, None::<&str>)?,
             &MenuItem::with_id(app, "island", "Modo ilha (liga/desliga)", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
