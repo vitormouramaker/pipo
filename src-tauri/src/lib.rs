@@ -6,6 +6,7 @@ mod db;
 mod documents;
 mod island;
 mod life;
+mod proactive;
 mod menu;
 mod hardware;
 mod secrets;
@@ -162,6 +163,8 @@ pub fn run() {
             updater::start(app.handle().clone());
             sensors::start(app.handle().clone());
             world::lives::start(app.handle().clone());
+            world::github::start(app.handle().clone());
+            world::calendar::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -207,6 +210,15 @@ pub fn run() {
             actions::ocr::ocr_start,
             world::open_url,
             life::life_status,
+            proactive::day_summary,
+            world::github::github_status,
+            world::github::github_refresh,
+            world::calendar::calendar_status,
+            world::calendar::calendar_refresh,
+            world::media::media_status,
+            world::media::media_control,
+            proactive::memory_list,
+            proactive::memory_remove,
             documents::chat_attach,
             documents::chat_take_attachments,
             updater::update_status,

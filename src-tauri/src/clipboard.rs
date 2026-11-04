@@ -101,8 +101,9 @@ pub fn poll(app: &AppHandle) {
     if text.trim().is_empty() || looks_secret(&text) {
         return;
     }
-    state.clipboard.lock().unwrap().push(text);
+    state.clipboard.lock().unwrap().push(text.clone());
     let _ = app.emit("clipboard-changed", ());
+    crate::proactive::on_clipboard(app, &text);
 }
 
 #[tauri::command]

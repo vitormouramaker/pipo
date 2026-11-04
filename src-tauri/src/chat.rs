@@ -115,7 +115,10 @@ fn system_prompt(sarcasm: u8, city: &str) -> String {
          blocos de código só quando ajudarem.\n\n\
          Você tem ferramentas para agir no computador: projetos e scripts, Git, portas, Docker, jogos, \
          rotinas, arquivos recentes, notas, lembretes e pomodoro. Também procura e lê arquivos do usuário \
-         (PDF, Word, PowerPoint, imagens, texto e código) quando ele pede. Quando o pedido depender delas, use-as \
+         (PDF, Word, PowerPoint, imagens, texto e código) quando ele pede. Quando o usuário contar algo \
+         sobre si que valha lembrar (preferências, rotina, projetos, nomes) ou pedir para lembrar, use \
+         remember; se pedir para esquecer, use forget com o número da memória. Você também vê a agenda \
+         (agenda), o GitHub dele (github_status) e controla a música que está tocando (media_control). Quando o pedido depender delas, use-as \
          em vez de explicar como o usuário faria. Ações que mudam algo pedem a confirmação do usuário \
          automaticamente; não peça permissão antes, só chame a ferramenta.\n\n\
          Quando a busca na web estiver disponível, use-a para notícias, fatos recentes, preços, placares e \
@@ -361,7 +364,7 @@ async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Cha
             "stream": true,
             "cache_control": { "type": "ephemeral" },
             "output_config": { "effort": "low" },
-            "system": system_prompt(settings.sarcasm, &settings.city),
+            "system": format!("{}\n\n{}", system_prompt(settings.sarcasm, &settings.city), crate::proactive::memory_prompt(app)).trim().to_string(),
             "tools": all_tools,
             "messages": messages,
         });

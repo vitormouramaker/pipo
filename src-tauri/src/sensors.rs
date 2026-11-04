@@ -120,6 +120,11 @@ pub fn start(app: AppHandle) {
                     state.sense.lock().unwrap().last_app = current.clone();
                 }
                 let idle = context::idle_seconds();
+                crate::proactive::record(&app, current.as_ref(), idle);
+                if tick % 30 == 0 {
+                    let gaming_now = state.sense.lock().unwrap().gaming;
+                    crate::proactive::tick(&app, current.as_ref(), idle, gaming_now);
+                }
 
                 let fullscreen = current.as_ref().filter(|c| c.fullscreen);
                 set_game_mode(&app, settings.game_mode && fullscreen.is_some(), fullscreen.map(|c| c.monitor));

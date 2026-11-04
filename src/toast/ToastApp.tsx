@@ -39,7 +39,7 @@ function Bubble({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     };
   }, [paused]);
 
-  const clickable = Boolean(toast.url || toast.view);
+  const clickable = Boolean(toast.url || toast.view || toast.prompt);
   return (
     <div
       className={`bubble ${TONE[toast.kind] ?? ""}${clickable ? " clickable" : ""}`}
@@ -47,7 +47,7 @@ function Bubble({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       onMouseLeave={() => setPaused(false)}
       onClick={() => {
         if (!clickable) return;
-        void api.toastOpen(toast.url, toast.view);
+        void api.toastOpen(toast.url, toast.view, toast.prompt);
         onClose();
       }}
     >

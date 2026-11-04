@@ -82,6 +82,21 @@ pub fn definitions() -> Value {
         ),
         tool("list_reminders", "Lembretes pendentes.", json!({}), &[]),
         tool(
+            "remember",
+            "Guarda um fato sobre o usuário para lembrar nas próximas conversas (uma frase curta).",
+            json!({ "text": { "type": "string" } }),
+            &["text"],
+        ),
+        tool("forget", "Apaga uma memória pelo número dela.", json!({ "id": { "type": "integer" } }), &["id"]),
+        tool("agenda", "Compromissos de hoje e amanhã da Google Agenda do usuário.", json!({}), &[]),
+        tool("github_status", "PRs abertos do usuário, revisões pedidas a ele e o último CI dos repositórios dos projetos recentes.", json!({}), &[]),
+        tool(
+            "media_control",
+            "Mostra o que está tocando no Windows e controla o player (toggle = tocar/pausar, next, previous). Use status para só consultar.",
+            json!({ "action": { "type": "string", "enum": ["status", "toggle", "play", "pause", "next", "previous"] } }),
+            &["action"],
+        ),
+        tool(
             "start_pomodoro",
             "Começa um pomodoro (padrão: 25 min de foco e 5 de pausa).",
             json!({ "focus_minutes": { "type": "integer" }, "break_minutes": { "type": "integer" } }),
@@ -142,6 +157,16 @@ pub fn label(name: &str, input: &Value) -> String {
         "search_notes" => "Buscando nas notas".into(),
         "add_reminder" => "Criando lembrete".into(),
         "list_reminders" => "Listando lembretes".into(),
+        "remember" => "Guardando na memória".into(),
+        "forget" => "Apagando da memória".into(),
+        "agenda" => "Olhando a agenda".into(),
+        "github_status" => "Olhando o GitHub".into(),
+        "media_control" => match s(input, "action") {
+            "status" => "Vendo o que está tocando".into(),
+            "next" => "Próxima música".into(),
+            "previous" => "Música anterior".into(),
+            _ => "Tocar/pausar".into(),
+        },
         "start_pomodoro" => "Começando pomodoro".into(),
         "stop_pomodoro" => "Encerrando pomodoro".into(),
         other => other.to_string(),
@@ -320,6 +345,24 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
             focus::add_reminder(app, &i.text, i.minutes, i.at.as_deref()).map(|due| format!("Lembrete marcado para {due}."))
         }
         "list_reminders" => to_json(focus::reminders(app)),
+        "remember" => crate::proactive::remember(app, input["text"].as_str().unwrap_or("")),
+        "forget" => crate::proactive::forget(app, input["id"].as_i64().unwrap_or(0)),
+        "agenda" => {
+            let status = crate::world::calendar::status(app);
+            if !status_configured(&status) {
+                return Ok("A agenda ainda não foi ligada. Peça ao usuário para colar o endereço secreto iCal da Google Agenda em Configurações > Integrações.".into());
+            }
+            to_json(status)
+        }
+        "github_status" => to_json(crate::world::github::status()),
+        "media_control" => {
+            let action = s(input, "action");
+            if action != "status" {
+                crate::world::media::control(&action)?;
+                std::thread::sleep(std::time::Duration::from_millis(250));
+            }
+            to_json(crate::world::media::now_playing())
+        }
         "start_pomodoro" => {
             #[derive(Deserialize)]
             struct In {
@@ -335,4 +378,9 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
         }
         other => Err(format!("Ferramenta desconhecida: {other}")),
     }
+}
+
+/// A agenda tem endereço configurado? (o status serializado diz).
+fn status_configured(status: &crate::world::calendar::CalendarStatus) -> bool {
+    serde_json::to_value(status).ok().and_then(|v| v["configured"].as_bool()).unwrap_or(false)
 }

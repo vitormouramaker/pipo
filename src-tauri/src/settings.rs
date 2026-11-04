@@ -48,6 +48,12 @@ pub struct Settings {
     /// Efeitos sonoros (0 a 100).
     pub sounds: bool,
     pub sound_volume: u8,
+    /// Fase 6.3: o Pipo toma a iniciativa (nível equilibrado) e resume o dia neste horário.
+    pub proactive: bool,
+    pub day_summary_time: String,
+    /// Fase 6.4: endereço secreto iCal da Google Agenda e avisos do GitHub.
+    pub calendar_url: String,
+    pub github_notify: bool,
     /// Modo ilha: pílula discreta grudada numa borda da tela.
     pub island: bool,
     /// "top", "bottom", "left" ou "right"
@@ -84,6 +90,10 @@ impl Default for Settings {
             hidden_accessories: Vec::new(),
             sounds: true,
             sound_volume: 60,
+            proactive: true,
+            day_summary_time: "18:30".into(),
+            calendar_url: String::new(),
+            github_notify: true,
             island: false,
             island_edge: "top".into(),
             island_pos: 0.5,

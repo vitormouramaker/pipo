@@ -1,12 +1,40 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, MODELS, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
+import { api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
 import { loadVoices, speak } from "./speech";
 
 const VOICE_MODELS = [
   { value: "base", label: "Rápido (142 MB)" },
   { value: "small", label: "Mais preciso (466 MB, mais lento)" },
 ] as const;
+
+function MemorySettings() {
+  const [items, setItems] = useState<Memory[]>([]);
+  useEffect(() => {
+    const refresh = () => void api.memoryList().then(setItems);
+    refresh();
+    const unlisten = listen("memories-changed", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  return (
+    <fieldset>
+      <legend>Memória do Pipo</legend>
+      <p className="hint">
+        O que você pediu (ou contou) para o Pipo lembrar. Isso vai junto nas conversas. No chat, diga "lembra que…" ou
+        "esquece…".
+      </p>
+      {items.length === 0 && <p className="hint">Nada guardado ainda.</p>}
+      {items.map((m) => (
+        <div key={m.id} className="trow">
+          <span className="grow">{m.text}</span>
+          <button className="link muted" onClick={() => void api.memoryRemove(m.id)}>
+            Esquecer
+          </button>
+        </div>
+      ))}
+    </fieldset>
+  );
+}
 
 function UpdateSettings() {
   const [status, setStatus] = useState<UpdateStatus | null>(null);
@@ -343,6 +371,62 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
       </fieldset>
 
       <UpdateSettings />
+
+      <fieldset>
+        <legend>Iniciativa</legend>
+        <label className="check">
+          <input type="checkbox" checked={settings.proactive} onChange={(e) => update({ proactive: e.target.checked })} />
+          Deixar o Pipo dar dicas sem eu perguntar
+        </label>
+        <p className="hint">
+          No máximo 3 por hora e nunca durante jogo, foco ou quando você está longe: erro copiado, muitas mudanças sem
+          commit, horas seguidas no PC, madrugada.
+        </p>
+        <label>
+          Resumo do dia às
+          <input className="short" type="time" value={settings.daySummaryTime} onChange={(e) => update({ daySummaryTime: e.target.value })} />
+        </label>
+      </fieldset>
+
+      <MemorySettings />
+
+      <fieldset>
+        <legend>Integrações</legend>
+        <label>
+          Google Agenda (endereço secreto no formato iCal)
+          <div className="inline-form">
+            <input
+              className="grow"
+              type="password"
+              placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+              value={settings.calendarUrl}
+              onChange={(e) => update({ calendarUrl: e.target.value.trim() })}
+              autoComplete="off"
+            />
+            <button
+              onClick={() => {
+                setStatus(null);
+                void api
+                  .settingsUpdate({ calendarUrl: settings.calendarUrl })
+                  .then(() => api.calendarRefresh())
+                  .then((n) => setStatus({ kind: "ok", text: `Agenda ligada: ${n} compromisso(s) hoje e amanhã.` }))
+                  .catch((e) => setStatus({ kind: "error", text: String(e) }));
+              }}
+            >
+              Testar
+            </button>
+          </div>
+        </label>
+        <p className="hint">
+          Na Google Agenda (computador): Configurações → sua agenda → "Integrar agenda" → copie o "Endereço secreto no
+          formato iCal". O Pipo só lê; esse link dá acesso à sua agenda, então não compartilhe.
+        </p>
+        <label className="check">
+          <input type="checkbox" checked={settings.githubNotify} onChange={(e) => update({ githubNotify: e.target.checked })} />
+          Avisar quando a CI dos meus projetos terminar e quando pedirem minha revisão no GitHub
+        </label>
+        <p className="hint">Usa o GitHub CLI (gh) que já está logado neste computador. A música é controlada pelo próprio Windows.</p>
+      </fieldset>
 
       <VoiceSettings settings={settings} update={update} />
 

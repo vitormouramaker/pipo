@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type Briefing, type LiveChannel, type Settings } from "../api";
+import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings } from "../api";
 import { sqliteDate } from "../format";
 import { sfx } from "../ui/sound";
 
@@ -231,10 +231,215 @@ function QuickSearch({ onAsk }: Props) {
   );
 }
 
+const CATEGORY: Record<string, string> = {
+  dev: "Desenvolvimento",
+  docs: "Documentos",
+  browser: "Navegador",
+  live: "Lives",
+  games: "Jogos",
+  chat: "Conversas",
+  other: "Outros",
+};
+const hm = (secs: number) => {
+  const m = Math.round(secs / 60);
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")}`;
+};
+
+function MyDay({ onAsk }: Props) {
+  const [day, setDay] = useState<DaySummary | null>(null);
+  useEffect(() => {
+    const refresh = () => void api.daySummary().then(setDay);
+    refresh();
+    const timer = window.setInterval(refresh, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (!day) return null;
+  const max = Math.max(1, ...day.categories.map(([, s]) => s));
+  const ask = () =>
+    onAsk(
+      `Analise meu dia no computador e me dê 3 observações curtas e úteis (sem julgamento): ` +
+        `${hm(day.activeSecs)} ativos; ` +
+        day.categories.map(([c, s]) => `${CATEGORY[c] ?? c}: ${hm(s)}`).join(", ") +
+        `; apps mais usados: ${day.apps.map(([a, , s]) => `${a} (${hm(s)})`).join(", ")}; ` +
+        `pomodoros: ${day.pomodoros}; mensagens ao Pipo: ${day.chats}; ações feitas pelo Pipo: ${day.actions}.`,
+    );
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>Seu dia · {hm(day.activeSecs)} ativo</h4>
+        {day.activeSecs > 0 && (
+          <button className="link" onClick={ask}>
+            Pedir análise ao Pipo
+          </button>
+        )}
+      </div>
+      {day.activeSecs === 0 ? (
+        <p className="hint">O Pipo registra aqui quanto tempo você passa em cada tipo de app hoje (só no computador).</p>
+      ) : (
+        <>
+          {day.categories.map(([c, s]) => (
+            <div key={c} className="meter">
+              <div className="meter-head">
+                <span>{CATEGORY[c] ?? c}</span>
+                <span>{hm(s)}</span>
+              </div>
+              <div className="meter-bar">
+                <div className="meter-fill low" style={{ width: `${(100 * s) / max}%` }} />
+              </div>
+            </div>
+          ))}
+          <p className="hint">
+            Mais usados: {day.apps.slice(0, 4).map(([a, , s]) => `${a} (${hm(s)})`).join(" · ")}
+            {day.pomodoros > 0 && ` · ${day.pomodoros} pomodoro(s)`}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Agenda() {
+  const [cal, setCal] = useState<CalendarStatus | null>(null);
+  useEffect(() => {
+    const refresh = () => void api.calendarStatus().then(setCal);
+    refresh();
+    const unlisten = listen("calendar-changed", refresh);
+    const timer = window.setInterval(refresh, 60_000);
+    return () => {
+      void unlisten.then((fn) => fn());
+      window.clearInterval(timer);
+    };
+  }, []);
+  if (!cal) return null;
+  const now = Date.now();
+  const row = (e: CalendarStatus["today"][number], i: number) => {
+    const past = !e.allDay && new Date(e.end).getTime() < now;
+    return (
+      <div key={i} className={past ? "trow past" : "trow"}>
+        <span className="mono">{e.allDay ? "dia todo" : e.time}</span>
+        <span className="grow" title={e.location || undefined}>{e.title}</span>
+        {e.link && (
+          <button className="link" onClick={() => void api.openUrl(e.link!)}>
+            Entrar
+          </button>
+        )}
+      </div>
+    );
+  };
+  return (
+    <div className="block">
+      <h4>Agenda</h4>
+      {!cal.configured && (
+        <p className="hint">Ligue a Google Agenda em ⚙ → Integrações para ver seus compromissos aqui e ser avisado 10 minutos antes.</p>
+      )}
+      {cal.error && <p className="hint">{cal.error}</p>}
+      {cal.configured && !cal.error && cal.today.length === 0 && <p className="hint">Nada marcado para hoje.</p>}
+      {cal.today.map(row)}
+      {cal.tomorrow.length > 0 && (
+        <>
+          <p className="hint">Amanhã</p>
+          {cal.tomorrow.map(row)}
+        </>
+      )}
+    </div>
+  );
+}
+
+function Github() {
+  const [gh, setGh] = useState<GithubStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const refresh = () => void api.githubStatus().then(setGh);
+    refresh();
+    const unlisten = listen("github-changed", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  if (!gh || (!gh.available && !gh.error)) return null;
+  const ci = (r: GithubStatus["runs"][number]) =>
+    r.status !== "completed" ? "running" : r.conclusion === "success" ? "ok" : "fail";
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>GitHub{gh.login ? ` · ${gh.login}` : ""}</h4>
+        <button
+          className="link muted"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            void api.githubRefresh().then(setGh).finally(() => setBusy(false));
+          }}
+        >
+          {busy ? "Atualizando…" : "Atualizar"}
+        </button>
+      </div>
+      {gh.error && <p className="hint">{gh.error}</p>}
+      {gh.reviews.map((p) => (
+        <div key={p.url} className="trow">
+          <span className="dot live" title="Revisão pedida a você" />
+          <span className="grow">{p.title}</span>
+          <span className="row-meta">{p.repo.split("/")[1]}#{p.number}</span>
+          <button className="link" onClick={() => void api.openUrl(p.url)}>Revisar</button>
+        </div>
+      ))}
+      {gh.prs.map((p) => (
+        <div key={p.url} className="trow">
+          <span className="dot" />
+          <span className="grow">{p.title}</span>
+          <span className="row-meta">{p.repo.split("/")[1]}#{p.number}</span>
+          <button className="link" onClick={() => void api.openUrl(p.url)}>Abrir</button>
+        </div>
+      ))}
+      {gh.runs.map((r) => (
+        <div key={r.repo} className="trow">
+          <span className={`dot ci-${ci(r)}`} title={ci(r) === "running" ? "Rodando" : ci(r) === "ok" ? "Passou" : "Falhou"} />
+          <span className="live-name">{r.repo.split("/")[1]}</span>
+          <span className="grow live-title" title={r.title}>{r.title}</span>
+          <button className="link muted" onClick={() => void api.openUrl(r.url)}>CI</button>
+        </div>
+      ))}
+      {gh.available && gh.prs.length === 0 && gh.reviews.length === 0 && gh.runs.length === 0 && (
+        <p className="hint">Sem PRs abertos nem revisões pedidas. A CI aparece para os repositórios dos seus projetos recentes.</p>
+      )}
+    </div>
+  );
+}
+
+function Music() {
+  const [now, setNow] = useState<NowPlaying | null>(null);
+  useEffect(() => {
+    const refresh = () => void api.mediaStatus().then(setNow);
+    refresh();
+    const timer = window.setInterval(refresh, 4000);
+    return () => window.clearInterval(timer);
+  }, []);
+  if (!now?.available || !now.title) return null;
+  const control = (action: "toggle" | "next" | "previous") => () => void api.mediaControl(action).then(setNow);
+  return (
+    <div className="block">
+      <h4>Tocando agora{now.app ? ` · ${now.app}` : ""}</h4>
+      <div className="trow">
+        <span className="grow">
+          <strong>{now.title}</strong>
+          {now.artist && <span className="live-title"> · {now.artist}</span>}
+        </span>
+        <button className="link" aria-label="Anterior" onClick={control("previous")}>⏮</button>
+        <button className="link" aria-label={now.playing ? "Pausar" : "Tocar"} onClick={control("toggle")}>
+          {now.playing ? "⏸" : "▶"}
+        </button>
+        <button className="link" aria-label="Próxima" onClick={control("next")}>⏭</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Today({ onAsk }: Props) {
   return (
     <section className="actions">
       <div className="actions-body">
+        <Agenda />
+        <Music />
+        <MyDay onAsk={onAsk} />
+        <Github />
         <BriefingCard />
         <Lives />
         <QuickSearch onAsk={onAsk} />

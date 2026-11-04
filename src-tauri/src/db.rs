@@ -68,6 +68,18 @@ impl Db {
                  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
              );
              CREATE INDEX IF NOT EXISTS xp_log_kind_day ON xp_log (kind, day);
+             CREATE TABLE IF NOT EXISTS activity (
+                 day      TEXT NOT NULL,
+                 app      TEXT NOT NULL,
+                 category TEXT NOT NULL,
+                 seconds  INTEGER NOT NULL DEFAULT 0,
+                 PRIMARY KEY (day, app)
+             );
+             CREATE TABLE IF NOT EXISTS memories (
+                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                 text       TEXT NOT NULL,
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
              CREATE TABLE IF NOT EXISTS achievements (
                  id          TEXT PRIMARY KEY,
                  unlocked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

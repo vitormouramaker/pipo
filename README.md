@@ -63,6 +63,8 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
   - **Foco**: pomodoro, lembretes, pausas para água e postura e notas rápidas.
   - **Atalhos**: ler texto da tela (OCR do Windows, offline), jogos da Steam/Epic/Riot com favoritos, rotinas (abrir vários apps, links e projetos de uma vez) e arquivos recentes.
 - **Arquivos**: arraste um PDF, Word, PowerPoint, imagem ou arquivo de texto/código em cima do Pipo (ou do painel) e ele vira anexo do chat, com atalhos para resumir, traduzir, ver os pontos principais ou explicar. No chat, peça "acha o contrato que baixei semana passada": o Pipo procura nas pastas Documentos, Downloads, Desktop e Imagens, lê o arquivo e responde.
+- **Hoje** também mostra a **agenda** (Google Agenda pelo endereço secreto iCal, com aviso 10 min antes e botão "Entrar" em reuniões do Meet/Teams/Zoom), **o que está tocando** no Windows (com tocar/pausar e pular), **seu dia** (tempo em cada tipo de app, registrado só no computador) e o **GitHub** (seus PRs, revisões pedidas a você e a CI dos seus projetos, com aviso quando termina).
+- **Pipo proativo** (nível equilibrado): no máximo 3 dicas por hora e nunca em jogo, foco ou com você longe: erro copiado, muitas mudanças sem commit, horas seguidas no PC, madrugada e o resumo do fim do dia. Ele também **lembra** do que você contar ("lembra que eu prefiro TypeScript"); a lista fica em ⚙ → Memória do Pipo.
 - **Clipboard**: últimos textos copiados (só em memória; senhas e tokens são ignorados), com Resumir, Traduzir e Revisar.
 - **Sistema**: app em uso, humor do Pipo, CPU, memória, GPU NVIDIA e os processos que mais consomem.
 - **Gastos**: custo estimado de hoje, do mês e de cada conversa, por modelo.
@@ -120,6 +122,7 @@ docs/             plano de implementação
 | 3 | Ações: atalhos de dev, documentos, rotinas, lembretes, OCR |
 | 4 | Mundo externo: lives, notícias, briefing matinal |
 | 5 | Vida: voz, XP, evolução, acessórios (concluída) |
+| 6 | Assistente completo: atualização automática, documentos, Pipo proativo, GitHub, agenda e música (concluída) |
 
 ## Privacidade
 

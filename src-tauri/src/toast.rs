@@ -23,16 +23,19 @@ pub struct Toast {
     body: String,
     /// Clicar no aviso abre este link…
     url: Option<String>,
-    /// …ou esta aba do painel.
+    /// …ou esta aba do painel…
     view: Option<String>,
+    /// …ou abre o chat já perguntando isto.
+    prompt: Option<String>,
 }
 
 /// Mostra um aviso. `action`: link http(s) ou aba do painel ("view:today").
 pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str, action: Option<&str>) {
-    let (url, view) = match action {
-        Some(a) if a.starts_with("view:") => (None, Some(a[5..].to_string())),
-        Some(a) if a.starts_with("http") => (Some(a.to_string()), None),
-        _ => (None, None),
+    let (url, view, prompt) = match action {
+        Some(a) if a.starts_with("view:") => (None, Some(a[5..].to_string()), None),
+        Some(a) if a.starts_with("prompt:") => (None, None, Some(a[7..].to_string())),
+        Some(a) if a.starts_with("http") => (Some(a.to_string()), None, None),
+        _ => (None, None, None),
     };
     let toast = Toast {
         id: SEQ.fetch_add(1, Ordering::SeqCst),
@@ -41,6 +44,7 @@ pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str, action: Opti
         body: body.into(),
         url,
         view,
+        prompt,
     };
     app.state::<AppState>().toasts.lock().unwrap().push(toast);
     if app.get_webview_window(TOAST).is_some() {
@@ -118,9 +122,13 @@ fn position(app: &AppHandle, w: i32, h: i32, scale: f64) -> Option<(i32, i32)> {
 
 /// Clique num aviso: abre o link ou a aba correspondente.
 #[tauri::command]
-pub async fn toast_open(app: AppHandle, url: Option<String>, view: Option<String>) -> Result<(), String> {
+pub async fn toast_open(app: AppHandle, url: Option<String>, view: Option<String>, prompt: Option<String>) -> Result<(), String> {
     if let Some(url) = url {
         return crate::world::open_url(url);
+    }
+    if let Some(prompt) = prompt {
+        crate::chat::prefill(&app, prompt, true, false);
+        return Ok(());
     }
     windows::show_panel(&app, Some(view.as_deref().unwrap_or("chat")));
     Ok(())

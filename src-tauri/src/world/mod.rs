@@ -1,7 +1,10 @@
 //! Fase 4: o mundo lá fora — lives, briefing diário e links da web.
 
 pub mod briefing;
+pub mod calendar;
+pub mod github;
 pub mod lives;
+pub mod media;
 
 use std::time::Duration;
 

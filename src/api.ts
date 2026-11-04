@@ -26,6 +26,10 @@ export type Settings = {
   hiddenAccessories: string[];
   sounds: boolean;
   soundVolume: number;
+  proactive: boolean;
+  daySummaryTime: string;
+  calendarUrl: string;
+  githubNotify: boolean;
   island: boolean;
   islandEdge: string;
   islandPos: number;
@@ -60,7 +64,23 @@ export type VoiceStatus = {
   listening: boolean;
   hasMicrophone: boolean;
 };
-export type Toast = { id: number; kind: string; title: string; body: string; url: string | null; view: string | null };
+export type Toast = { id: number; kind: string; title: string; body: string; url: string | null; view: string | null; prompt: string | null };
+export type DaySummary = {
+  day: string;
+  activeSecs: number;
+  categories: [string, number][];
+  apps: [string, string, number][];
+  pomodoros: number;
+  chats: number;
+  actions: number;
+};
+export type Memory = { id: number; text: string; createdAt: string };
+export type CalendarEvent = { title: string; start: string; end: string; time: string; allDay: boolean; location: string; link: string | null };
+export type CalendarStatus = { configured: boolean; today: CalendarEvent[]; tomorrow: CalendarEvent[]; error: string | null; checkedAt: string | null };
+export type Pr = { repo: string; number: number; title: string; url: string };
+export type CiRun = { repo: string; id: number; status: string; conclusion: string; title: string; url: string; branch: string; workflow: string };
+export type GithubStatus = { available: boolean; login: string | null; prs: Pr[]; reviews: Pr[]; runs: CiRun[]; error: string | null; checkedAt: string | null };
+export type NowPlaying = { available: boolean; title: string; artist: string; app: string; playing: boolean };
 export type UpdateStatus = {
   current: string;
   available: string | null;
@@ -288,7 +308,16 @@ export const api = {
   islandStatus: () => invoke<{ active: boolean; edge: string; scale: number }>("island_status"),
   toastTake: () => invoke<Toast[]>("toast_take"),
   toastLayout: (height: number) => invoke<void>("toast_layout", { height }),
-  toastOpen: (url: string | null, view: string | null) => invoke<void>("toast_open", { url, view }),
+  toastOpen: (url: string | null, view: string | null, prompt: string | null) => invoke<void>("toast_open", { url, view, prompt }),
+  daySummary: () => invoke<DaySummary>("day_summary"),
+  calendarStatus: () => invoke<CalendarStatus>("calendar_status"),
+  calendarRefresh: () => invoke<number>("calendar_refresh"),
+  githubStatus: () => invoke<GithubStatus>("github_status"),
+  githubRefresh: () => invoke<GithubStatus>("github_refresh"),
+  mediaStatus: () => invoke<NowPlaying>("media_status"),
+  mediaControl: (action: "toggle" | "next" | "previous") => invoke<NowPlaying>("media_control", { action }),
+  memoryList: () => invoke<Memory[]>("memory_list"),
+  memoryRemove: (id: number) => invoke<void>("memory_remove", { id }),
   toastDone: () => invoke<void>("toast_done"),
   petDragStart: () => invoke<void>("pet_drag_start"),
   radialOpen: () => invoke<RadialLayout>("radial_open"),
