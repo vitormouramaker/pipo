@@ -172,6 +172,7 @@ export default function PetApp() {
     ? [
         { id: "chat", label: "Chat", icon: ICONS.chat, action: open("chat") },
         { id: "mic", label: "Falar com o Pipo", icon: ICONS.mic, action: () => void api.voiceToggle() },
+        { id: "screen", label: "Perguntar sobre a tela (Ctrl+Alt+Shift+S)", icon: ICONS.crop, action: () => void api.screenAsk() },
         ...(suggestion
           ? [{ id: "spark", label: suggestion.label, icon: ICONS.spark, action: () => void api.chatPrefill(suggestion.prompt) }]
           : []),

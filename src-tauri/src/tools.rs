@@ -71,6 +71,7 @@ pub fn definitions() -> Value {
             &["path"],
         ),
         tool("open_file", "Abre um arquivo no programa padrão do Windows.", json!({ "path": { "type": "string" }, "name": { "type": "string" } }), &["path", "name"]),
+        tool("organize_downloads", "Separa os arquivos soltos da pasta Downloads em pastas por tipo (dá para desfazer em Ações > Atalhos).", json!({}), &[]),
         tool("open_recent_file", "Abre um arquivo recente (use o path retornado por recent_files).", json!({ "path": { "type": "string" }, "name": { "type": "string" } }), &["path", "name"]),
         tool("add_note", "Guarda uma nota rápida.", json!({ "text": { "type": "string" } }), &["text"]),
         tool("search_notes", "Busca nas notas do usuário (sem query, lista as mais recentes).", json!({ "query": { "type": "string" } }), &[]),
@@ -120,6 +121,7 @@ const CONFIRM: &[&str] = &[
     "run_routine",
     "open_recent_file",
     "open_file",
+    "organize_downloads",
 ];
 
 pub fn needs_confirmation(name: &str) -> bool {
@@ -157,6 +159,7 @@ pub fn label(name: &str, input: &Value) -> String {
         "search_files" => format!("Procurando arquivos: {}", s(input, "query")),
         "read_file" => format!("Lendo {}", std::path::Path::new(&s(input, "path")).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
         "open_file" => format!("Abrindo {}", s(input, "name")),
+        "organize_downloads" => "Organizando Downloads".into(),
         "open_recent_file" => format!("Abrindo {}", s(input, "name")),
         "add_note" => "Guardando nota".into(),
         "search_notes" => "Buscando nas notas".into(),
@@ -192,6 +195,7 @@ pub fn confirmation(name: &str, input: &Value) -> String {
         "run_routine" => format!("Rodar a rotina {}?", s(input, "name")),
         "open_recent_file" => format!("Abrir {}?", s(input, "name")),
         "open_file" => format!("Abrir {}?", s(input, "name")),
+        "organize_downloads" => "Organizar a pasta Downloads em pastas por tipo?".into(),
         other => format!("Executar {other}?"),
     }
 }
@@ -221,6 +225,7 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
                 to_json(found)
             }
         }
+        "organize_downloads" => crate::actions::downloads::organize(app).map(|n| format!("{n} arquivo(s) organizados em pastas por tipo.")),
         "open_file" => {
             let path = std::path::Path::new(input["path"].as_str().unwrap_or(""));
             if !crate::documents::allowed(path) {

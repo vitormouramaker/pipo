@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type Game, type RecentFile, type Routine, type RoutineStep } from "../../api";
+import { type DownloadsPlan, api, type Game, type RecentFile, type Routine, type RoutineStep } from "../../api";
 
 const STEP_LABEL: Record<RoutineStep["kind"], string> = {
   app: "Programa",
@@ -211,9 +211,97 @@ function RecentFiles() {
   );
 }
 
+function Downloads() {
+  const [plan, setPlan] = useState<DownloadsPlan | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const refresh = () =>
+    void api
+      .downloadsPlan()
+      .then((p) => {
+        setPlan(p);
+        setPicked(p.candidates.map((c) => c.path));
+      })
+      .catch((e) => setMessage(String(e)));
+  useEffect(refresh, []);
+  const mb = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
+  const run = (p: Promise<number>, text: (n: number) => string) =>
+    void p
+      .then((n) => {
+        setMessage(text(n));
+        refresh();
+      })
+      .catch((e) => setMessage(String(e)));
+  if (!plan) return null;
+  const toMove = plan.groups.reduce((n, g) => n + g.count, 0);
+  const trashBytes = plan.candidates.filter((c) => picked.includes(c.path)).reduce((n, c) => n + c.bytes, 0);
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>Pasta Downloads · {plan.loose} arquivo(s) soltos</h4>
+        {plan.canUndo && (
+          <button className="link muted" onClick={() => run(api.downloadsUndo(), (n) => `${n} arquivo(s) voltaram para onde estavam.`)}>
+            Desfazer última organização
+          </button>
+        )}
+      </div>
+      {toMove > 0 ? (
+        <>
+          <p className="hint">{plan.groups.map((g) => `${g.folder}: ${g.count}`).join(" · ")}</p>
+          <div className="btns">
+            <button className="primary" onClick={() => run(api.downloadsOrganize(), (n) => `${n} arquivo(s) organizados em pastas.`)}>
+              Organizar {toMove} arquivo(s) em pastas
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="hint">Nada solto para organizar agora.</p>
+      )}
+      {plan.candidates.length > 0 && (
+        <>
+          <p className="hint">Provavelmente dá para apagar (vai para a Lixeira, dá para restaurar):</p>
+          {plan.candidates.map((c) => (
+            <label key={c.path} className="trow check-row">
+              <input
+                type="checkbox"
+                checked={picked.includes(c.path)}
+                onChange={(e) => setPicked((p) => (e.target.checked ? [...p, c.path] : p.filter((x) => x !== c.path)))}
+              />
+              <span className="grow" title={c.name}>{c.name}</span>
+              <span className="row-meta">{c.reason} · {mb(c.bytes)}</span>
+            </label>
+          ))}
+          <div className="btns">
+            <button disabled={picked.length === 0} onClick={() => run(api.downloadsTrash(picked), (n) => `${n} arquivo(s) foram para a Lixeira.`)}>
+              Mandar {picked.length} para a Lixeira ({mb(trashBytes)})
+            </button>
+          </div>
+        </>
+      )}
+      {message && <p className="hint ok">{message}</p>}
+    </div>
+  );
+}
+
+function AskScreen() {
+  return (
+    <div className="block">
+      <h4>Perguntar sobre a tela</h4>
+      <p className="hint">Recorte qualquer parte da tela (erro, gráfico, print) e o Pipo olha e responde. Atalho: Ctrl+Alt+Shift+S.</p>
+      <div className="btns">
+        <button className="primary" onClick={() => void api.screenAsk()}>
+          Recortar e perguntar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Shortcuts() {
   return (
     <>
+      <AskScreen />
+      <Downloads />
       <ReadScreen />
       <Games />
       <Routines />

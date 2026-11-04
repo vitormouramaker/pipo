@@ -58,6 +58,7 @@ export default function MenuApp() {
   const items: Item[] = [
     { id: "chat", label: "Abrir chat", icon: ICONS.chat, action: () => void api.panelOpen("chat") },
     { id: "mic", label: "Falar com o Pipo", icon: ICONS.mic, action: () => void api.voiceToggle() },
+    { id: "screen", label: "Perguntar sobre a tela", icon: ICONS.crop, action: () => void api.screenAsk() },
     island
       ? { id: "island", label: "Voltar ao Pipo", icon: ICONS.expand, action: () => void api.islandToggle() }
       : { id: "island", label: "Modo ilha", icon: ICONS.island, action: () => void api.islandToggle() },

@@ -12,7 +12,7 @@ use crate::{windows, AppState};
 const WAIT: Duration = Duration::from_secs(90);
 
 #[cfg(windows)]
-fn sequence_number() -> u32 {
+pub(crate) fn sequence_number() -> u32 {
     unsafe { windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber() }
 }
 
@@ -59,7 +59,7 @@ fn recognize(image: &arboard::ImageData) -> Result<String, String> {
 }
 
 #[cfg(not(windows))]
-fn sequence_number() -> u32 {
+pub(crate) fn sequence_number() -> u32 {
     0
 }
 

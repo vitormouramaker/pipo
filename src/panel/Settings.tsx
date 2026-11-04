@@ -269,6 +269,10 @@ function VoiceSettings({ settings, update }: { settings: Settings; update: (patc
         Atalho para falar
         <input value={settings.voiceShortcut} onChange={(e) => update({ voiceShortcut: e.target.value })} />
       </label>
+      <label>
+        Atalho para perguntar sobre a tela
+        <input value={settings.screenShortcut} onChange={(e) => update({ screenShortcut: e.target.value })} />
+      </label>
       <label className="check">
         <input type="checkbox" checked={settings.speakReplies} onChange={(e) => update({ speakReplies: e.target.checked })} />
         Ler em voz alta as respostas de perguntas feitas por voz

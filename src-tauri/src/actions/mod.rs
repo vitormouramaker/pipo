@@ -2,6 +2,7 @@
 //! como ferramentas do chat (com confirmação para o que tem efeito).
 
 pub mod docker;
+pub mod downloads;
 pub mod files;
 pub mod focus;
 pub mod games;
@@ -12,6 +13,7 @@ pub mod ocr;
 pub mod ports;
 pub mod projects;
 pub mod routines;
+pub mod screen;
 
 use std::path::Path;
 use std::process::Command;

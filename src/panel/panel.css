@@ -409,3 +409,6 @@
   border: 1px solid rgba(45, 212, 232, 0.5); background: rgba(45, 212, 232, 0.08); color: var(--accent); font-size: 13px;
 }
 .panel .stop-speaking:hover { background: rgba(45, 212, 232, 0.16); }
+
+.trow.check-row { cursor: pointer; }
+.trow.check-row input { margin: 0; }

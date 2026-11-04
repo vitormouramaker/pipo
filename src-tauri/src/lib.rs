@@ -98,9 +98,15 @@ pub fn run() {
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
-                    let voice = app.state::<AppState>().settings.lock().unwrap().voice_shortcut.clone();
-                    if voice.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|v| v == *shortcut) {
+                    let (voice, screen) = {
+                        let s = app.state::<AppState>().settings.lock().unwrap().clone();
+                        (s.voice_shortcut, s.screen_shortcut)
+                    };
+                    let is = |text: &str| text.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|v| v == *shortcut);
+                    if is(&voice) {
                         voice::toggle(app);
+                    } else if is(&screen) {
+                        let _ = actions::screen::start(app);
                     } else {
                         windows::toggle_panel(app);
                     }
@@ -232,6 +238,11 @@ pub fn run() {
             proactive::memory_list,
             proactive::memory_remove,
             documents::chat_attach,
+            actions::screen::screen_ask,
+            actions::downloads::downloads_plan,
+            actions::downloads::downloads_organize,
+            actions::downloads::downloads_undo,
+            actions::downloads::downloads_trash,
             documents::chat_take_attachments,
             updater::update_status,
             updater::update_check,

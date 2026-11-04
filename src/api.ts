@@ -20,6 +20,7 @@ export type Settings = {
   city: string;
   voiceModel: "base" | "small";
   voiceShortcut: string;
+  screenShortcut: string;
   speakReplies: boolean;
   voiceName: string;
   voiceEngine: "natural" | "windows";
@@ -93,6 +94,12 @@ export type UpdateStatus = {
 };
 export type Attachment = { path: string; name: string; kind: "pdf" | "image" | "docx" | "pptx" | "text"; size: number };
 export type AttachResult = { path: string; name: string; attachment: Attachment | null; error: string | null };
+export type DownloadsPlan = {
+  loose: number;
+  groups: { folder: string; count: number; bytes: number }[];
+  candidates: { path: string; name: string; reason: string; bytes: number }[];
+  canUndo: boolean;
+};
 export type VoiceState = { phase: "idle" | "listening" | "transcribing" | "error" | "nomodel"; message: string | null };
 
 /** Acessórios em uso: os liberados que o usuário não escondeu. */
@@ -299,6 +306,11 @@ export const api = {
   voiceStatus: (model?: string) => invoke<VoiceStatus>("voice_status", { model }),
   voiceDownload: (model?: string) => invoke<void>("voice_download", { model }),
   voiceToggle: () => invoke<void>("voice_toggle"),
+  screenAsk: () => invoke<void>("screen_ask"),
+  downloadsPlan: () => invoke<DownloadsPlan>("downloads_plan"),
+  downloadsOrganize: () => invoke<number>("downloads_organize"),
+  downloadsUndo: () => invoke<number>("downloads_undo"),
+  downloadsTrash: (paths: string[]) => invoke<number>("downloads_trash", { paths }),
   ttsStatus: () => invoke<{ ready: boolean; downloading: boolean; downloaded: number; total: number }>("tts_status"),
   ttsDownload: () => invoke<void>("tts_download"),
   ttsSynth: (text: string) => invoke<string>("tts_synth", { text }),

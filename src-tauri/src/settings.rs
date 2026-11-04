@@ -38,6 +38,8 @@ pub struct Settings {
     /// "base" (rápido, 142 MB) ou "small" (mais preciso, 466 MB).
     pub voice_model: String,
     pub voice_shortcut: String,
+    /// Fase 7.1: atalho para recortar a tela e perguntar sobre ela.
+    pub screen_shortcut: String,
     /// Ler em voz alta as respostas de comandos de voz.
     pub speak_replies: bool,
     /// Nome da voz do Windows ("" = primeira voz em português).
@@ -88,6 +90,7 @@ impl Default for Settings {
             city: String::new(),
             voice_model: "base".into(),
             voice_shortcut: "Ctrl+Alt+Shift+V".into(),
+            screen_shortcut: "Ctrl+Alt+Shift+S".into(),
             speak_replies: true,
             voice_name: String::new(),
             voice_engine: "natural".into(),
@@ -122,12 +125,16 @@ fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
         gs.register(s.voice_shortcut.as_str())
             .map_err(|e| format!("Atalho de voz inválido ou em uso por outro app ({}): {e}", s.voice_shortcut))?;
     }
+    if !s.screen_shortcut.trim().is_empty() {
+        gs.register(s.screen_shortcut.as_str())
+            .map_err(|e| format!("Atalho da tela inválido ou em uso por outro app ({}): {e}", s.screen_shortcut))?;
+    }
     Ok(())
 }
 
 /// Aplica as configurações no sistema. Na inicialização `old` é `None`.
 pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<(), String> {
-    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut) {
+    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut) {
         if let Err(e) = register_shortcuts(app, new) {
             if let Some(o) = old {
                 let _ = register_shortcuts(app, o);

@@ -1,6 +1,6 @@
 [package]
 name = "pipo"
-version = "0.5.0"
+version = "0.6.0"
 description = "Pipo, bichinho virtual de desktop"
 authors = ["vitormouramaker"]
 edition = "2024"
@@ -42,6 +42,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 base64 = "0.23.1"
 rrule = "0.14"
 chrono-tz = "0.10"
+png = "0.17"
 
 
 [target.'cfg(windows)'.dependencies]
