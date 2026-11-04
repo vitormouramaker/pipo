@@ -29,13 +29,28 @@ const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, 
 export default function Island({ edge, state }: { edge: Edge; state: PipoState }) {
   const vertical = edge === "left" || edge === "right";
   const [hover, setHover] = useState(false);
+  // Brilho rápido ao virar ilha, para ela não sumir em fundos escuros.
+  const [glow, setGlow] = useState(true);
   const [info, setInfo] = useState(clock());
   const press = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const unlisten = listen<boolean>("island-hover", (e) => setHover(e.payload));
-    return () => void unlisten.then((fn) => fn());
+    const unlistenGlow = listen("island-glow", () => {
+      setGlow(false);
+      requestAnimationFrame(() => setGlow(true));
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+      void unlistenGlow.then((fn) => fn());
+    };
   }, []);
+
+  useEffect(() => {
+    if (!glow) return;
+    const timer = window.setTimeout(() => setGlow(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [glow]);
 
   // Expandida: mostra o pomodoro (se houver) ou a hora.
   useEffect(() => {
@@ -56,7 +71,7 @@ export default function Island({ edge, state }: { edge: Edge; state: PipoState }
   return (
     <main className="island-stage">
       <div
-        className={`island ${edge} s-${state}${hover ? " hover" : ""}`}
+        className={`island ${edge} s-${state}${hover ? " hover" : ""}${glow ? " glow" : ""}`}
         style={{ left: x, top: y, width: w, height: h }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;

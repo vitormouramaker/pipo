@@ -14,6 +14,7 @@ impl Db {
         let conn = Connection::open(path)?;
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = FULL;
              CREATE TABLE IF NOT EXISTS settings (
                  key   TEXT PRIMARY KEY,
                  value TEXT NOT NULL
@@ -75,6 +76,49 @@ impl Db {
         // Colunas acrescentadas depois da primeira versão (o erro de coluna repetida é esperado).
         let _ = conn.execute("ALTER TABLE usage ADD COLUMN web_searches INTEGER NOT NULL DEFAULT 0", []);
         Ok(Self { conn })
+    }
+
+    /// Passa tudo o que está no diário (WAL) para o arquivo principal do banco.
+    pub fn checkpoint(&self) {
+        let _ = self.conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
+    }
+
+    /// Resumo do que há no banco (para o registro de diagnóstico).
+    pub fn stats(&self) -> String {
+        let count = |table: &str| -> i64 {
+            self.conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0)).unwrap_or(-1)
+        };
+        format!(
+            "configurações={} conversas={} mensagens={} gastos={} xp={} notas={} lembretes={}",
+            count("settings"),
+            count("conversations"),
+            count("messages"),
+            count("usage"),
+            count("xp_log"),
+            count("notes"),
+            count("reminders")
+        )
+    }
+
+    /// Cópia de segurança consistente do banco (VACUUM INTO), mantendo as `keep` mais novas.
+    pub fn backup(&self, dir: &Path, keep: usize) -> Result<std::path::PathBuf, String> {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let name = format!("pipo-{}.db", chrono::Local::now().format("%Y%m%d-%H%M%S"));
+        let target = dir.join(name);
+        self.conn
+            .execute("VACUUM INTO ?1", params![target.to_string_lossy()])
+            .map_err(|e| e.to_string())?;
+        let mut old: Vec<_> = std::fs::read_dir(dir)
+            .map_err(|e| e.to_string())?
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().starts_with("pipo-"))
+            .map(|e| e.path())
+            .collect();
+        old.sort();
+        while old.len() > keep {
+            let _ = std::fs::remove_file(old.remove(0));
+        }
+        Ok(target)
     }
 
     /// Acesso direto para os módulos de ações (notas, lembretes).

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, MODELS, type Settings, type VoiceStatus } from "../api";
 import { loadVoices, speak } from "./speech";
@@ -103,6 +103,9 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
   const [detecting, setDetecting] = useState(false);
   const [keyInput, setKeyInput] = useState("");
   const [status, setStatus] = useState<Status>(null);
+  // Mudanças esperando para salvar (texto digitado espera uma pausa curta).
+  const pending = useRef<Partial<Settings>>({});
+  const timer = useRef(0);
 
   const refreshKey = () =>
     void api.keyStatus().then((ok) => {
@@ -124,8 +127,25 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
     }
   };
 
+  // Salva sozinho: cada mudança vai para o Pipo logo depois (sem botão "Salvar").
+  const flush = () => {
+    const patch = pending.current;
+    pending.current = {};
+    if (Object.keys(patch).length === 0) return;
+    void api
+      .settingsUpdate(patch)
+      .then(() => setStatus({ kind: "ok", text: "Salvo" }))
+      .catch((e) => setStatus({ kind: "error", text: String(e) }));
+  };
+  useEffect(() => () => flush(), []);
+
   if (!settings) return null;
-  const update = (patch: Partial<Settings>) => setSettings({ ...settings, ...patch });
+  const update = (patch: Partial<Settings>) => {
+    setSettings({ ...settings, ...patch });
+    pending.current = { ...pending.current, ...patch };
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(flush, 600);
+  };
 
   return (
     <section className="settings">
@@ -342,10 +362,11 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
       </fieldset>
 
       <div className="settings-footer">
-        {status && <span className={`status ${status.kind}`}>{status.text}</span>}
-        <button className="primary" onClick={() => void run(() => api.saveSettings(settings), "Configurações salvas.")}>
-          Salvar configurações
-        </button>
+        {status ? (
+          <span className={`status ${status.kind}`}>{status.text}</span>
+        ) : (
+          <span className="status">As mudanças são salvas automaticamente.</span>
+        )}
       </div>
     </section>
   );

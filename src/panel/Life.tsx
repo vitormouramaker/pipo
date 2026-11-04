@@ -58,9 +58,8 @@ export default function Life() {
     const hidden = settings.hiddenAccessories.includes(id)
       ? settings.hiddenAccessories.filter((a) => a !== id)
       : [...settings.hiddenAccessories, id];
-    const next = { ...settings, hiddenAccessories: hidden };
-    setSettings(next);
-    void api.saveSettings(next);
+    setSettings({ ...settings, hiddenAccessories: hidden });
+    void api.settingsUpdate({ hiddenAccessories: hidden });
     sfx.tick();
   };
 

@@ -136,9 +136,8 @@ function Breaks({ status }: { status: FocusStatus | null }) {
   if (!settings) return null;
 
   const save = (patch: Partial<Settings>) => {
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    void api.saveSettings(next);
+    setSettings({ ...settings, ...patch });
+    void api.settingsUpdate(patch);
   };
 
   return (

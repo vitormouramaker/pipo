@@ -142,6 +142,24 @@ pub fn get_settings(app: AppHandle) -> Settings {
     load(&db)
 }
 
+/// Muda só os campos enviados, a partir das configurações atuais. Assim uma tela com uma
+/// cópia antiga não desfaz o que outra tela acabou de salvar.
+#[tauri::command]
+pub fn settings_update(app: AppHandle, patch: serde_json::Value) -> Result<Settings, String> {
+    let current = app.state::<AppState>().settings.lock().unwrap().clone();
+    let mut value = serde_json::to_value(&current).map_err(|e| e.to_string())?;
+    if let (Some(target), Some(changes)) = (value.as_object_mut(), patch.as_object()) {
+        for (key, v) in changes {
+            if target.contains_key(key) {
+                target.insert(key.clone(), v.clone());
+            }
+        }
+    }
+    let next: Settings = serde_json::from_value(value).map_err(|e| format!("Configuração inválida: {e}"))?;
+    save_settings(app, next.clone())?;
+    Ok(next)
+}
+
 #[tauri::command]
 pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     let state = app.state::<AppState>();

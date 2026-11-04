@@ -158,46 +158,88 @@ pub fn exit(app: &AppHandle) {
     save(app, |s| s.island = false);
 }
 
-/// Depois do arrasto: gruda na borda mais próxima do centro da pílula.
-pub fn snap(app: &AppHandle) {
-    let Some(pet) = app.get_webview_window(windows::MAIN) else { return };
-    let (Ok(pos), Ok(size)) = (pet.outer_position(), pet.outer_size()) else { return };
-    let (cx, cy) = (pos.x + size.width as i32 / 2, pos.y + size.height as i32 / 2);
-    let Some(monitor) = app.monitor_from_point(cx as f64, cy as f64).ok().flatten() else { return };
+/// Distância (px lógicos) do cursor até a borda para virar ilha; já na ilha, é preciso
+/// afastar mais para ela soltar da borda (evita ficar piscando entre os dois).
+const ZONE: f64 = 56.0;
+const ZONE_EXIT: f64 = 120.0;
+
+/// Borda ou canto de ilha onde o cursor está (ou `None`, longe das bordas).
+pub fn dock_zone(app: &AppHandle, cursor: PhysicalPosition<f64>, already_island: bool) -> Option<String> {
+    let monitor = app.monitor_from_point(cursor.x, cursor.y).ok().flatten()?;
     let area = monitor.work_area();
-    let (left, top) = (area.position.x, area.position.y);
-    let (width, height) = (area.size.width as i32, area.size.height as i32);
-    let distances = [
-        ("top", cy - top),
-        ("bottom", top + height - cy),
-        ("left", cx - left),
-        ("right", left + width - cx),
-    ];
-    let side = distances.iter().min_by_key(|(_, d)| *d).map(|(e, _)| *e).unwrap_or("top");
-    // Perto de um canto (nos primeiros/últimos 15% da borda), gruda no canto.
-    let near_start = |d: i32, total: i32| (d as f64) < total as f64 * 0.15;
-    let edge = match side {
-        "top" | "bottom" if near_start(cx - left, width) => if side == "top" { "top-left" } else { "bottom-left" },
-        "top" | "bottom" if near_start(left + width - cx, width) => if side == "top" { "top-right" } else { "bottom-right" },
-        "left" | "right" if near_start(cy - top, height) => if side == "left" { "top-left" } else { "top-right" },
-        "left" | "right" if near_start(top + height - cy, height) => if side == "left" { "bottom-left" } else { "bottom-right" },
-        other => other,
-    };
-    let (w, h) = dims(edge);
+    let zone = if already_island { ZONE_EXIT } else { ZONE } * monitor.scale_factor();
+    let (left, top) = (area.position.x as f64, area.position.y as f64);
+    let (right, bottom) = (left + area.size.width as f64, top + area.size.height as f64);
+    zone_for(cursor.y - top, bottom - cursor.y, cursor.x - left, right - cursor.x, zone)
+}
+
+/// Regra pura: distâncias do cursor às bordas (cima, baixo, esquerda, direita) → borda ou canto.
+fn zone_for(dt: f64, db: f64, dl: f64, dr: f64, zone: f64) -> Option<String> {
+    // Canto: perto das duas bordas (com uma folga maior para facilitar).
+    let corner = zone * 1.8;
+    let vertical = if dt <= corner { Some("top") } else if db <= corner { Some("bottom") } else { None };
+    let horizontal = if dl <= corner { Some("left") } else if dr <= corner { Some("right") } else { None };
+    if let (Some(v), Some(h)) = (vertical, horizontal) {
+        if dt.min(db).min(dl).min(dr) <= zone {
+            return Some(format!("{v}-{h}"));
+        }
+    }
+    let nearest = [("top", dt), ("bottom", db), ("left", dl), ("right", dr)]
+        .into_iter()
+        .min_by(|a, b| a.1.total_cmp(&b.1))?;
+    (nearest.1 <= zone).then(|| nearest.0.to_string())
+}
+
+/// Solta como ilha na borda `edge`, na altura (ou largura) do cursor, com um brilho para ser notada.
+pub fn dock(app: &AppHandle, edge: &str, cursor: PhysicalPosition<f64>) {
+    let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y).ok().flatten() else { return };
+    let area = monitor.work_area();
     let scale = monitor.scale_factor();
-    let (w, h) = ((w * scale) as i32, (h * scale) as i32);
+    let (w, h) = dims(edge);
+    let (w, h) = (w * scale, h * scale);
+    let (left, top) = (area.position.x as f64, area.position.y as f64);
+    let (width, height) = (area.size.width as f64, area.size.height as f64);
     let pos = if matches!(edge, "left" | "right") {
-        (cy - h / 2 - top) as f64 / (height - h).max(1) as f64
+        (cursor.y - h / 2.0 - top) / (height - h).max(1.0)
     } else {
-        (cx - w / 2 - left) as f64 / (width - w).max(1) as f64
-    };
-    let pos = pos.clamp(0.0, 1.0);
+        (cursor.x - w / 2.0 - left) / (width - w).max(1.0)
+    }
+    .clamp(0.0, 1.0);
+    let was_island = ACTIVE.swap(true, Ordering::SeqCst);
+    if !was_island {
+        // Veio arrastado: "Voltar ao Pipo" o põe ao lado da ilha.
+        *HOME.lock().unwrap() = None;
+        windows::close_radial(app);
+        windows::hide_panel(app);
+    }
     save(app, |s| {
+        s.island = true;
         s.island_edge = edge.into();
         s.island_pos = pos;
     });
     place(app, edge, pos);
     emit(app);
+    let _ = app.emit_to(windows::MAIN, "island-glow", ());
+}
+
+/// A ilha foi arrastada para longe da borda: vira o Pipo de novo, centralizado no cursor.
+/// Devolve a nova posição da janela (para o arrasto continuar dali).
+pub fn undock_at(app: &AppHandle, cursor: PhysicalPosition<f64>) -> Option<PhysicalPosition<i32>> {
+    if !ACTIVE.swap(false, Ordering::SeqCst) {
+        return None;
+    }
+    HOVER.store(false, Ordering::SeqCst);
+    *HOME.lock().unwrap() = None;
+    let pet = app.get_webview_window(windows::MAIN)?;
+    let logical = windows::window_size(app.state::<AppState>().settings.lock().unwrap().pet_size);
+    let _ = pet.set_size(LogicalSize::new(logical, logical));
+    let scale = app.monitor_from_point(cursor.x, cursor.y).ok().flatten().map_or(1.0, |m| m.scale_factor());
+    let half = (logical * scale / 2.0) as i32;
+    let pos = PhysicalPosition::new(cursor.x as i32 - half, cursor.y as i32 - half);
+    let _ = pet.set_position(pos);
+    emit(app);
+    save(app, |s| s.island = false);
+    Some(pos)
 }
 
 /// Durante o arrasto a pílula anda livre, mas sem sair da área útil do monitor.
@@ -255,5 +297,25 @@ mod tests {
         assert_eq!(pill("top-right", false), [130.0, 0.0, 120.0, 28.0]);
         assert_eq!(pill("bottom-left", true), [0.0, 6.0, 236.0, 46.0]);
         assert_eq!(pill("bottom-right", false), [130.0, 24.0, 120.0, 28.0]);
+    }
+}
+
+#[cfg(test)]
+mod zone_tests {
+    use super::zone_for;
+    const Z: f64 = 56.0;
+
+    #[test]
+    fn bordas_cantos_e_longe() {
+        // Tela 1920×1032: (cima, baixo, esquerda, direita)
+        assert_eq!(zone_for(10.0, 1022.0, 900.0, 1020.0, Z).as_deref(), Some("top"));
+        assert_eq!(zone_for(600.0, 432.0, 20.0, 1900.0, Z).as_deref(), Some("left"));
+        assert_eq!(zone_for(1000.0, 32.0, 900.0, 1020.0, Z).as_deref(), Some("bottom"));
+        assert_eq!(zone_for(5.0, 1027.0, 60.0, 1860.0, Z).as_deref(), Some("top-left"));
+        assert_eq!(zone_for(1025.0, 7.0, 1900.0, 20.0, Z).as_deref(), Some("bottom-right"));
+        // Longe de tudo: continua Pipo normal.
+        assert_eq!(zone_for(400.0, 632.0, 500.0, 1420.0, Z), None);
+        // Perto do canto mas sem encostar em nenhuma borda: nada.
+        assert_eq!(zone_for(80.0, 952.0, 80.0, 1840.0, Z), None);
     }
 }

@@ -248,6 +248,8 @@ export const api = {
   senseStatus: () => invoke<SenseStatus>("sense_status"),
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
+  /** Salva só os campos alterados (sem sobrescrever o que outra tela mudou). */
+  settingsUpdate: (patch: Partial<Settings>) => invoke<Settings>("settings_update", { patch }),
   keyStatus: () => invoke<boolean>("key_status"),
   saveApiKey: (key: string) => invoke<void>("save_api_key", { key }),
   deleteApiKey: () => invoke<void>("delete_api_key"),

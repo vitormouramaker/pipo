@@ -58,6 +58,14 @@ pub struct AppState {
     pub toasts: Mutex<Vec<toast::Toast>>,
 }
 
+/// Registro simples de diagnóstico em `pipo.log` (fica só no computador).
+pub fn log(dir: &std::path::Path, line: &str) {
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join("pipo.log")) {
+        let _ = writeln!(f, "{} {line}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"));
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -96,6 +104,15 @@ pub fn run() {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             let db = db::Db::open(&dir.join("pipo.db"))?;
+            // Diagnóstico e proteção: registra o que há no banco e guarda uma cópia a cada início.
+            let stats = db.stats();
+            log(&dir, &format!("início: {stats}"));
+            if !stats.contains("configurações=0 conversas=0") {
+                match db.backup(&dir.join("backups"), 15) {
+                    Ok(path) => log(&dir, &format!("cópia de segurança: {}", path.display())),
+                    Err(e) => log(&dir, &format!("cópia de segurança falhou: {e}")),
+                }
+            }
             let settings = settings::load(&db);
             app.manage(AppState {
                 db: Mutex::new(db),
@@ -130,6 +147,12 @@ pub fn run() {
             if settings.island {
                 island::enter(app.handle(), true);
             }
+            // Grava o diário do banco no arquivo principal a cada 5 minutos.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(300));
+                handle.state::<AppState>().db.lock().unwrap().checkpoint();
+            });
             sensors::start(app.handle().clone());
             world::lives::start(app.handle().clone());
             Ok(())
@@ -211,6 +234,7 @@ pub fn run() {
             usage::usage_summary,
             settings::get_settings,
             settings::save_settings,
+            settings::settings_update,
             secrets::key_status,
             secrets::save_api_key,
             secrets::delete_api_key,

@@ -58,9 +58,8 @@ function BriefingCard() {
 
   const save = (patch: Partial<Settings>) => {
     if (!settings) return;
-    const next = { ...settings, ...patch };
-    setSettings(next);
-    void api.saveSettings(next);
+    setSettings({ ...settings, ...patch });
+    void api.settingsUpdate(patch);
   };
 
   const today = new Date().toLocaleDateString("sv-SE"); // AAAA-MM-DD

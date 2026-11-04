@@ -283,6 +283,14 @@ pub fn toggle_pet(app: &AppHandle) {
 pub fn quit(app: &AppHandle) {
     close_radial(app);
     let _ = app.save_window_state(StateFlags::POSITION);
+    // Antes de sair, tudo o que está no diário do banco vai para o arquivo principal.
+    let state = app.state::<AppState>();
+    let db = state.db.lock().unwrap();
+    db.checkpoint();
+    if let Ok(dir) = app.path().app_data_dir() {
+        crate::log(&dir, &format!("saída: {}", db.stats()));
+    }
+    drop(db);
     app.exit(0);
 }
 
@@ -395,7 +403,12 @@ pub fn pet_drag_start(app: AppHandle) {
     };
 
     std::thread::spawn(move || {
+        // Base do arrasto (muda quando a ilha vira Pipo no meio do caminho).
+        let (mut origin, mut grab) = (window, cursor);
         let mut last = window;
+        let mut moved = false;
+        // Prévia de ilha mostrada pelo Pipo enquanto ele está perto de uma borda.
+        let mut preview: Option<String> = None;
         // Velocidade do arrasto (px lógicos/s, suavizada) para a animação de física do Pipo.
         let scale = app.get_webview_window(MAIN).and_then(|w| w.scale_factor().ok()).unwrap_or(1.0);
         let mut tick = std::time::Instant::now();
@@ -404,8 +417,21 @@ pub fn pet_drag_start(app: AppHandle) {
         let mut velocity = (0.0f64, 0.0f64);
         while primary_button_down() {
             if let Ok(now) = app.cursor_position() {
-                let x = window.x + (now.x - cursor.x).round() as i32;
-                let y = window.y + (now.y - cursor.y).round() as i32;
+                if (now.x - cursor.x).abs() + (now.y - cursor.y).abs() > 6.0 {
+                    moved = true;
+                }
+                let zone = if moved { island::dock_zone(&app, now, island::active()) } else { None };
+                if island::active() && moved && zone.is_none() {
+                    // Puxou a ilha para longe da borda: vira o Pipo de novo, sem soltar o mouse.
+                    if let Some(p) = island::undock_at(&app, now) {
+                        (origin, grab, last) = (p, now, p);
+                    }
+                } else if !island::active() && zone != preview {
+                    preview = zone.clone();
+                    let _ = app.emit_to(MAIN, "island-preview", preview.clone());
+                }
+                let x = origin.x + (now.x - grab.x).round() as i32;
+                let y = origin.y + (now.y - grab.y).round() as i32;
                 if (x, y) != (last.x, last.y) {
                     if island::active() {
                         island::move_clamped(&app, x, y, now);
@@ -431,8 +457,16 @@ pub fn pet_drag_start(app: AppHandle) {
         }
         app.state::<AppState>().dragging.store(false, Ordering::SeqCst);
         let _ = app.emit_to(MAIN, "pipo-drag", (velocity.0.round(), velocity.1.round(), false));
-        if island::active() && (last.x, last.y) != (window.x, window.y) {
-            island::snap(&app);
+        // Soltou perto de uma borda ou canto: vira (ou continua) ilha ali.
+        if moved {
+            if let Ok(now) = app.cursor_position() {
+                if let Some(edge) = island::dock_zone(&app, now, island::active()) {
+                    island::dock(&app, &edge, now);
+                }
+            }
+        }
+        if preview.is_some() {
+            let _ = app.emit_to(MAIN, "island-preview", None::<String>);
         }
     });
 }
