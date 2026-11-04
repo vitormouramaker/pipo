@@ -52,7 +52,7 @@ pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str, action: Opti
 
 /// Como `notify`, dizendo a origem (ex.: "github", "email", "lol", "proactive").
 pub fn notify_from(app: &AppHandle, source: &str, kind: &str, title: &str, body: &str, action: Option<&str>) {
-    if !crate::modes::allows(source) {
+    if !crate::modes::allows(app, source) {
         return;
     }
     crate::world::telegram::mirror(app, source, title, body);

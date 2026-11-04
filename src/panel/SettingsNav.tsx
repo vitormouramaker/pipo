@@ -1,4 +1,4 @@
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { ICONS } from "../ui/icons";
 
 type Section = { id: string; label: string; el: HTMLFieldSetElement };
@@ -16,6 +16,12 @@ export default function SettingsNav({ root }: { root: RefObject<HTMLElement | nu
   const [query, setQuery] = useState("");
   const [active, setActive] = useState<string | null>(null);
   const [empty, setEmpty] = useState(false);
+  const nav = useRef<HTMLElement>(null);
+
+  // A seção atual sempre visível no índice (ele rola de lado quando não cabe).
+  useEffect(() => {
+    nav.current?.querySelector<HTMLElement>("button.on")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
 
   // Lê as seções (e relê quando alguma aparece depois, ex.: as que carregam dados).
   useEffect(() => {
@@ -97,7 +103,7 @@ export default function SettingsNav({ root }: { root: RefObject<HTMLElement | nu
           </button>
         )}
       </div>
-      <nav className="settings-index" aria-label="Índice das configurações">
+      <nav ref={nav} className="settings-index" aria-label="Índice das configurações">
         {shown.map((s) => (
           <button key={s.id} className={s.id === active ? "on" : undefined} aria-current={s.id === active ? "true" : undefined} onClick={() => go(s)}>
             {s.label}

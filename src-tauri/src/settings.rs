@@ -72,6 +72,8 @@ pub struct Settings {
     pub auto_modes: bool,
     pub manual_mode: String,
     pub mode_rules: Vec<crate::modes::ModeRule>,
+    /// O que continua funcionando em cada modo ("normal", "trabalho", "estudo", "jogo").
+    pub mode_allow: std::collections::BTreeMap<String, Vec<String>>,
     /// Fase 7.5: atalhos de texto.
     pub text_expander: bool,
     pub snippets: Vec<crate::actions::expander::Snippet>,
@@ -133,6 +135,7 @@ impl Default for Settings {
             auto_modes: true,
             manual_mode: "auto".into(),
             mode_rules: crate::modes::default_rules(),
+            mode_allow: crate::modes::default_allow(),
             text_expander: true,
             snippets: Vec::new(),
             lol_enabled: true,

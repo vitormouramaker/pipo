@@ -368,3 +368,13 @@ body,
   .find-fx span { animation: none; opacity: 1; }
   .stage.finding .pet .pipo { animation: none; filter: drop-shadow(0 0 8px rgba(45, 212, 232, 0.9)); }
 }
+
+/* Brilho também nas ilhas das laterais: a regra do esparramo vertical (.island.left.splat-v)
+   trocava a lista de animações e o brilho sumia. */
+.island.left.splat-v.glow,
+.island.right.splat-v.glow {
+  animation: island-splat-v 420ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both, island-glow 1.8s ease-out 120ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .island.left.splat-v.glow, .island.right.splat-v.glow { animation: none; border-color: #2dd4e8; }
+}

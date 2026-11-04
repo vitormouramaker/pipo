@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, type ModeRule, type ModeStatus, type Settings, type TelegramStatus } from "../api";
 import { sfx } from "../ui/sound";
@@ -6,10 +6,83 @@ import { sfx } from "../ui/sound";
 type Update = (patch: Partial<Settings>) => void;
 
 const MODES = [
-  { id: "trabalho", label: "Trabalho", hint: "tudo normal, menos avisos de lives" },
-  { id: "estudo", label: "Estudo", hint: "só lembretes e agenda; o Pipo não puxa assunto" },
-  { id: "jogo", label: "Jogo", hint: "só lembretes, agenda e dicas do LoL" },
+  { id: "trabalho", label: "Trabalho" },
+  { id: "estudo", label: "Estudo" },
+  { id: "jogo", label: "Jogo" },
 ];
+const ALL_MODES = [{ id: "normal", label: "Normal" }, ...MODES];
+
+/** O que pode continuar funcionando em cada modo (mesma lista do modes.rs). */
+const FEATURES = [
+  { id: "reminder", label: "Lembretes e agenda", hint: "lembretes, pomodoro, pausas e compromissos" },
+  { id: "live", label: "Lives", hint: "aviso quando um canal seguido entra ao vivo" },
+  { id: "github", label: "GitHub", hint: "CI terminou e pedidos de revisão" },
+  { id: "email", label: "E-mails novos", hint: "aviso de e-mail novo na caixa principal" },
+  { id: "alert", label: "Alertas do computador", hint: "CPU ou memória no limite" },
+  { id: "lol", label: "League of Legends", hint: "dica do campeão, Dragão/Barão e resumo da partida" },
+  { id: "proactive", label: "Pipo puxa assunto", hint: "dicas sem você pedir: erro copiado, commit, resumo do dia" },
+  { id: "pipo", label: "Nível e conquistas", hint: "subiu de nível, conquista nova" },
+  { id: "info", label: "Briefing e avisos gerais", hint: "briefing pronto, atualização do Pipo" },
+  { id: "actions", label: "Resultado do que você pediu", hint: "script terminou, texto copiado, erros" },
+];
+const DEFAULT_ALLOW: Record<string, string[]> = {
+  normal: FEATURES.map((f) => f.id),
+  trabalho: FEATURES.map((f) => f.id).filter((id) => id !== "live"),
+  estudo: ["reminder", "actions"],
+  jogo: ["reminder", "lol", "actions"],
+};
+
+/** Abas por modo; cada item ligado continua funcionando naquele modo. */
+function ModeFeatures({ settings, update, now }: { settings: Settings; update: Update; now: string }) {
+  const [editing, setEditing] = useState(now || "normal");
+  // Abre na aba do modo de agora assim que ele for conhecido.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || !now) return;
+    opened.current = true;
+    setEditing(now);
+  }, [now]);
+  const allow = (mode: string) => settings.modeAllow?.[mode] ?? DEFAULT_ALLOW[mode];
+  const list = allow(editing);
+  const set = (mode: string, next: string[]) => update({ modeAllow: { ...DEFAULT_ALLOW, ...settings.modeAllow, [mode]: next } });
+  const toggle = (id: string) => set(editing, list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+  const label = ALL_MODES.find((m) => m.id === editing)?.label ?? "";
+  return (
+    <div className="mode-features">
+      <span className="field-label">O que funciona em cada modo</span>
+      <div className="mode-tabs" role="tablist">
+        {ALL_MODES.map((m) => (
+          <button key={m.id} role="tab" aria-selected={editing === m.id} className={editing === m.id ? "on" : undefined} onClick={() => setEditing(m.id)}>
+            {m.label}
+            {(now || "normal") === m.id && <span className="mode-now" title="Modo de agora" />}
+          </button>
+        ))}
+      </div>
+      <div className="feature-list" role="tabpanel">
+        {FEATURES.map((f) => {
+          const on = list.includes(f.id);
+          return (
+            <label key={f.id} className={`feature${on ? " on" : ""}`}>
+              <input type="checkbox" className="switch" checked={on} onChange={() => toggle(f.id)} />
+              <span className="feature-text">
+                <strong>{f.label}</strong>
+                <span>{f.hint}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <div className="feature-foot">
+        <span className="hint">
+          No modo {label.toLowerCase()}: {list.length} de {FEATURES.length} ligados. Desligado = fica em silêncio enquanto o modo estiver ativo.
+        </span>
+        <button className="link muted" onClick={() => set(editing, DEFAULT_ALLOW[editing])}>
+          Restaurar padrão
+        </button>
+      </div>
+    </div>
+  );
+}
 const DAYS = ["S", "T", "Q", "Q", "S", "S", "D"];
 const DAY_NAMES = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
 
@@ -32,6 +105,7 @@ export function ModesSettings({ settings, update }: { settings: Settings; update
         Agora: <strong>{current ? `modo ${current.label.toLowerCase()}` : "modo normal"}</strong>
         {status?.reason ? ` (${status.reason})` : ""}.
       </p>
+      <span className="field-label">Usar agora</span>
       <div className="segmented" aria-label="Modo">
         {[{ id: "auto", label: "Automático" }, { id: "normal", label: "Normal" }, ...MODES].map((m) => (
           <button
@@ -43,13 +117,7 @@ export function ModesSettings({ settings, update }: { settings: Settings; update
           </button>
         ))}
       </div>
-      <ul className="mode-legend">
-        {MODES.map((m) => (
-          <li key={m.id}>
-            <strong>{m.label}:</strong> {m.hint}.
-          </li>
-        ))}
-      </ul>
+      <ModeFeatures settings={settings} update={update} now={status?.mode ?? ""} />
       <label className="check">
         <input type="checkbox" checked={settings.autoModes} onChange={(e) => update({ autoModes: e.target.checked })} />
         No automático, ligar os modos pelas regras abaixo

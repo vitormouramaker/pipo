@@ -4,6 +4,7 @@
 //! - estudo: só lembretes, agenda e o que você mesmo pediu; o Pipo não puxa assunto;
 //! - jogo: só lembretes, agenda e as dicas do LoL; o Pipo não puxa assunto.
 
+use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -150,18 +151,50 @@ pub fn tick(app: &AppHandle, active: Option<&ActiveApp>) {
 }
 
 /// Avisos de cada origem que podem aparecer no modo atual.
-pub fn allows(source: &str) -> bool {
-    match current().as_str() {
-        "trabalho" => source != "live",
-        "estudo" => matches!(source, "reminder" | "mode" | "error" | "done"),
-        "jogo" => matches!(source, "reminder" | "mode" | "lol" | "error" | "done"),
-        _ => true,
+/// O que pode funcionar em cada modo (o usuário escolhe em Configurações > Modos).
+/// "proactive" também decide se o Pipo pode puxar assunto; "actions" cobre o resultado
+/// das ações que você mesmo pediu (script terminou, erro ao anexar…).
+pub const SOURCES: &[&str] = &["reminder", "live", "github", "email", "alert", "lol", "proactive", "pipo", "info", "actions"];
+
+fn defaults_for(mode: &str) -> Vec<String> {
+    let list: &[&str] = match mode {
+        "trabalho" => &["reminder", "github", "email", "alert", "lol", "proactive", "pipo", "info", "actions"],
+        "estudo" => &["reminder", "actions"],
+        "jogo" => &["reminder", "lol", "actions"],
+        _ => SOURCES,
+    };
+    list.iter().map(|s| s.to_string()).collect()
+}
+
+pub fn default_allow() -> BTreeMap<String, Vec<String>> {
+    ["normal", "trabalho", "estudo", "jogo"].iter().map(|m| (m.to_string(), defaults_for(m))).collect()
+}
+
+/// O modo permite avisos desta origem? (Origens fora da lista, como a troca de modo, sempre passam.)
+fn permits(allow: &BTreeMap<String, Vec<String>>, mode: &str, source: &str) -> bool {
+    let source = match source {
+        "done" | "error" => "actions",
+        other => other,
+    };
+    if !SOURCES.contains(&source) {
+        return true;
+    }
+    let mode = if mode.is_empty() { "normal" } else { mode };
+    match allow.get(mode) {
+        Some(list) => list.iter().any(|s| s == source),
+        None => defaults_for(mode).iter().any(|s| s == source),
     }
 }
 
-/// Estudo e jogo: o Pipo não puxa assunto.
-pub fn quiet() -> bool {
-    matches!(current().as_str(), "estudo" | "jogo")
+/// Avisos desta origem podem aparecer no modo atual?
+pub fn allows(app: &AppHandle, source: &str) -> bool {
+    let allow = app.state::<AppState>().settings.lock().unwrap().mode_allow.clone();
+    permits(&allow, &current(), source)
+}
+
+/// O Pipo não puxa assunto quando o modo atual desligou as "dicas do Pipo".
+pub fn quiet(app: &AppHandle) -> bool {
+    !allows(app, "proactive")
 }
 
 #[derive(Clone, Serialize)]
@@ -199,6 +232,22 @@ mod tests {
 
     fn at(h: u32, m: u32) -> NaiveTime {
         NaiveTime::from_hms_opt(h, m, 0).unwrap()
+    }
+
+    #[test]
+    fn cada_modo_deixa_passar_o_que_o_usuario_escolheu() {
+        let mut allow = default_allow();
+        assert!(permits(&allow, "", "live"));
+        assert!(!permits(&allow, "trabalho", "live"));
+        assert!(permits(&allow, "jogo", "lol"));
+        assert!(!permits(&allow, "jogo", "proactive"));
+        assert!(permits(&allow, "estudo", "error"));
+        assert!(permits(&allow, "estudo", "mode"));
+        allow.insert("jogo".into(), vec!["live".into()]);
+        assert!(permits(&allow, "jogo", "live"));
+        assert!(!permits(&allow, "jogo", "reminder"));
+        allow.remove("estudo");
+        assert!(!permits(&allow, "estudo", "live"));
     }
 
     #[test]

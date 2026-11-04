@@ -40,6 +40,7 @@ export type Settings = {
   autoModes: boolean;
   manualMode: string;
   modeRules: ModeRule[];
+  modeAllow: Record<string, string[]>;
   textExpander: boolean;
   snippets: Snippet[];
   lolEnabled: boolean;

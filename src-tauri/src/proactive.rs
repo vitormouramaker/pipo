@@ -208,7 +208,7 @@ pub fn memory_remove(app: AppHandle, id: i64) -> Result<(), String> {
 
 /// Pode falar agora? Respeita o limite por hora, o intervalo, jogo, foco e ausência.
 fn can_speak(app: &AppHandle, idle: u64, gaming: bool) -> bool {
-    if gaming || idle >= AWAY || focus::pomodoro_focusing(app) || crate::modes::quiet() {
+    if gaming || idle >= AWAY || focus::pomodoro_focusing(app) || crate::modes::quiet(app) {
         return false;
     }
     if !app.state::<AppState>().settings.lock().unwrap().proactive {
