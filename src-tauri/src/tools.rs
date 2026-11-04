@@ -71,6 +71,12 @@ pub fn definitions() -> Value {
             &["path"],
         ),
         tool("open_file", "Abre um arquivo no programa padrão do Windows.", json!({ "path": { "type": "string" }, "name": { "type": "string" } }), &["path", "name"]),
+        tool(
+            "search_file_contents",
+            "Procura pelo CONTEÚDO dos documentos do usuário (PDF, Word, PowerPoint, textos) e pelo nome das imagens, no índice local das pastas Documentos, Downloads, Área de Trabalho e Imagens. Use palavras-chave do assunto; para sinônimos use OR (ex.: \"contrato OR locação apartamento\"). Devolve caminho e trecho; depois use read_file para ler.",
+            json!({ "query": { "type": "string" } }),
+            &["query"],
+        ),
         tool("check_email", "Lista os e-mails não lidos da caixa principal do Gmail (últimos 2 dias): remetente, assunto e começo do texto. Só leitura.", json!({}), &[]),
         tool("watch_live", "Abre a live de um canal seguido no mini-player (janela pequena por cima de tudo). channel: nome do canal.", json!({ "channel": { "type": "string" } }), &["channel"]),
         tool("organize_downloads", "Separa os arquivos soltos da pasta Downloads em pastas por tipo (dá para desfazer em Ações > Atalhos).", json!({}), &[]),
@@ -163,6 +169,7 @@ pub fn label(name: &str, input: &Value) -> String {
         "open_file" => format!("Abrindo {}", s(input, "name")),
         "organize_downloads" => "Organizando Downloads".into(),
         "check_email" => "Lendo os e-mails não lidos".into(),
+        "search_file_contents" => format!("Procurando nos seus arquivos: {}", s(input, "query")),
         "watch_live" => format!("Abrindo a live de {}", s(input, "channel")),
         "open_recent_file" => format!("Abrindo {}", s(input, "name")),
         "add_note" => "Guardando nota".into(),
@@ -230,6 +237,14 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
             }
         }
         "check_email" => crate::world::email::summary_text(app),
+        "search_file_contents" => {
+            let hits = crate::files_index::search(app, input["query"].as_str().unwrap_or(""), 12)?;
+            if hits.is_empty() {
+                Ok("Nada encontrado no índice. Tente outras palavras ou sinônimos (com OR); o índice pode ainda estar sendo montado.".into())
+            } else {
+                to_json(hits)
+            }
+        }
         "watch_live" => {
             let wanted = s(input, "channel").trim_start_matches('@').to_lowercase();
             let found = crate::world::lives::list(app).into_iter().find(|c| c.handle.trim_start_matches('@').to_lowercase().contains(&wanted));

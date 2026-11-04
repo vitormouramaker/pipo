@@ -205,6 +205,11 @@ fn clip(mut text: String) -> String {
     text
 }
 
+/// Texto puro (para o índice de busca nos arquivos).
+pub fn plain_text(a: &Attachment) -> Result<String, String> {
+    text_of(a)
+}
+
 /// Texto puro de um arquivo de texto, Word ou PowerPoint.
 fn text_of(a: &Attachment) -> Result<String, String> {
     let path = Path::new(&a.path);

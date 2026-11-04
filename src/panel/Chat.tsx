@@ -32,6 +32,21 @@ function renderText(text: string): ReactNode[] {
   });
 }
 
+/** Comandos de barra do chat: aparecem ao digitar "/" (as mesmas ideias do Telegram). */
+const COMMANDS: { name: string; arg?: string; hint: string }[] = [
+  { name: "novo", hint: "Começa uma conversa nova" },
+  { name: "historico", hint: "Abre o histórico de conversas" },
+  { name: "tela", hint: "Recorta a tela e pergunta sobre ela" },
+  { name: "lembrete", arg: "texto", hint: "Cria um lembrete (ex.: /lembrete amanhã 9h pagar a conta)" },
+  { name: "lembretes", hint: "Mostra os lembretes pendentes" },
+  { name: "email", hint: "Resume os e-mails não lidos" },
+  { name: "semana", hint: "Relatório da semana agora" },
+  { name: "pomodoro", arg: "min", hint: "Começa um pomodoro (25 min se não disser)" },
+  { name: "ilha", hint: "Liga ou desliga o modo ilha" },
+  { name: "encontrar", hint: "Faz o Pipo pulsar na tela" },
+  { name: "ajuda", hint: "Lista os comandos" },
+];
+
 /** Igual a MAX_ATTACHMENTS no Rust (documents.rs). */
 const MAX_ATTACHMENTS = 5;
 
@@ -147,9 +162,66 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, history]);
 
+  // Comandos de barra: lista enquanto digita o nome do comando.
+  const [pick, setPick] = useState(0);
+  const typing = /^\/(\S*)$/.exec(input);
+  const matches = typing ? COMMANDS.filter((c) => c.name.startsWith(typing[1].toLowerCase())) : [];
+  const note = (text: string) => setMessages((m) => [...m, { role: "assistant", text }]);
+
+  const runCommand = async (name: string, arg: string) => {
+    setInput("");
+    setHistory(null);
+    try {
+      switch (name) {
+        case "novo":
+          return void (await newConversation());
+        case "historico":
+          return void (await toggleHistory());
+        case "tela":
+          return void (await api.screenAsk());
+        case "ilha":
+          return void (await api.islandToggle());
+        case "encontrar":
+          return void (await api.petFind());
+        case "lembrete":
+          if (!arg) {
+            setInput("/lembrete ");
+            return;
+          }
+          return void (await sendText(`Crie um lembrete: ${arg}`));
+        case "email":
+          return void (await sendText("Tenho e-mails importantes? Resuma os não lidos da caixa principal e diga o que pede ação."));
+        case "lembretes": {
+          const list = (await api.focusStatus()).reminders;
+          return note(list.length ? `⏰ Lembretes\n${list.map((r) => `• ${r.due} — ${r.text}`).join("\n")}` : "Nenhum lembrete pendente.");
+        }
+        case "semana":
+          note("Montando o relatório da semana…");
+          return note((await api.reportGenerate()).text);
+        case "pomodoro": {
+          const min = Number(arg) || 25;
+          await api.pomodoroStart(min, 5);
+          return note(`🍅 Pomodoro de ${min} min começou.`);
+        }
+        case "ajuda":
+          return note(["Comandos:", ...COMMANDS.map((c) => `/${c.name}${c.arg ? ` <${c.arg}>` : ""} — ${c.hint}`)].join("\n"));
+        default:
+          return note(`Não conheço /${name}. Digite / para ver a lista.`);
+      }
+    } catch (e) {
+      setError(String(e));
+      sfx.error();
+    }
+  };
+
   const send = (preset?: string) => {
     const text = (preset ?? input).trim();
     if ((!text && attachments.length === 0) || busy) return;
+    const command = preset === undefined && attachments.length === 0 ? /^\/(\S+)\s*(.*)$/s.exec(text) : null;
+    if (command && COMMANDS.some((c) => c.name === command[1].toLowerCase())) {
+      void runCommand(command[1].toLowerCase(), command[2].trim());
+      return;
+    }
     setInput("");
     void sendText(text);
   };
@@ -409,13 +481,64 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
             </div>
           </div>
         )}
+        {matches.length > 0 && (
+          <div className="slash-menu" role="listbox" aria-label="Comandos">
+            {matches.map((c, i) => (
+              <button
+                key={c.name}
+                role="option"
+                aria-selected={i === Math.min(pick, matches.length - 1)}
+                className={i === Math.min(pick, matches.length - 1) ? "on" : undefined}
+                onMouseEnter={() => setPick(i)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  if (c.arg) setInput(`/${c.name} `);
+                  else void runCommand(c.name, "");
+                  inputRef.current?.focus();
+                }}
+              >
+                <strong>
+                  /{c.name}
+                  {c.arg && <em> {c.arg}</em>}
+                </strong>
+                <span>{c.hint}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <textarea
           ref={inputRef}
           rows={2}
           value={input}
-          placeholder={attachments.length ? "Pergunte sobre o anexo ou use um atalho acima" : "Mensagem para o Pipo  (Enter envia, Shift+Enter quebra linha)"}
-          onChange={(e) => setInput(e.target.value)}
+          placeholder={
+            attachments.length
+              ? "Pergunte sobre o anexo ou use um atalho acima"
+              : "Mensagem para o Pipo  (Enter envia, Shift+Enter quebra linha, / para comandos)"
+          }
+          onChange={(e) => {
+            setInput(e.target.value);
+            setPick(0);
+          }}
           onKeyDown={(e) => {
+            if (matches.length > 0) {
+              const current = matches[Math.min(pick, matches.length - 1)];
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                setPick((p) => (Math.min(p, matches.length - 1) + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
+                return;
+              }
+              if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                e.preventDefault();
+                if (current.arg) setInput(`/${current.name} `);
+                else void runCommand(current.name, "");
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setInput("");
+                return;
+              }
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               void send();

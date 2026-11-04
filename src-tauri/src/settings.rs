@@ -42,6 +42,8 @@ pub struct Settings {
     pub screen_shortcut: String,
     /// Atalho para o Pipo pulsar na tela (quando você perde ele de vista).
     pub find_shortcut: String,
+    /// Fase 8.2: colar o que está copiado como texto puro (sem formatação).
+    pub plain_paste_shortcut: String,
     /// Ler em voz alta as respostas de comandos de voz.
     pub speak_replies: bool,
     /// Nome da voz do Windows ("" = primeira voz em português).
@@ -97,6 +99,8 @@ pub struct Settings {
     pub weekly_report_ai: bool,
     /// Fase 8.1: automações ("se X, faça Y").
     pub automations: Vec<crate::automations::Automation>,
+    /// Fase 8.2: índice de busca pelo conteúdo dos documentos (só neste PC).
+    pub file_index: bool,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -127,6 +131,7 @@ impl Default for Settings {
             voice_shortcut: "Ctrl+Alt+Shift+V".into(),
             screen_shortcut: "Ctrl+Alt+Shift+S".into(),
             find_shortcut: "Ctrl+Alt+Shift+P".into(),
+            plain_paste_shortcut: "Ctrl+Alt+Shift+T".into(),
             speak_replies: true,
             voice_name: String::new(),
             voice_engine: "natural".into(),
@@ -162,6 +167,7 @@ impl Default for Settings {
             weekly_report_time: "19:00".into(),
             weekly_report_ai: true,
             automations: Vec::new(),
+            file_index: true,
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,
@@ -188,6 +194,10 @@ fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
         gs.register(s.screen_shortcut.as_str())
             .map_err(|e| format!("Atalho da tela inválido ou em uso por outro app ({}): {e}", s.screen_shortcut))?;
     }
+    if !s.plain_paste_shortcut.trim().is_empty() {
+        gs.register(s.plain_paste_shortcut.as_str())
+            .map_err(|e| format!("Atalho de colar texto puro inválido ou em uso por outro app ({}): {e}", s.plain_paste_shortcut))?;
+    }
     if !s.find_shortcut.trim().is_empty() {
         gs.register(s.find_shortcut.as_str())
             .map_err(|e| format!("Atalho para encontrar o Pipo inválido ou em uso por outro app ({}): {e}", s.find_shortcut))?;
@@ -197,7 +207,7 @@ fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
 
 /// Aplica as configurações no sistema. Na inicialização `old` é `None`.
 pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<(), String> {
-    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut || o.find_shortcut != new.find_shortcut) {
+    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut || o.find_shortcut != new.find_shortcut || o.plain_paste_shortcut != new.plain_paste_shortcut) {
         if let Err(e) = register_shortcuts(app, new) {
             if let Some(o) = old {
                 let _ = register_shortcuts(app, o);

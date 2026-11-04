@@ -297,13 +297,17 @@ function MyDay({ onAsk }: Props) {
               <div className="meter-bar">
                 <div className="meter-fill low" style={{ width: `${(100 * s) / max}%` }} />
               </div>
-              <div className="meter-apps">
+              <ul className="meter-apps">
                 {day.apps
                   .filter(([, cat, secs]) => cat === c && secs >= 60)
-                  .slice(0, 4)
-                  .map(([a, , secs]) => `${a} ${hm(secs)}`)
-                  .join(" · ")}
-              </div>
+                  .slice(0, 5)
+                  .map(([a, , secs]) => (
+                    <li key={a}>
+                      <span>{a}</span>
+                      <span>{hm(secs)}</span>
+                    </li>
+                  ))}
+              </ul>
             </div>
           ))}
           {day.pomodoros > 0 && <p className="hint">{day.pomodoros} pomodoro(s) hoje</p>}

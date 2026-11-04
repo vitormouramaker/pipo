@@ -74,7 +74,9 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
 - **Relatório semanal** (domingo 19h, ajustável): tempo no PC por tipo de app comparado à semana anterior, pomodoros, commits, partidas de LoL, XP e gastos, com um comentário do Pipo, na aba Hoje e no Telegram.
 - **Gmail** (só leitura): com uma senha de app, a aba Hoje mostra os não lidos da caixa principal e o botão "Resumir com o Pipo"; no chat, pergunte "tenho e-mail importante?". Nada é marcado como lido.
 - **Pipo proativo** (nível equilibrado): no máximo 3 dicas por hora e nunca em jogo, foco ou com você longe: erro copiado, muitas mudanças sem commit, horas seguidas no PC, madrugada e o resumo do fim do dia. Ele também **lembra** do que você contar ("lembra que eu prefiro TypeScript"); a lista fica em ⚙ → Memória do Pipo.
-- **Clipboard**: últimos textos copiados (só em memória; senhas e tokens são ignorados), com Resumir, Traduzir e Revisar.
+- **Clipboard**: últimos textos e imagens copiados (só em memória; senhas e tokens são ignorados), com busca, filtros, itens fixados (os textos fixados ficam guardados), Resumir, Traduzir, Revisar e Perguntar ao Pipo sobre a imagem. **Ctrl + Alt + Shift + T** cola o que está copiado como texto puro.
+- **Buscar nos meus arquivos** (Ações → Atalhos, ou no chat "acha o PDF do contrato"): procura pelo assunto dentro de PDFs, Word, PowerPoint e textos de Documentos, Downloads, Área de Trabalho e Imagens. O índice fica só no PC.
+- **Comandos de barra no chat**: digite `/` para ver /novo, /tela, /lembrete, /lembretes, /email, /semana, /pomodoro, /ilha, /encontrar e /ajuda.
 - **Sistema**: app em uso, humor do Pipo, CPU, memória, GPU NVIDIA e os processos que mais consomem.
 - **Gastos**: custo estimado de hoje, do mês e de cada conversa, por modelo.
 - **⚙ Configurações**: chave, modelo, sarcasmo, atalho, tamanho e cada sensor pode ser ligado ou desligado.

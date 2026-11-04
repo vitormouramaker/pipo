@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { type DownloadsPlan, type Snippet, api, type Game, type RecentFile, type Routine, type RoutineStep } from "../../api";
+import { type DownloadsPlan, type FileHit, type FileIndexStatus, type Snippet, api, type Game, type RecentFile, type Routine, type RoutineStep } from "../../api";
 
 const STEP_LABEL: Record<RoutineStep["kind"], string> = {
   app: "Programa",
@@ -353,6 +353,116 @@ function TextSnippets() {
   );
 }
 
+/** Trecho com as palavras achadas entre [ ] -> destaque. */
+function Snippet({ text }: { text: string }) {
+  const parts = text.split(/(\[[^\]]*\])/g);
+  return (
+    <span className="file-snippet">
+      {parts.map((p, i) => (p.startsWith("[") && p.endsWith("]") ? <mark key={i}>{p.slice(1, -1)}</mark> : <span key={i}>{p}</span>))}
+    </span>
+  );
+}
+
+/** Fase 8.2: busca pelo assunto nos documentos (índice local). */
+function FileSearch() {
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<FileHit[] | null>(null);
+  const [status, setStatus] = useState<FileIndexStatus | null>(null);
+  const [enabled, setEnabled] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const refresh = () => void api.filesIndexStatus().then(setStatus);
+    refresh();
+    void api.getSettings().then((s) => setEnabled(s.fileIndex));
+    const unlisten = listen("files-index-changed", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  const search = () => {
+    if (!query.trim()) return;
+    setError(null);
+    void api
+      .filesSearch(query)
+      .then(setHits)
+      .catch((e) => setError(String(e)));
+  };
+  const toggle = (on: boolean) => {
+    setEnabled(on);
+    void api.settingsUpdate({ fileIndex: on }).then(() => {
+      if (on) void api.filesReindex();
+    });
+  };
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>Buscar nos meus arquivos</h4>
+        <label className="check inline">
+          <input type="checkbox" checked={enabled} onChange={(e) => toggle(e.target.checked)} />
+          Índice ligado
+        </label>
+      </div>
+      <p className="hint">
+        Procure pelo assunto, não pelo nome: "contrato do apartamento", "boleto da faculdade". O Pipo lê PDFs, Word, PowerPoint e
+        textos de Documentos, Downloads, Área de Trabalho e Imagens e guarda o índice só neste PC. No chat, é só pedir: "acha aquele
+        PDF do contrato".
+      </p>
+      <div className="inline-form">
+        <input
+          className="grow"
+          placeholder="Do que é o arquivo?"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && search()}
+        />
+        <button className="primary" disabled={!query.trim()} onClick={search}>
+          Buscar
+        </button>
+      </div>
+      {status && (
+        <p className="hint">
+          {status.running
+            ? `Lendo seus arquivos… ${status.progress} novo(s) até agora`
+            : `${status.files} arquivo(s) no índice, ${status.withContent} com texto${status.updatedAt ? ` · atualizado às ${status.updatedAt}` : ""}`}
+          {!status.running && enabled && (
+            <>
+              {" · "}
+              <button className="link" onClick={() => void api.filesReindex()}>
+                Atualizar agora
+              </button>
+            </>
+          )}
+          {status.error && ` · ${status.error}`}
+        </p>
+      )}
+      {error && <p className="hint error">{error}</p>}
+      {hits && hits.length === 0 && <p className="hint">Nada encontrado. Tente outras palavras.</p>}
+      {hits && hits.length > 0 && (
+        <div className="file-hits">
+          {hits.map((h) => (
+            <div key={h.path} className="file-hit">
+              <div className="file-hit-head">
+                <strong title={h.path}>{h.name}</strong>
+                <span className="row-meta">{h.modified}</span>
+              </div>
+              {h.snippet && <Snippet text={h.snippet} />}
+              <div className="file-hit-actions">
+                <span className="row-meta" title={h.folder}>
+                  {h.folder}
+                </span>
+                <button className="link" onClick={() => void api.recentOpen(h.path)}>
+                  Abrir
+                </button>
+                <button className="link" onClick={() => void api.chatAttach([h.path], true)}>
+                  Perguntar ao Pipo
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AskScreen() {
   return (
     <div className="block">
@@ -370,6 +480,7 @@ function AskScreen() {
 export default function Shortcuts() {
   return (
     <>
+      <FileSearch />
       <AskScreen />
       <TextSnippets />
       <Downloads />

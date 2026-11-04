@@ -6,6 +6,7 @@ mod clipboard;
 mod context;
 mod db;
 mod documents;
+mod files_index;
 mod island;
 mod life;
 mod proactive;
@@ -69,6 +70,11 @@ pub struct AppState {
     pub attachments: Mutex<Vec<documents::Attachment>>,
 }
 
+/// `pipo.exe --pdf-text arquivo.pdf` (processo separado do índice de arquivos).
+pub fn pdf_text_cli(path: &str) {
+    files_index::pdf_text_cli(path);
+}
+
 /// Registro simples de diagnóstico em `pipo.log` (fica só no computador).
 pub fn log(dir: &std::path::Path, line: &str) {
     use std::io::Write;
@@ -103,9 +109,9 @@ pub fn run() {
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
-                    let (voice, screen, find) = {
+                    let (voice, screen, find, plain) = {
                         let s = app.state::<AppState>().settings.lock().unwrap().clone();
-                        (s.voice_shortcut, s.screen_shortcut, s.find_shortcut)
+                        (s.voice_shortcut, s.screen_shortcut, s.find_shortcut, s.plain_paste_shortcut)
                     };
                     let is = |text: &str| text.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|v| v == *shortcut);
                     if is(&voice) {
@@ -114,6 +120,8 @@ pub fn run() {
                         let _ = actions::screen::start(app);
                     } else if is(&find) {
                         windows::find_pet(app);
+                    } else if is(&plain) {
+                        clipboard::paste_plain(app);
                     } else {
                         windows::toggle_panel(app);
                     }
@@ -168,6 +176,7 @@ pub fn run() {
                 attachments: Mutex::new(Vec::new()),
             });
 
+            clipboard::load_pins(app.handle());
             secrets::import_from_file_if_missing();
             windows::create_tray(app.handle())?;
             if let Err(e) = settings::apply(app.handle(), &settings, None) {
@@ -193,6 +202,7 @@ pub fn run() {
             world::lol::start(app.handle().clone());
             world::email::start(app.handle().clone());
             world::telegram::start(app.handle().clone());
+            files_index::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -274,6 +284,9 @@ pub fn run() {
             world::telegram::telegram_test,
             world::telegram::telegram_disconnect,
             report::report_latest,
+            files_index::files_search,
+            files_index::files_index_status,
+            files_index::files_reindex,
             automations::automation_test,
             automations::running_programs,
             report::report_generate,
@@ -310,6 +323,8 @@ pub fn run() {
             clipboard::clipboard_copy,
             clipboard::clipboard_remove,
             clipboard::clipboard_clear,
+            clipboard::clipboard_pin,
+            clipboard::clipboard_ask_image,
             hardware::system_stats,
             hardware::system_release,
             sensors::sense_status,

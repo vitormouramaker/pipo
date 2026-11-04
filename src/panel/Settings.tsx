@@ -276,6 +276,10 @@ function VoiceSettings({ settings, update }: { settings: Settings; update: (patc
         <input value={settings.findShortcut} onChange={(e) => update({ findShortcut: e.target.value })} />
       </label>
       <label>
+        Atalho para colar como texto puro (sem formatação)
+        <input value={settings.plainPasteShortcut} onChange={(e) => update({ plainPasteShortcut: e.target.value })} />
+      </label>
+      <label>
         Atalho para perguntar sobre a tela
         <input value={settings.screenShortcut} onChange={(e) => update({ screenShortcut: e.target.value })} />
       </label>

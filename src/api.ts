@@ -22,6 +22,7 @@ export type Settings = {
   voiceShortcut: string;
   screenShortcut: string;
   findShortcut: string;
+  plainPasteShortcut: string;
   speakReplies: boolean;
   voiceName: string;
   voiceEngine: "natural" | "windows";
@@ -57,6 +58,7 @@ export type Settings = {
   weeklyReportTime: string;
   weeklyReportAi: boolean;
   automations: Automation[];
+  fileIndex: boolean;
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -129,6 +131,8 @@ export type AutomationAction = {
   value: string;
 };
 export type Automation = { id: string; name: string; enabled: boolean; trigger: AutomationTrigger; actions: AutomationAction[] };
+export type FileHit = { path: string; name: string; folder: string; snippet: string; modified: string };
+export type FileIndexStatus = { files: number; withContent: number; running: boolean; progress: number; updatedAt: string | null; error: string | null };
 export type WeeklyReport = { week: string; text: string; createdAt: string };
 export type MiniSource = { platform: string; handle: string; title: string | null; video: string | null; url: string };
 export type ModeStatus = { mode: string; reason: string };
@@ -246,7 +250,7 @@ export type UsageSummary = {
   models: { model: string; requests: number; cost: number }[];
 };
 
-export type ClipItem = { id: number; text: string; at: string };
+export type ClipItem = { id: number; kind: "text" | "image"; text: string; at: string; pinned: boolean; thumb?: string };
 
 export type ProcessUsage = { name: string; cpu: number; memory: number };
 
@@ -345,6 +349,8 @@ export const api = {
   clipboardCopy: (id: number) => invoke<void>("clipboard_copy", { id }),
   clipboardRemove: (id: number) => invoke<void>("clipboard_remove", { id }),
   clipboardClear: () => invoke<void>("clipboard_clear"),
+  clipboardPin: (id: number, pinned: boolean) => invoke<void>("clipboard_pin", { id, pinned }),
+  clipboardAskImage: (id: number) => invoke<void>("clipboard_ask_image", { id }),
   systemStats: () => invoke<HardwareInfo>("system_stats"),
   systemRelease: () => invoke<void>("system_release"),
   senseStatus: () => invoke<SenseStatus>("sense_status"),
@@ -402,6 +408,9 @@ export const api = {
   telegramDisconnect: () => invoke<void>("telegram_disconnect"),
   emailStatus: () => invoke<MailStatus>("email_status"),
   reportLatest: () => invoke<WeeklyReport | null>("report_latest"),
+  filesSearch: (query: string) => invoke<FileHit[]>("files_search", { query }),
+  filesIndexStatus: () => invoke<FileIndexStatus>("files_index_status"),
+  filesReindex: () => invoke<void>("files_reindex"),
   automationTest: (automation: Automation) => invoke<string[]>("automation_test", { automation }),
   runningPrograms: () => invoke<string[]>("running_programs"),
   reportGenerate: () => invoke<WeeklyReport>("report_generate"),

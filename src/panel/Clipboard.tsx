@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, type ClipItem } from "../api";
+import { ICONS } from "../ui/icons";
+import { sfx } from "../ui/sound";
 
 type Props = {
   enabled: boolean;
@@ -16,14 +18,22 @@ const QUICK: { label: string; prompt: (t: string) => string }[] = [
   { label: "Revisar", prompt: (t) => `Revise a ortografia, a gramática e a clareza, e mostre a versão corrigida:\n\n${t}` },
 ];
 
+type Filter = "all" | "pinned" | "images";
+const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
 export default function Clipboard({ enabled, onAsk, onRun, onOpenSettings }: Props) {
   const [items, setItems] = useState<ClipItem[]>([]);
   const [copied, setCopied] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [zoom, setZoom] = useState<string | null>(null);
+  const [shortcut, setShortcut] = useState("Ctrl+Alt+Shift+T");
 
   const refresh = () => void api.clipboardList().then(setItems);
 
   useEffect(() => {
     refresh();
+    void api.getSettings().then((s) => setShortcut(s.plainPasteShortcut));
     const unlisten = listen("clipboard-changed", refresh);
     return () => void unlisten.then((fn) => fn());
   }, []);
@@ -41,41 +51,89 @@ export default function Clipboard({ enabled, onAsk, onRun, onOpenSettings }: Pro
     );
   }
 
+  const q = fold(query.trim());
+  const shown = items.filter(
+    (i) => (filter === "all" || (filter === "pinned" ? i.pinned : i.kind === "image")) && (!q || fold(i.text).includes(q)),
+  );
+  const copy = (item: ClipItem) =>
+    void api.clipboardCopy(item.id).then(() => {
+      sfx.tick();
+      setCopied(item.id);
+      window.setTimeout(() => setCopied(null), 1500);
+    });
+
   return (
     <section className="clipboard">
+      <div className="clip-top">
+        <div className="settings-search clip-search">
+          {ICONS.search}
+          <input type="search" placeholder="Procurar no que você copiou" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Procurar" />
+        </div>
+        <div className="segmented" aria-label="Filtro">
+          {(
+            [
+              ["all", "Tudo"],
+              ["pinned", "Fixados"],
+              ["images", "Imagens"],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="chat-toolbar">
-        <span className="hint">Só texto, só neste computador; some ao fechar o Pipo. Senhas e tokens são ignorados.</span>
-        {items.length > 0 && (
+        <span className="hint">
+          Só neste computador; some ao fechar o Pipo (menos os fixados). Senhas e tokens são ignorados. <strong>{shortcut}</strong> cola o
+          que está copiado como texto puro, sem formatação.
+        </span>
+        {items.some((i) => !i.pinned) && (
           <button className="link" onClick={() => void api.clipboardClear().then(refresh)}>
             Limpar
           </button>
         )}
       </div>
       <div className="clip-list">
-        {items.length === 0 && <p className="empty">Copie algum texto e ele aparece aqui.</p>}
-        {items.map((item) => (
-          <div key={item.id} className="clip-item">
-            <pre className="clip-text">{item.text}</pre>
-            <div className="clip-actions">
-              <span className="clip-time">{item.at}</span>
-              <button
-                className="link"
-                onClick={() =>
-                  void api.clipboardCopy(item.id).then(() => {
-                    setCopied(item.id);
-                    window.setTimeout(() => setCopied(null), 1500);
-                  })
-                }
-              >
-                {copied === item.id ? "Copiado ✓" : "Copiar"}
+        {shown.length === 0 && (
+          <p className="empty">{items.length === 0 ? "Copie um texto ou uma imagem e ele aparece aqui." : "Nada encontrado."}</p>
+        )}
+        {shown.map((item) => (
+          <div key={item.id} className={`clip-item${item.pinned ? " pinned" : ""}`}>
+            {item.kind === "image" && item.thumb ? (
+              <button className="thumb clip-thumb" title="Ver maior" onClick={() => setZoom(item.thumb!)}>
+                <img src={item.thumb} alt={item.text} />
               </button>
-              {QUICK.map((q) => (
-                <button key={q.label} className="link" onClick={() => onRun(q.prompt(item.text))}>
-                  {q.label}
+            ) : (
+              <pre className="clip-text">{item.text}</pre>
+            )}
+            <div className="clip-actions">
+              <span className="clip-time">{item.kind === "image" ? `${item.text} · ${item.at}` : item.at}</span>
+              <button className="link" onClick={() => copy(item)}>
+                {copied === item.id ? "Copiado ✓" : item.kind === "text" ? "Copiar (texto puro)" : "Copiar"}
+              </button>
+              {item.kind === "text" ? (
+                <>
+                  {QUICK.map((qk) => (
+                    <button key={qk.label} className="link" onClick={() => onRun(qk.prompt(item.text))}>
+                      {qk.label}
+                    </button>
+                  ))}
+                  <button className="link" onClick={() => onAsk(item.text)}>
+                    Perguntar
+                  </button>
+                </>
+              ) : (
+                <button className="link" onClick={() => void api.clipboardAskImage(item.id).then(() => api.panelOpen("chat"))}>
+                  Perguntar ao Pipo
                 </button>
-              ))}
-              <button className="link" onClick={() => onAsk(item.text)}>
-                Perguntar
+              )}
+              <button
+                className={`link${item.pinned ? "" : " muted"}`}
+                title={item.pinned ? "Desafixar" : item.kind === "text" ? "Fixar (fica guardado mesmo depois de fechar o Pipo)" : "Fixar nesta sessão"}
+                onClick={() => void api.clipboardPin(item.id, !item.pinned).then(refresh)}
+              >
+                {item.pinned ? "📌 Fixado" : "Fixar"}
               </button>
               <button className="link muted" onClick={() => void api.clipboardRemove(item.id).then(refresh)}>
                 Excluir
@@ -84,6 +142,11 @@ export default function Clipboard({ enabled, onAsk, onRun, onOpenSettings }: Pro
           </div>
         ))}
       </div>
+      {zoom && (
+        <div className="lightbox" role="dialog" aria-label="Imagem copiada" onClick={() => setZoom(null)}>
+          <img src={zoom} alt="Imagem copiada" />
+        </div>
+      )}
     </section>
   );
 }

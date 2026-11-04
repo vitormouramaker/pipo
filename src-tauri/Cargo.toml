@@ -1,6 +1,6 @@
 [package]
 name = "pipo"
-version = "0.8.1"
+version = "0.8.2"
 description = "Pipo, bichinho virtual de desktop"
 authors = ["vitormouramaker"]
 edition = "2024"
@@ -45,6 +45,7 @@ chrono-tz = "0.10"
 png = "0.17"
 native-tls = "0.2"
 mailparse = "0.16"
+pdf-extract = "0.9"
 
 
 [target.'cfg(windows)'.dependencies]
