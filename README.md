@@ -34,7 +34,7 @@ npm run tauri build   # gera os instaladores em src-tauri/target/release/bundle/
 
 ## Instalar e atualizar
 
-O jeito certo de usar no dia a dia é instalado, como qualquer app: rode `src-tauri\target\release\bundle\nsis\Pipo_<versão>_x64-setup.exe`. Ele instala só para o seu usuário (sem pedir administrador) em `%LOCALAPPDATA%\Pipo` e cria atalhos no Menu Iniciar e na Área de Trabalho. Para atualizar, gere o instalador da versão nova e rode por cima (`Pipo_<versão>_x64-setup.exe /S` instala em silêncio). Seus dados ficam em `%APPDATA%\com.vitormouramaker.pipo`, separados do programa, então atualizar não apaga nada.
+O jeito certo de usar no dia a dia é instalado, como qualquer app: rode `src-tauri\target\release\bundle\nsis\Pipo_<versão>_x64-setup.exe`. Ele instala só para o seu usuário (sem pedir administrador) em `%LOCALAPPDATA%\Pipo` e cria atalhos no Menu Iniciar e na Área de Trabalho. Para atualizar, gere o instalador da versão nova e rode por cima (`Pipo_<versão>_x64-setup.exe /S` instala em silêncio). Desde a 0.3.0 o Pipo **se atualiza sozinho**: ele procura versões novas no GitHub Releases, avisa com um balão e atualiza em Configurações > Atualizações. Para publicar uma versão: suba o número da versão, faça o commit e rode `python scripts/release.py "o que mudou"` (precisa da chave de assinatura, que fica só neste computador). Seus dados ficam em `%APPDATA%\com.vitormouramaker.pipo`, separados do programa, então atualizar não apaga nada.
 
 ## Como usar
 
