@@ -13,7 +13,7 @@ impl Db {
     pub fn open(path: &Path) -> rusqlite::Result<Self> {
         let conn = Connection::open(path)?;
         conn.execute_batch(
-            "PRAGMA journal_mode = WAL;
+            "PRAGMA journal_mode = DELETE;
              PRAGMA synchronous = FULL;
              CREATE TABLE IF NOT EXISTS settings (
                  key   TEXT PRIMARY KEY,
@@ -88,6 +88,54 @@ impl Db {
         // Colunas acrescentadas depois da primeira versão (o erro de coluna repetida é esperado).
         let _ = conn.execute("ALTER TABLE usage ADD COLUMN web_searches INTEGER NOT NULL DEFAULT 0", []);
         Ok(Self { conn })
+    }
+
+    /// O banco está íntegro? (verificação rápida do SQLite)
+    pub fn healthy(&self) -> bool {
+        self.conn
+            .query_row("PRAGMA quick_check", [], |r| r.get::<_, String>(0))
+            .is_ok_and(|r| r == "ok")
+    }
+
+    /// Todas as linhas da tabela de configurações (para salvar ao consertar o banco).
+    fn settings_rows(&self) -> Vec<(String, String)> {
+        self.conn
+            .prepare("SELECT key, value FROM settings")
+            .and_then(|mut st| st.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).map(|rows| rows.flatten().collect()))
+            .unwrap_or_default()
+    }
+
+    /// Abre o banco; se estiver corrompido, guarda o estragado numa pasta à parte, restaura a
+    /// cópia de segurança íntegra mais nova e regrava por cima as configurações atuais (que
+    /// costumam continuar legíveis). Devolve o banco e, se houve conserto, o que foi feito.
+    pub fn open_or_repair(dir: &Path) -> Result<(Self, Option<String>), String> {
+        let path = dir.join("pipo.db");
+        let first = Self::open(&path);
+        let rows = match &first {
+            Ok(db) if db.healthy() => return Ok((first.unwrap(), None)),
+            Ok(db) => db.settings_rows(),
+            Err(_) => Vec::new(),
+        };
+        drop(first);
+
+        let aside = dir.join(format!("corrompido-{}", chrono::Local::now().format("%Y%m%d-%H%M%S")));
+        std::fs::create_dir_all(&aside).map_err(|e| e.to_string())?;
+        for name in ["pipo.db", "pipo.db-wal", "pipo.db-shm"] {
+            let file = dir.join(name);
+            if file.exists() {
+                std::fs::rename(&file, aside.join(name)).map_err(|e| format!("não consegui guardar {name}: {e}"))?;
+            }
+        }
+        let backup = newest_healthy_backup(&dir.join("backups"));
+        if let Some(b) = &backup {
+            std::fs::copy(b, &path).map_err(|e| e.to_string())?;
+        }
+        let db = Self::open(&path).map_err(|e| e.to_string())?;
+        for (key, value) in &rows {
+            let _ = db.set_setting(key, value);
+        }
+        let from = backup.map(|b| b.display().to_string()).unwrap_or_else(|| "nenhuma cópia (banco novo)".into());
+        Ok((db, Some(format!("banco corrompido guardado em {}; restaurado de {from}; {} configurações mantidas", aside.display(), rows.len()))))
     }
 
     /// Passa tudo o que está no diário (WAL) para o arquivo principal do banco.
@@ -326,5 +374,82 @@ impl Db {
             Ok((role, serde_json::from_str(&content).unwrap_or(Value::Null)))
         })?;
         rows.collect()
+    }
+}
+
+/// Melhor cópia de segurança: entre as que abrem e passam na verificação de integridade, a
+/// que tem mais dados (conversas, mensagens, gastos, XP, notas, lembretes); a mais nova desempata.
+/// Só "a mais nova" não basta: uma cópia feita depois de um problema pode ter um estado antigo.
+fn newest_healthy_backup(dir: &Path) -> Option<std::path::PathBuf> {
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("pipo-")))
+        .filter(|p| p.metadata().is_ok_and(|m| m.len() > 0))
+        .collect();
+    files.sort();
+    let score = |p: &std::path::PathBuf| -> Option<i64> {
+        let c = Connection::open_with_flags(p, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
+        let ok: String = c.query_row("PRAGMA quick_check", [], |r| r.get(0)).ok()?;
+        if ok != "ok" {
+            return None;
+        }
+        let count = |t: &str| c.query_row(&format!("SELECT COUNT(*) FROM {t}"), [], |r| r.get::<_, i64>(0)).unwrap_or(0);
+        Some(["conversations", "messages", "usage", "xp_log", "notes", "reminders"].iter().map(|t| count(t)).sum())
+    };
+    // `files` está em ordem cronológica; com `max_by_key`, no empate fica a mais nova (a última).
+    files.into_iter().filter_map(|p| score(&p).map(|s| (s, p))).max_by_key(|(s, _)| *s).map(|(_, p)| p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Db;
+
+    #[test]
+    fn conserta_banco_corrompido_com_a_copia_boa() {
+        let dir = std::env::temp_dir().join(format!("pipo-test-db-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("backups")).unwrap();
+        // Cópia boa com uma conversa e uma configuração antiga.
+        {
+            let good = Db::open(&dir.join("backups").join("pipo-20260101-000000.db")).unwrap();
+            good.conn().execute("INSERT INTO conversations DEFAULT VALUES", []).unwrap();
+            good.set_setting("settings", "antiga").unwrap();
+        }
+        // Banco atual com configuração nova e páginas estragadas no meio do arquivo.
+        {
+            let db = Db::open(&dir.join("pipo.db")).unwrap();
+            db.set_setting("settings", "nova").unwrap();
+            for i in 0..300 {
+                db.conn().execute("INSERT INTO notes (text) VALUES (?1)", [format!("nota {i} {}", "x".repeat(200))]).unwrap();
+            }
+        }
+        let mut bytes = std::fs::read(dir.join("pipo.db")).unwrap();
+        for b in bytes.iter_mut().skip(4096 * 3).take(4096 * 4) {
+            *b = 0xAB;
+        }
+        std::fs::write(dir.join("pipo.db"), bytes).unwrap();
+
+        let (db, repaired) = Db::open_or_repair(&dir).unwrap();
+        assert!(repaired.is_some(), "deveria ter consertado");
+        assert!(db.healthy());
+        let conversations: i64 = db.conn().query_row("SELECT COUNT(*) FROM conversations", [], |r| r.get(0)).unwrap();
+        assert_eq!(conversations, 1, "veio da cópia boa");
+        assert_eq!(db.get_setting("settings").as_deref(), Some("nova"), "configuração atual mantida");
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod real_copy {
+    #[test]
+    #[ignore = "usa uma copia do banco real na pasta temporaria pipo-real-test"]
+    fn conserta_a_copia_do_banco_real() {
+        let dir = std::env::temp_dir().join("pipo-real-test");
+        let (db, repaired) = super::Db::open_or_repair(&dir).unwrap();
+        println!("conserto: {repaired:?}");
+        println!("depois: {} íntegro={}", db.stats(), db.healthy());
     }
 }

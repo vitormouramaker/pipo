@@ -109,11 +109,22 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
-            let db = db::Db::open(&dir.join("pipo.db"))?;
+            // Um Pipo só por vez, mesmo quando um não enxerga o outro (a trava é um arquivo
+            // na pasta de dados): dois Pipo gravando o mesmo banco podem corrompê-lo.
+            let lock = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(dir.join("pipo.lock"))?;
+            if lock.try_lock().is_err() {
+                log(&dir, "outro Pipo já está aberto; esta cópia foi fechada");
+                std::process::exit(0);
+            }
+            std::mem::forget(lock);
+            let (db, repaired) = db::Db::open_or_repair(&dir).map_err(|e| format!("banco: {e}"))?;
+            if let Some(what) = &repaired {
+                log(&dir, &format!("conserto: {what}"));
+            }
             // Diagnóstico e proteção: registra o que há no banco e guarda uma cópia a cada início.
             let stats = db.stats();
-            log(&dir, &format!("início: {stats}"));
-            if !stats.contains("configurações=0 conversas=0") {
+            log(&dir, &format!("início v{}: {stats}", app.package_info().version));
+            if repaired.is_none() && !stats.contains("configurações=0 conversas=0") {
                 match db.backup(&dir.join("backups"), 15) {
                     Ok(path) => log(&dir, &format!("cópia de segurança: {}", path.display())),
                     Err(e) => log(&dir, &format!("cópia de segurança falhou: {e}")),
