@@ -248,6 +248,7 @@ const CATEGORY: Record<string, string> = {
   live: "Lives",
   games: "Jogos",
   chat: "Conversas",
+  ai: "IA",
   other: "Outros",
 };
 const hm = (secs: number) => {
@@ -296,12 +297,16 @@ function MyDay({ onAsk }: Props) {
               <div className="meter-bar">
                 <div className="meter-fill low" style={{ width: `${(100 * s) / max}%` }} />
               </div>
+              <div className="meter-apps">
+                {day.apps
+                  .filter(([, cat, secs]) => cat === c && secs >= 60)
+                  .slice(0, 4)
+                  .map(([a, , secs]) => `${a} ${hm(secs)}`)
+                  .join(" · ")}
+              </div>
             </div>
           ))}
-          <p className="hint">
-            Mais usados: {day.apps.slice(0, 4).map(([a, , s]) => `${a} (${hm(s)})`).join(" · ")}
-            {day.pomodoros > 0 && ` · ${day.pomodoros} pomodoro(s)`}
-          </p>
+          {day.pomodoros > 0 && <p className="hint">{day.pomodoros} pomodoro(s) hoje</p>}
         </>
       )}
     </div>

@@ -9,6 +9,7 @@ const CATEGORY: Record<Category, string> = {
   live: "Assistindo live",
   games: "Jogos",
   chat: "Conversando",
+  ai: "Usando IA",
   other: "Outro app",
 };
 

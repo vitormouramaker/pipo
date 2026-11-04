@@ -70,7 +70,7 @@ fn app_matches(rule: &ModeRule, app: Option<&ActiveApp>, running: &[String]) -> 
 /// Programas abertos (nome do executável sem ".exe", em minúsculas), lidos a cada 10 s.
 static RUNNING: Mutex<Option<(Instant, Vec<String>)>> = Mutex::new(None);
 
-fn running_programs() -> Vec<String> {
+pub fn running_programs() -> Vec<String> {
     let mut cache = RUNNING.lock().unwrap();
     if let Some((at, list)) = cache.as_ref() {
         if at.elapsed() < Duration::from_secs(10) {

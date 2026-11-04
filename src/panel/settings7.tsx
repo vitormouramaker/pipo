@@ -200,7 +200,11 @@ export function TelegramSettings({ settings, update }: { settings: Settings; upd
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const refresh = () => void api.telegramStatus().then(setStatus);
-  useEffect(refresh, [settings.telegramChatId, settings.telegramBot]);
+  useEffect(refresh, [settings.telegramChatId, settings.telegramBot, settings.telegramCommands]);
+  useEffect(() => {
+    const unlisten = listen("telegram-changed", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
 
   const run = (label: string, action: () => Promise<string | void>) => {
     setBusy(label);
@@ -290,6 +294,15 @@ export function TelegramSettings({ settings, update }: { settings: Settings; upd
             <input type="checkbox" checked={settings.telegramCommands} onChange={(e) => update({ telegramCommands: e.target.checked })} />
             Conversar com o Pipo pelo Telegram
           </label>
+          {settings.telegramCommands && (
+            <p className={`hint${status.error ? " error" : status.listening ? " ok" : ""}`}>
+              {status.error
+                ? `Não estou recebendo as mensagens do celular: ${status.error}`
+                : status.listening
+                  ? `Escutando o celular ✓${status.lastMessage ? ` · última mensagem às ${status.lastMessage}` : ""}`
+                  : "Conectando ao bot…"}
+            </p>
+          )}
           {settings.telegramCommands && (
             <p className="hint">
               Escreva para @{status.bot} como no chat ("me lembra às 18h de…", "o build terminou?"). Ações que mudam algo no PC pedem

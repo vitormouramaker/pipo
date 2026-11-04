@@ -29,6 +29,7 @@ fn category_name(c: Category) -> &'static str {
         Category::Live => "live",
         Category::Games => "games",
         Category::Chat => "chat",
+        Category::Ai => "ai",
         Category::Other => "other",
     }
 }
@@ -60,7 +61,7 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> R {
 
 /// Chamado pelos sensores a cada 2 s com o app em uso.
 pub fn record(app: &AppHandle, current: Option<&ActiveApp>, idle: u64) {
-    if idle < 120 {
+    if idle < AWAY {
         if let Some(c) = current {
             with(|s| *s.pending.entry((c.name.clone(), category_name(c.category))).or_default() += 2);
         }
@@ -116,7 +117,7 @@ fn summary(app: &AppHandle, day: &str) -> DaySummary {
         .and_then(|mut st| st.query_map([day], |r| Ok((r.get(0)?, r.get(1)?))).map(|r| r.flatten().collect()))
         .unwrap_or_default();
     let apps: Vec<(String, String, i64)> = conn
-        .prepare("SELECT app, category, seconds FROM activity WHERE day = ?1 ORDER BY seconds DESC LIMIT 6")
+        .prepare("SELECT app, category, seconds FROM activity WHERE day = ?1 ORDER BY seconds DESC LIMIT 20")
         .and_then(|mut st| st.query_map([day], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).map(|r| r.flatten().collect()))
         .unwrap_or_default();
     let xp = |kind: &str| -> i64 {
@@ -362,6 +363,7 @@ pub fn label(category: &str) -> &'static str {
         "live" => "lives",
         "games" => "jogos",
         "chat" => "conversas",
+        "ai" => "IA",
         _ => "outros apps",
     }
 }

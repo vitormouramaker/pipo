@@ -56,6 +56,7 @@ export type Settings = {
   weeklyReportDay: number;
   weeklyReportTime: string;
   weeklyReportAi: boolean;
+  automations: Automation[];
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -117,6 +118,17 @@ export type UpdateStatus = {
 };
 export type Attachment = { path: string; name: string; kind: "pdf" | "image" | "docx" | "pptx" | "text"; size: number };
 export type AttachResult = { path: string; name: string; attachment: Attachment | null; error: string | null };
+export type AutomationTrigger = {
+  kind: "app_open" | "app_close" | "time" | "mode_on" | "mode_off" | "back" | "startup";
+  value: string;
+  at: string;
+  days: number[];
+};
+export type AutomationAction = {
+  kind: "open" | "routine" | "notify" | "telegram" | "mode" | "pomodoro" | "media" | "island" | "wait";
+  value: string;
+};
+export type Automation = { id: string; name: string; enabled: boolean; trigger: AutomationTrigger; actions: AutomationAction[] };
 export type WeeklyReport = { week: string; text: string; createdAt: string };
 export type MiniSource = { platform: string; handle: string; title: string | null; video: string | null; url: string };
 export type ModeStatus = { mode: string; reason: string };
@@ -130,7 +142,14 @@ export type LolStatus = {
   tip: string | null;
   lastGame: string | null;
 };
-export type TelegramStatus = { hasToken: boolean; linked: boolean; bot: string };
+export type TelegramStatus = {
+  hasToken: boolean;
+  linked: boolean;
+  bot: string;
+  listening: boolean;
+  error: string | null;
+  lastMessage: string | null;
+};
 export type Mail = { uid: number; from: string; subject: string; date: string; snippet: string };
 export type MailStatus = { configured: boolean; address: string; unread: Mail[]; checkedAt: string | null; error: string | null };
 export type DownloadsPlan = {
@@ -241,7 +260,7 @@ export type HardwareInfo = {
   topMemory: ProcessUsage[];
 };
 
-export type Category = "dev" | "docs" | "browser" | "live" | "games" | "chat" | "other";
+export type Category = "dev" | "docs" | "browser" | "live" | "games" | "chat" | "ai" | "other";
 
 export type SenseStatus = {
   context: {
@@ -383,6 +402,8 @@ export const api = {
   telegramDisconnect: () => invoke<void>("telegram_disconnect"),
   emailStatus: () => invoke<MailStatus>("email_status"),
   reportLatest: () => invoke<WeeklyReport | null>("report_latest"),
+  automationTest: (automation: Automation) => invoke<string[]>("automation_test", { automation }),
+  runningPrograms: () => invoke<string[]>("running_programs"),
   reportGenerate: () => invoke<WeeklyReport>("report_generate"),
   reportSend: () => invoke<void>("report_send"),
   emailRefresh: () => invoke<MailStatus>("email_refresh"),

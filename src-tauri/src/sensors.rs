@@ -127,6 +127,7 @@ pub fn start(app: AppHandle) {
                 }
 
                 crate::modes::tick(&app, current.as_ref());
+                crate::automations::tick(&app, idle);
 
                 let fullscreen = current.as_ref().filter(|c| c.fullscreen);
                 set_game_mode(&app, settings.game_mode && fullscreen.is_some(), fullscreen.map(|c| c.monitor));

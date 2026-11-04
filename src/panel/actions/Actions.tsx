@@ -2,13 +2,15 @@ import { useState } from "react";
 import Dev from "./Dev";
 import Focus from "./Focus";
 import Shortcuts from "./Shortcuts";
+import Automations from "./Automations";
 
-type Section = "dev" | "focus" | "shortcuts";
+type Section = "dev" | "focus" | "shortcuts" | "automations";
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "dev", label: "Dev" },
   { id: "focus", label: "Foco" },
   { id: "shortcuts", label: "Atalhos" },
+  { id: "automations", label: "Automações" },
 ];
 
 export default function Actions({ onAsk }: { onAsk: (prompt: string) => void }) {
@@ -26,6 +28,7 @@ export default function Actions({ onAsk }: { onAsk: (prompt: string) => void }) 
         {section === "dev" && <Dev onAsk={onAsk} />}
         {section === "focus" && <Focus />}
         {section === "shortcuts" && <Shortcuts />}
+        {section === "automations" && <Automations />}
       </div>
     </section>
   );

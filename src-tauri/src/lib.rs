@@ -1,5 +1,6 @@
 mod actions;
 mod ai;
+mod automations;
 mod chat;
 mod clipboard;
 mod context;
@@ -273,6 +274,8 @@ pub fn run() {
             world::telegram::telegram_test,
             world::telegram::telegram_disconnect,
             report::report_latest,
+            automations::automation_test,
+            automations::running_programs,
             report::report_generate,
             report::report_send,
             world::email::email_status,

@@ -95,6 +95,8 @@ pub struct Settings {
     pub weekly_report_day: u8,
     pub weekly_report_time: String,
     pub weekly_report_ai: bool,
+    /// Fase 8.1: automações ("se X, faça Y").
+    pub automations: Vec<crate::automations::Automation>,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -159,6 +161,7 @@ impl Default for Settings {
             weekly_report_day: 7,
             weekly_report_time: "19:00".into(),
             weekly_report_ai: true,
+            automations: Vec::new(),
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,

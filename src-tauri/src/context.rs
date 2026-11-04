@@ -12,6 +12,8 @@ pub enum Category {
     Live,
     Games,
     Chat,
+    /// Assistentes de IA (Claude, ChatGPT…), no app ou no navegador.
+    Ai,
     Other,
 }
 
@@ -69,6 +71,9 @@ fn classify(exe: &str, title: &str) -> (String, Category) {
         ("epicgameslauncher.exe", "Epic Games", Category::Games),
         ("battle.net.exe", "Battle.net", Category::Games),
         ("riotclientservices.exe", "Riot Client", Category::Games),
+        ("claude.exe", "Claude", Category::Ai),
+        ("chatgpt.exe", "ChatGPT", Category::Ai),
+        ("perplexity.exe", "Perplexity", Category::Ai),
         ("discord.exe", "Discord", Category::Chat),
         ("slack.exe", "Slack", Category::Chat),
         ("ms-teams.exe", "Teams", Category::Chat),
@@ -86,6 +91,10 @@ fn classify(exe: &str, title: &str) -> (String, Category) {
         && (t.contains("twitch") || t.contains("kick.com") || (t.contains("youtube") && (t.contains("ao vivo") || t.contains("live"))))
     {
         category = Category::Live;
+    }
+    // IA aberta numa aba do navegador também conta como IA.
+    if category == Category::Browser && (t.contains("claude") || t.contains("chatgpt") || t.contains("gemini") || t.contains("perplexity")) {
+        category = Category::Ai;
     }
     (name, category)
 }

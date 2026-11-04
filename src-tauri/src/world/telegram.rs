@@ -73,15 +73,93 @@ pub struct TelegramStatus {
     has_token: bool,
     linked: bool,
     bot: String,
+    /// O Pipo está recebendo as mensagens do celular agora.
+    listening: bool,
+    /// Último problema ao escutar o bot (sem o token).
+    error: Option<String>,
+    /// Última mensagem recebida ("14:05").
+    last_message: Option<String>,
+}
+
+/// Situação da escuta do bot (mostrada nas Configurações e anotada no pipo.log).
+#[derive(Default)]
+struct Listen {
+    listening: bool,
+    error: Option<String>,
+    last_message: Option<String>,
+    /// Token para o qual o menu de comandos já foi registrado.
+    menu_for: Option<u64>,
+}
+
+static LISTEN: std::sync::Mutex<Option<Listen>> = std::sync::Mutex::new(None);
+
+fn with_listen<R>(f: impl FnOnce(&mut Listen) -> R) -> R {
+    f(LISTEN.lock().unwrap().get_or_insert_with(Listen::default))
+}
+
+fn log(app: &AppHandle, line: &str) {
+    if let Ok(dir) = app.path().app_data_dir() {
+        crate::log(&dir, &format!("telegram: {line}"));
+    }
+}
+
+/// Muda a situação e registra no log só quando ela muda (sem repetir o mesmo erro).
+fn set_listening(app: &AppHandle, ok: Result<(), String>) {
+    let line = with_listen(|l| {
+        let (listening, error) = match &ok {
+            Ok(()) => (true, None),
+            Err(e) => (false, Some(e.clone())),
+        };
+        if l.listening == listening && l.error == error {
+            return None;
+        }
+        l.listening = listening;
+        l.error = error.clone();
+        Some(match error {
+            None => "escutando o bot".to_string(),
+            Some(e) => format!("não consegui escutar o bot: {e}"),
+        })
+    });
+    if let Some(line) = line {
+        log(app, &line);
+        let _ = app.emit("telegram-changed", ());
+    }
+}
+
+/// Menu que aparece no Telegram ao digitar "/".
+const COMMANDS: &[(&str, &str)] = &[
+    ("status", "O que está rolando no PC agora"),
+    ("lembretes", "Lembretes pendentes"),
+    ("apagar", "Apaga um lembrete (ex.: /apagar 2)"),
+    ("email", "E-mails não lidos"),
+    ("semana", "Relatório da semana agora"),
+    ("novo", "Começa uma conversa nova"),
+    ("ajuda", "Como falar com o Pipo"),
+];
+
+async fn register_menu(token: &str) -> Result<(), String> {
+    let commands: Vec<Value> = COMMANDS.iter().map(|(c, d)| json!({ "command": c, "description": d })).collect();
+    call(token, "setMyCommands", json!({ "commands": commands })).await.map(|_| ())
+}
+
+fn token_id(token: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    token.hash(&mut h);
+    h.finish()
 }
 
 #[tauri::command]
 pub fn telegram_status(app: AppHandle) -> TelegramStatus {
     let settings = app.state::<AppState>().settings.lock().unwrap().clone();
+    let (listening, error, last_message) = with_listen(|l| (l.listening, l.error.clone(), l.last_message.clone()));
     TelegramStatus {
         has_token: secrets::get_named(ACCOUNT).is_some(),
         linked: !settings.telegram_chat_id.is_empty(),
         bot: settings.telegram_bot,
+        listening: listening && settings.telegram_commands,
+        error,
+        last_message,
     }
 }
 
@@ -197,7 +275,11 @@ impl Remote {
 
     async fn say(&self, text: &str) {
         for part in chunks(&plain(text), 3900) {
-            let _ = send(&self.token, &self.chat, &part).await;
+            // Se falhar (ex.: texto recusado), tenta de novo só com o começo.
+            if send(&self.token, &self.chat, &part).await.is_err() {
+                let short: String = part.chars().take(1000).collect();
+                let _ = send(&self.token, &self.chat, &short).await;
+            }
         }
     }
 
@@ -377,7 +459,10 @@ async fn handle_message(app: AppHandle, remote: Remote, text: String) {
     match result {
         Ok(reply) if !reply.is_empty() => remote.say(&reply).await,
         Ok(_) => remote.say("Feito. ✅").await,
-        Err(e) => remote.say(&format!("⚠️ {e}")).await,
+        Err(e) => {
+            log(&app, &format!("a resposta falhou: {e}"));
+            remote.say(&format!("⚠️ {e}")).await
+        }
     }
 }
 
@@ -407,13 +492,23 @@ pub fn start(app: AppHandle) {
             let settings = app.state::<AppState>().settings.lock().unwrap().clone();
             let token = secrets::get_named(ACCOUNT);
             let (Some(token), true, false) = (token, settings.telegram_enabled && settings.telegram_commands, settings.telegram_chat_id.is_empty()) else {
+                with_listen(|l| l.listening = false);
                 tokio::time::sleep(Duration::from_secs(15)).await;
                 continue;
             };
             let chat = settings.telegram_chat_id.clone();
+            // Menu de comandos (aparece ao digitar "/" no Telegram), uma vez por bot.
+            let id = token_id(&token);
+            if with_listen(|l| l.menu_for) != Some(id) && register_menu(&token).await.is_ok() {
+                with_listen(|l| l.menu_for = Some(id));
+            }
             let updates = match call(&token, "getUpdates", json!({ "offset": offset, "timeout": 25, "allowed_updates": ["message", "callback_query"] })).await {
-                Ok(u) => u,
-                Err(_) => {
+                Ok(u) => {
+                    set_listening(&app, Ok(()));
+                    u
+                }
+                Err(e) => {
+                    set_listening(&app, Err(e));
                     tokio::time::sleep(Duration::from_secs(10)).await;
                     continue;
                 }
@@ -439,6 +534,10 @@ pub fn start(app: AppHandle) {
                     let _ = send(&token, &chat, "Por enquanto eu só entendo texto. ✍️").await;
                     continue;
                 };
+                with_listen(|l| l.last_message = Some(crate::actions::now_hm()));
+                // Só o fato, nunca o texto da mensagem.
+                log(&app, if text.starts_with('/') { "comando recebido" } else { "mensagem recebida" });
+                let _ = app.emit("telegram-changed", ());
                 let remote = Remote { token: token.clone(), chat: chat.clone() };
                 tauri::async_runtime::spawn(handle_message(app.clone(), remote, text));
             }
