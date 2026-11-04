@@ -286,7 +286,10 @@ body,
 
 /* Brilho ao virar ilha (duas ondas ciano suaves). */
 .island.glow {
-  animation: island-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both, island-glow 1.8s ease-out 120ms both;
+  animation: island-splat 420ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both, island-glow 1.8s ease-out 120ms both;
+}
+.island.splat-v.glow {
+  animation: island-splat-v 420ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both, island-glow 1.8s ease-out 120ms both;
 }
 .island.glow .island-eyes i { box-shadow: 0 0 6px rgba(45, 212, 232, 0.9); }
 @keyframes island-glow {
@@ -298,4 +301,58 @@ body,
 }
 @media (prefers-reduced-motion: reduce) {
   .island.glow { animation: none; border-color: #2dd4e8; }
+}
+
+/* Gosma descolando da borda (pet/Goo.tsx) */
+.goo-fx {
+  position: absolute;
+  left: -56px;
+  top: -56px;
+  pointer-events: none;
+  overflow: visible;
+}
+.goo-blob {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: goo-retract 560ms cubic-bezier(0.5, 0, 0.3, 1.4) both;
+}
+.goo-drop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: goo-drop 650ms ease-out both;
+}
+@keyframes goo-retract {
+  0% { transform: translate(var(--tx), var(--ty)) scale(1); }
+  55% { transform: translate(calc(var(--tx) * 0.25), calc(var(--ty) * 0.25)) scale(0.9); }
+  100% { transform: translate(0, 0) scale(0.2); opacity: 0; }
+}
+@keyframes goo-drop {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  25% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0.3); opacity: 0; }
+}
+
+/* Grudando na borda: a ilha "esparrama" contra ela e se assenta. */
+.island { animation-name: island-splat; animation-duration: 420ms; animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.25); }
+.island.top, .island.top-left, .island.top-right { transform-origin: 50% 0%; }
+.island.bottom, .island.bottom-left, .island.bottom-right { transform-origin: 50% 100%; }
+.island.left { transform-origin: 0% 50%; }
+.island.right { transform-origin: 100% 50%; }
+@keyframes island-splat {
+  0% { opacity: 0; transform: scale(0.5, 0.5); }
+  35% { opacity: 1; transform: scale(1.18, 0.7); }
+  60% { transform: scale(0.94, 1.08); }
+  80% { transform: scale(1.03, 0.97); }
+  100% { transform: none; }
+}
+.island.left.splat-v, .island.right.splat-v { animation-name: island-splat-v; }
+@keyframes island-splat-v {
+  0% { opacity: 0; transform: scale(0.5, 0.5); }
+  35% { opacity: 1; transform: scale(0.7, 1.18); }
+  60% { transform: scale(1.08, 0.94); }
+  80% { transform: scale(0.97, 1.03); }
+  100% { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .goo-blob, .goo-drop, .island { animation: none; }
 }

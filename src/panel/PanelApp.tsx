@@ -14,6 +14,7 @@ import Usage from "./Usage";
 import "./panel.css";
 import { ICONS } from "../ui/icons";
 import { sfx } from "../ui/sound";
+import { stopSpeaking } from "./speech";
 
 const TABS: { view: PanelView; icon: keyof typeof ICONS; title: string }[] = [
   { view: "chat", icon: "chat", title: "Chat" },
@@ -34,6 +35,16 @@ export default function PanelApp() {
   const [life, setLife] = useState<LifeStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [dropping, setDropping] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && stopSpeaking();
+    window.addEventListener("keydown", onKey);
+    const unlistenStop = listen("speech-stop", () => stopSpeaking());
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      void unlistenStop.then((fn) => fn());
+    };
+  }, []);
 
   useEffect(() => {
     const unlisten = getCurrentWebview().onDragDropEvent((e) => {

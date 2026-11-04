@@ -132,6 +132,86 @@ function UpdateSettings() {
   );
 }
 
+function NaturalVoice({
+  settings,
+  update,
+  voices,
+}: {
+  settings: Settings;
+  update: (patch: Partial<Settings>) => void;
+  voices: SpeechSynthesisVoice[];
+}) {
+  const [status, setStatus] = useState<{ ready: boolean; downloading: boolean; downloaded: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const refresh = () => void api.ttsStatus().then(setStatus);
+  useEffect(() => {
+    refresh();
+    const unlisten = listen("tts-download", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, [settings.naturalVoice]);
+  const download = () => {
+    setError(null);
+    void api
+      .ttsDownload()
+      .catch((e) => setError(String(e)))
+      .finally(refresh);
+    window.setTimeout(refresh, 300);
+  };
+  const percent = status && status.total > 0 ? Math.min(100, Math.floor((100 * status.downloaded) / status.total)) : 0;
+  const test = () => void speak("Olá! Eu sou o Pipo. É assim que eu falo agora.", settings);
+  return (
+    <>
+      <label>
+        Voz do Pipo
+        <select value={settings.voiceEngine} onChange={(e) => update({ voiceEngine: e.target.value as Settings["voiceEngine"] })}>
+          <option value="natural">Natural (neural, roda no PC)</option>
+          <option value="windows">Windows (mais robótica, sem download)</option>
+        </select>
+      </label>
+      {settings.voiceEngine === "natural" ? (
+        <>
+          <label>
+            Qual voz
+            <select value={settings.naturalVoice} onChange={(e) => update({ naturalVoice: e.target.value as Settings["naturalVoice"] })}>
+              <option value="faber">Faber (masculina, pt-BR)</option>
+              <option value="cadu">Cadu (masculina, pt-BR)</option>
+            </select>
+          </label>
+          <div className="row">
+            {status?.ready ? (
+              <button onClick={test}>Testar voz</button>
+            ) : status?.downloading ? (
+              <span className="hint">Baixando a voz natural… {percent}%</span>
+            ) : (
+              <button className="primary" onClick={download}>
+                Baixar voz natural (~85 MB, uma vez)
+              </button>
+            )}
+          </div>
+          <p className="hint">Roda no seu computador, sem internet e sem custo. Enquanto não baixar, o Pipo usa a voz do Windows.</p>
+        </>
+      ) : (
+        <label>
+          Voz do Windows
+          <div className="inline-form">
+            <select className="grow" value={settings.voiceName} onChange={(e) => update({ voiceName: e.target.value })}>
+              <option value="">Automática (português)</option>
+              {voices.map((v) => (
+                <option key={v.name} value={v.name}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+            <button onClick={test}>Testar</button>
+          </div>
+        </label>
+      )}
+      {error && <p className="hint">{error}</p>}
+      <p className="hint">Para fazer o Pipo parar de falar: botão "Parar de falar" no chat, Esc, clique nele ou o atalho de voz.</p>
+    </>
+  );
+}
+
 function VoiceSettings({ settings, update }: { settings: Settings; update: (patch: Partial<Settings>) => void }) {
   const [status, setStatus] = useState<VoiceStatus | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -193,20 +273,7 @@ function VoiceSettings({ settings, update }: { settings: Settings; update: (patc
         <input type="checkbox" checked={settings.speakReplies} onChange={(e) => update({ speakReplies: e.target.checked })} />
         Ler em voz alta as respostas de perguntas feitas por voz
       </label>
-      <label>
-        Voz do Pipo
-        <div className="inline-form">
-          <select className="grow" value={settings.voiceName} onChange={(e) => update({ voiceName: e.target.value })}>
-            <option value="">Automática (português)</option>
-            {voices.map((v) => (
-              <option key={v.name} value={v.name}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-          <button onClick={() => void speak("Olá! Eu sou o Pipo. É assim que eu falo.", settings.voiceName)}>Testar</button>
-        </div>
-      </label>
+      <NaturalVoice settings={settings} update={update} voices={voices} />
     </fieldset>
   );
 }

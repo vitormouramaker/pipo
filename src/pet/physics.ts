@@ -92,6 +92,15 @@ export function useDragPhysics(el: RefObject<HTMLElement | null>, callbacks: Cal
       p.lift.v -= 0.02;
       run();
     },
+    /** Tranco numa direção (ex.: a gosma soltando da borda puxa o Pipo para o outro lado). */
+    nudge(dx: number, dy: number) {
+      const p = state.current;
+      p.dir = Math.round((Math.atan2(dy, dx) * 180) / Math.PI);
+      p.tilt.v -= dx * 2.2;
+      p.stretch.v += 0.05;
+      p.lift.v += 0.03;
+      run();
+    },
     /** Pulinho (ex.: ao recolher o menu radial). */
     bump() {
       const p = state.current;

@@ -41,6 +41,7 @@ fn dims(edge: &str) -> (f64, f64) {
 }
 
 /// Retângulo da pílula dentro da janela (px lógicos: x, y, largura, altura), igual ao Island.tsx.
+#[cfg(test)]
 fn pill(edge: &str, big: bool) -> [f64; 4] {
     let (ww, wh) = dims(edge);
     pill_in(edge, big, ww, wh)
@@ -306,6 +307,7 @@ pub fn undock_at(app: &AppHandle, cursor: PhysicalPosition<f64>) -> Option<Physi
     }
     HOVER.store(false, Ordering::SeqCst);
     *HOME.lock().unwrap() = None;
+    let left_edge = edge_of(app);
     *LIVE.lock().unwrap() = None;
     let pet = app.get_webview_window(windows::MAIN)?;
     let logical = windows::window_size(app.state::<AppState>().settings.lock().unwrap().pet_size);
@@ -315,6 +317,8 @@ pub fn undock_at(app: &AppHandle, cursor: PhysicalPosition<f64>) -> Option<Physi
     let pos = PhysicalPosition::new(cursor.x as i32 - half, cursor.y as i32 - half);
     let _ = pet.set_position(pos);
     emit(app);
+    // A interface mostra a gosma descolando da borda que a ilha deixou.
+    let _ = app.emit_to(windows::MAIN, "island-undock", left_edge);
     save(app, |s| s.island = false);
     Some(pos)
 }

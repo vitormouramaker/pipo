@@ -128,6 +128,8 @@ async fn download(app: &AppHandle, model: &str) -> Result<(), String> {
 
 /// Liga a escuta; se já estiver ouvindo, encerra e transcreve o que já foi falado.
 pub fn toggle(app: &AppHandle) {
+    // Falar com o Pipo interrompe o que ele estiver falando.
+    let _ = app.emit_to(windows::PANEL, "speech-stop", ());
     if LISTENING.load(Ordering::SeqCst) {
         STOP.store(true, Ordering::SeqCst);
         return;

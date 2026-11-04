@@ -4,6 +4,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ICONS } from "../ui/icons";
 import { useDragPhysics } from "./physics";
 import Island, { type Edge } from "./Island";
+import Goo from "./Goo";
 import { sfx } from "../ui/sound";
 import { api, wornAccessories, type LifeStatus, type PanelView, type RadialLayout, type Settings } from "../api";
 import { Pipo, PIPO_STATES, type PipoState } from "../pipo/Pipo";
@@ -48,6 +49,8 @@ export default function PetApp() {
   // Modo ilha: borda em que a pílula está (null = Pipo normal).
   const [island, setIsland] = useState<Edge | null>(null);
   const [islandScale, setIslandScale] = useState(1);
+  // Gosma descolando da borda que a ilha acabou de deixar.
+  const [goo, setGoo] = useState<{ edge: Edge; key: number } | null>(null);
 
   const press = useRef<{ x: number; y: number } | null>(null);
   const petRef = useRef<HTMLDivElement>(null);
@@ -68,6 +71,18 @@ export default function PetApp() {
     const unlistenGaze = listen<[number, number]>("pipo-gaze", (e) => setGaze(e.payload));
     const unlistenLife = listen("life-changed", refreshLife);
     const unlistenSettings = listen<Settings>("settings-changed", (e) => setSettings(e.payload));
+    const unlistenUndock = listen<string>("island-undock", (e) => {
+      const edge = e.payload as Edge;
+      setGoo({ edge, key: Date.now() });
+      sfx.goo();
+      const d: Record<string, [number, number]> = {
+        top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0],
+        "top-left": [-1, -1], "top-right": [1, -1], "bottom-left": [-1, 1], "bottom-right": [1, 1],
+      };
+      const [dx, dy] = d[edge] ?? [0, 0];
+      physics.nudge(-dx, -dy);
+      window.setTimeout(() => setGoo((g) => (g && Date.now() - g.key >= 650 ? null : g)), 700);
+    });
     const unlistenIsland = listen<{ active: boolean; edge: string; scale: number }>("island", (e) => {
       setIslandScale(e.payload.scale);
       setIsland((was) => {
@@ -80,6 +95,7 @@ export default function PetApp() {
       void unlistenLife.then((fn) => fn());
       void unlistenSettings.then((fn) => fn());
       void unlistenIsland.then((fn) => fn());
+      void unlistenUndock.then((fn) => fn());
     };
   }, []);
 
@@ -204,6 +220,10 @@ export default function PetApp() {
           press.current = null;
           physics.release();
           if (!p || Math.hypot(e.screenX - p.x, e.screenY - p.y) > CLICK_TOLERANCE) return;
+          if (state === "speaking") {
+            void api.speechStop();
+            return;
+          }
           if (radial) closeRadial();
           else if (!closing)
             void api.radialOpen().then((layout) => {
@@ -212,6 +232,7 @@ export default function PetApp() {
             });
         }}
       >
+        {goo && <Goo key={goo.key} edge={goo.edge} size={(settings?.petSize ?? 160) + 112} />}
         <Pipo
           state={state}
           gaze={state === "sleep" || state === "gaming" ? [0, 0] : gaze}

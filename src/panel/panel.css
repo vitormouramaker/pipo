@@ -402,3 +402,10 @@
 .calendar-field { display: grid; gap: 6px; }
 .calendar-field .field-label { color: var(--muted); font-size: 13px; }
 .calendar-field .row { align-items: center; flex-wrap: wrap; }
+
+/* Parar de falar */
+.panel .stop-speaking {
+  display: block; width: 100%; margin-bottom: 8px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(45, 212, 232, 0.5); background: rgba(45, 212, 232, 0.08); color: var(--accent); font-size: 13px;
+}
+.panel .stop-speaking:hover { background: rgba(45, 212, 232, 0.16); }

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, type Attachment, type ChatMessage, type Conversation, type VoiceState } from "../api";
-import { speak, stopSpeaking } from "./speech";
+import { onSpeakingChange, speak, stopSpeaking } from "./speech";
 import { ICONS } from "../ui/icons";
 import { sfx } from "../ui/sound";
 import { sqliteDate } from "../format";
@@ -40,6 +40,8 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
   const [history, setHistory] = useState<Conversation[] | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [voice, setVoice] = useState<VoiceState>({ phase: "idle", message: null });
+  const [talking, setTalking] = useState(false);
+  useEffect(() => onSpeakingChange(setTalking), []);
   // Arquivos anexados (soltos no Pipo ou no painel) que vão com a próxima mensagem.
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [download, setDownload] = useState<{ percent: number; error: string | null } | null>(null);
@@ -179,7 +181,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     // Pergunta feita por voz: a resposta também pode ser falada.
     if (spoken && reply.trim()) {
       const settings = await api.getSettings();
-      if (settings.speakReplies) void speak(reply, settings.voiceName);
+      if (settings.speakReplies) void speak(reply, settings);
     }
   };
 
@@ -316,6 +318,11 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
       )}
 
       <footer className="composer">
+        {talking && (
+          <button className="stop-speaking" onClick={stopSpeaking} title="Também para com Esc ou clicando no Pipo">
+            ■ Parar de falar
+          </button>
+        )}
         {attachments.length > 0 && (
           <div className="attachments">
             {attachments.map((a) => (

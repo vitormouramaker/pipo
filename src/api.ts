@@ -22,6 +22,8 @@ export type Settings = {
   voiceShortcut: string;
   speakReplies: boolean;
   voiceName: string;
+  voiceEngine: "natural" | "windows";
+  naturalVoice: "faber" | "cadu";
   followCursor: boolean;
   hiddenAccessories: string[];
   sounds: boolean;
@@ -297,6 +299,10 @@ export const api = {
   voiceStatus: (model?: string) => invoke<VoiceStatus>("voice_status", { model }),
   voiceDownload: (model?: string) => invoke<void>("voice_download", { model }),
   voiceToggle: () => invoke<void>("voice_toggle"),
+  ttsStatus: () => invoke<{ ready: boolean; downloading: boolean; downloaded: number; total: number }>("tts_status"),
+  ttsDownload: () => invoke<void>("tts_download"),
+  ttsSynth: (text: string) => invoke<string>("tts_synth", { text }),
+  speechStop: () => invoke<void>("speech_stop"),
   petMenuOpen: () => invoke<void>("pet_menu_open"),
   menuPending: () => invoke<boolean | null>("menu_pending"),
   menuLayout: (width: number, height: number) => invoke<void>("menu_layout", { width, height }),

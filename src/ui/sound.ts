@@ -219,6 +219,13 @@ export const sfx = {
     }),
   /** Ação concluída (lembrete criado, canal seguido…). */
   done: () => play((g, t) => bell(g, t, 79, 0.6, 0.1)),
+  /** Gosma descolando: um "ploc" elástico, grave e macio. */
+  goo: () =>
+    play((g, t) => {
+      tone(g, t, { f: 180, f2: 420, d: 0.12, v: 0.22, lp: 900, rev: 0.15 });
+      tone(g, t + 0.1, { f: 520, f2: 260, d: 0.14, v: 0.16, lp: 1100, rev: 0.2 });
+      breath(g, t + 0.02, 300, 900, 0.1, 0.05);
+    }),
   /** Pipo encolhendo para a ilha / voltando dela. */
   shrink: () => play((g, t) => tone(g, t, { f: 520, f2: 260, w: "triangle", d: 0.22, v: 0.22, lp: 1400 })),
   grow: () => play((g, t) => tone(g, t, { f: 260, f2: 520, w: "triangle", d: 0.22, v: 0.22, lp: 1400 })),

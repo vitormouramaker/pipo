@@ -14,6 +14,7 @@ mod sensors;
 mod settings;
 mod tools;
 mod toast;
+mod tts;
 mod updater;
 mod usage;
 mod voice;
@@ -248,6 +249,10 @@ pub fn run() {
             windows::panel_expand,
             windows::panel_is_expanded,
             voice::voice_status,
+            tts::tts_status,
+            tts::tts_download,
+            tts::tts_synth,
+            tts::speech_stop,
             voice::voice_download,
             voice::voice_toggle,
             windows::pet_express,

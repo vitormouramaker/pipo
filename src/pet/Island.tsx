@@ -80,7 +80,7 @@ export default function Island({ edge, state, scale = 1 }: { edge: Edge; state: 
   return (
     <main className="island-stage">
       <div
-        className={`island ${edge} s-${state}${hover ? " hover" : ""}${glow ? " glow" : ""}`}
+        className={`island ${edge}${vertical ? " splat-v" : ""} s-${state}${hover ? " hover" : ""}${glow ? " glow" : ""}`}
         style={{ left: x, top: y, width: w, height: h, "--k": scale } as CSSProperties}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
@@ -91,7 +91,9 @@ export default function Island({ edge, state, scale = 1 }: { edge: Edge; state: 
           const p = press.current;
           press.current = null;
           if (!p || Math.hypot(e.screenX - p.x, e.screenY - p.y) > CLICK_TOLERANCE) return;
-          if ((e.target as Element).closest(".island-exit")) {
+          if (state === "speaking") {
+            void api.speechStop();
+          } else if ((e.target as Element).closest(".island-exit")) {
             sfx.grow();
             void api.islandToggle();
           } else {

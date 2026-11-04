@@ -42,6 +42,10 @@ pub struct Settings {
     pub speak_replies: bool,
     /// Nome da voz do Windows ("" = primeira voz em português).
     pub voice_name: String,
+    /// "natural" (Piper, voz neural local) ou "windows" (vozes do sistema).
+    pub voice_engine: String,
+    /// Voz natural: "faber" ou "cadu".
+    pub natural_voice: String,
     pub follow_cursor: bool,
     /// Acessórios liberados que o usuário preferiu não usar.
     pub hidden_accessories: Vec<String>,
@@ -86,6 +90,8 @@ impl Default for Settings {
             voice_shortcut: "Ctrl+Alt+Shift+V".into(),
             speak_replies: true,
             voice_name: String::new(),
+            voice_engine: "natural".into(),
+            natural_voice: "faber".into(),
             follow_cursor: true,
             hidden_accessories: Vec::new(),
             sounds: true,
