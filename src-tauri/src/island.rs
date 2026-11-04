@@ -3,7 +3,7 @@
 //! já vira a ilha naquele lugar (a prévia é a ilha de verdade); ao soltar, ela fica.
 //! Bom para quando o usuário precisa de concentração.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -12,6 +12,22 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition};
 use crate::{settings, windows, AppState};
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
+/// Escala da ilha (1.0 = Pipo "Médio"), guardada como bits de f64.
+static SCALE: AtomicU64 = AtomicU64::new(0x3FF0_0000_0000_0000);
+
+/// A ilha acompanha o tamanho do Pipo (suavizado, para não ficar minúscula nem enorme).
+pub fn island_scale(pet_size: u32) -> f64 {
+    (pet_size as f64 / 160.0).powf(0.6).clamp(0.6, 1.3)
+}
+
+fn scale() -> f64 {
+    f64::from_bits(SCALE.load(Ordering::SeqCst))
+}
+
+fn update_scale(app: &AppHandle) {
+    let k = island_scale(app.state::<AppState>().settings.lock().unwrap().pet_size);
+    SCALE.store(k.to_bits(), Ordering::SeqCst);
+}
 static HOVER: AtomicBool = AtomicBool::new(false);
 /// Onde o Pipo estava antes de virar ilha.
 static HOME: Mutex<Option<(i32, i32)>> = Mutex::new(None);
@@ -20,18 +36,20 @@ static LIVE: Mutex<Option<(String, f64)>> = Mutex::new(None);
 
 /// Tamanho da janela da ilha (px lógicos): deitada no topo, na base e nos cantos; em pé nas laterais.
 fn dims(edge: &str) -> (f64, f64) {
-    if matches!(edge, "left" | "right") { (52.0, 210.0) } else { (250.0, 52.0) }
+    let k = scale();
+    if matches!(edge, "left" | "right") { (52.0 * k, 210.0 * k) } else { (250.0 * k, 52.0 * k) }
 }
 
 /// Retângulo da pílula dentro da janela (px lógicos: x, y, largura, altura), igual ao Island.tsx.
 fn pill(edge: &str, big: bool) -> [f64; 4] {
     let (ww, wh) = dims(edge);
     let vertical = matches!(edge, "left" | "right");
+    let k = scale();
     let (w, h) = match (vertical, big) {
-        (true, false) => (28.0, 112.0),
-        (true, true) => (46.0, 196.0),
-        (false, false) => (120.0, 28.0),
-        (false, true) => (236.0, 46.0),
+        (true, false) => (28.0 * k, 112.0 * k),
+        (true, true) => (46.0 * k, 196.0 * k),
+        (false, false) => (120.0 * k, 28.0 * k),
+        (false, true) => (236.0 * k, 46.0 * k),
     };
     let x = match edge {
         "left" | "top-left" | "bottom-left" => 0.0,
@@ -66,10 +84,25 @@ pub fn edge(app: &AppHandle) -> Option<String> {
 pub struct IslandStatus {
     active: bool,
     edge: String,
+    scale: f64,
 }
 
 fn emit(app: &AppHandle) {
-    let _ = app.emit_to(windows::MAIN, "island", IslandStatus { active: active(), edge: edge_of(app) });
+    let _ = app.emit_to(windows::MAIN, "island", IslandStatus { active: active(), edge: edge_of(app), scale: scale() });
+}
+
+/// O tamanho do Pipo mudou: a ilha acompanha, no mesmo lugar.
+pub fn refresh(app: &AppHandle) {
+    update_scale(app);
+    if !active() {
+        return;
+    }
+    let (edge, pos) = LIVE.lock().unwrap().clone().unwrap_or_else(|| {
+        let s = app.state::<AppState>().settings.lock().unwrap().clone();
+        (s.island_edge, s.island_pos)
+    });
+    place(app, &edge, pos);
+    emit(app);
 }
 
 /// Coloca a janela da ilha na borda `edge`, na posição `pos` (0 = início, 1 = fim da borda).
@@ -126,6 +159,7 @@ pub fn enter(app: &AppHandle, restore: bool) {
     }
     windows::close_radial(app);
     windows::hide_panel(app);
+    update_scale(app);
     ACTIVE.store(true, Ordering::SeqCst);
     let (edge, pos) = {
         let s = app.state::<AppState>().settings.lock().unwrap().clone();
@@ -203,6 +237,9 @@ fn zone_for(dt: f64, db: f64, dl: f64, dr: f64, zone: f64) -> Option<String> {
 
 /// Durante o arrasto, perto de uma borda: a janela já vira a ilha exatamente onde vai ficar.
 pub fn preview(app: &AppHandle, edge: &str, cursor: PhysicalPosition<f64>) {
+    if !active() {
+        update_scale(app);
+    }
     let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y).ok().flatten() else { return };
     let area = monitor.work_area();
     let scale = monitor.scale_factor();
@@ -289,7 +326,7 @@ pub fn island_toggle(app: AppHandle) {
 
 #[tauri::command]
 pub fn island_status(app: AppHandle) -> IslandStatus {
-    IslandStatus { active: active(), edge: edge_of(&app) }
+    IslandStatus { active: active(), edge: edge_of(&app), scale: scale() }
 }
 
 

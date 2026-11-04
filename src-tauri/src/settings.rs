@@ -126,7 +126,12 @@ pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<
         result.map_err(|e| format!("Não consegui alterar a inicialização com o Windows: {e}"))?;
     }
 
-    // Na ilha a janela tem outro tamanho; o do Pipo volta quando sair dela.
+    // Na ilha a janela tem outro tamanho (proporcional ao Pipo); o do Pipo volta quando sair dela.
+    if old.map_or(true, |o| o.pet_size != new.pet_size) {
+        // A configuração nova só vale depois de salva: atualiza a cópia antes de redimensionar.
+        app.state::<AppState>().settings.lock().unwrap().pet_size = new.pet_size;
+        crate::island::refresh(app);
+    }
     if let Some(pet) = app.get_webview_window(windows::MAIN).filter(|_| !crate::island::active()) {
         let size = windows::window_size(new.pet_size);
         let _ = pet.set_size(LogicalSize::new(size, size));

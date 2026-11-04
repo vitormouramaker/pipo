@@ -193,7 +193,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: calc(10px * var(--k, 1));
   background: #121417;
   border: 1px solid #2a2e35;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
@@ -202,35 +202,36 @@ body,
   transition: left 220ms cubic-bezier(0.2, 0.9, 0.3, 1.15), top 220ms cubic-bezier(0.2, 0.9, 0.3, 1.15),
     width 220ms cubic-bezier(0.2, 0.9, 0.3, 1.15), height 220ms cubic-bezier(0.2, 0.9, 0.3, 1.15), border-color 200ms;
   animation: island-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
-  font: 12.5px/1 "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  font: calc(12.5px * var(--k, 1))/1 "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
   color: #e8eaed;
 }
 /* Colada na borda: os cantos do lado da borda ficam retos, como um entalhe. */
-.island.top { border-top: 0; border-radius: 0 0 16px 16px; }
-.island.bottom { border-bottom: 0; border-radius: 16px 16px 0 0; }
-.island.left { border-left: 0; border-radius: 0 16px 16px 0; flex-direction: column; }
-.island.right { border-right: 0; border-radius: 16px 0 0 16px; flex-direction: column; }
+.island { --r: calc(16px * var(--k, 1)); --rc: calc(18px * var(--k, 1)); }
+.island.top { border-top: 0; border-radius: 0 0 var(--r) var(--r); }
+.island.bottom { border-bottom: 0; border-radius: var(--r) var(--r) 0 0; }
+.island.left { border-left: 0; border-radius: 0 var(--r) var(--r) 0; flex-direction: column; }
+.island.right { border-right: 0; border-radius: var(--r) 0 0 var(--r); flex-direction: column; }
 /* Nos cantos: encaixada nas duas bordas, só o canto de dentro arredondado. */
-.island.top-left { border-top: 0; border-left: 0; border-radius: 0 0 18px 0; }
-.island.top-right { border-top: 0; border-right: 0; border-radius: 0 0 0 18px; }
-.island.bottom-left { border-bottom: 0; border-left: 0; border-radius: 0 18px 0 0; }
-.island.bottom-right { border-bottom: 0; border-right: 0; border-radius: 18px 0 0 0; }
+.island.top-left { border-top: 0; border-left: 0; border-radius: 0 0 var(--rc) 0; }
+.island.top-right { border-top: 0; border-right: 0; border-radius: 0 0 0 var(--rc); }
+.island.bottom-left { border-bottom: 0; border-left: 0; border-radius: 0 var(--rc) 0 0; }
+.island.bottom-right { border-bottom: 0; border-right: 0; border-radius: var(--rc) 0 0 0; }
 .island.hover { border-color: #3a3f47; }
 .island-eyes {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 12px;
+  gap: calc(6px * var(--k, 1));
+  height: calc(12px * var(--k, 1));
 }
 .island-eyes i {
   display: block;
-  width: 4px;
-  height: 11px;
+  width: calc(4px * var(--k, 1));
+  height: calc(11px * var(--k, 1));
   border-radius: 2px;
   background: #2dd4e8;
   transition: height 160ms, background 160ms;
 }
-.island.hover .island-eyes i { height: 13px; }
+.island.hover .island-eyes i { height: calc(13px * var(--k, 1)); }
 .island.s-thinking .island-eyes i { animation: island-pulse 1.2s ease-in-out infinite; }
 .island.s-thinking .island-eyes i + i { animation-delay: 0.3s; }
 .island.s-alert .island-eyes i { background: #f5b544; }
@@ -251,8 +252,8 @@ body,
 .island-exit {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: calc(24px * var(--k, 1));
+  height: calc(24px * var(--k, 1));
   padding: 0;
   border: 0;
   border-radius: 7px;
@@ -262,7 +263,7 @@ body,
   animation: fade-in 180ms ease-out both;
 }
 .island-exit:hover { background: #262a30; color: #2dd4e8; }
-.island-exit svg { width: 14px; height: 14px; }
+.island-exit svg { width: calc(14px * var(--k, 1)); height: calc(14px * var(--k, 1)); }
 @keyframes island-in {
   from { opacity: 0; transform: scale(0.6); }
   to { opacity: 1; transform: none; }

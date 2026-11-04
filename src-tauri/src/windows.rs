@@ -147,8 +147,31 @@ pub fn beside_pet(app: &AppHandle, w: i32, h: i32, align_bottom: bool) -> Option
 fn place_panel(app: &AppHandle, panel: &WebviewWindow) {
     let Ok(size) = panel.outer_size() else { return };
     let Some((x, y)) = beside_pet(app, size.width as i32, size.height as i32, true) else { return };
+    // A base do painel fica sempre na base do Pipo: se o Pipo está alto demais para isso
+    // (o painel bateria no topo da tela), o Pipo desce o necessário.
+    if !island::active() {
+        if let Some(pet) = app.get_webview_window(MAIN) {
+            if let (Ok(pos), Ok(pet_size)) = (pet.outer_position(), pet.outer_size()) {
+                let (_, inset_y) = body_insets(pet_size, pet.scale_factor().unwrap_or(1.0));
+                let body_bottom = pos.y + pet_size.height as i32 - inset_y as i32;
+                let drop = (y + size.height as i32) - body_bottom;
+                if drop > 0 {
+                    let _ = pet.set_position(PhysicalPosition::new(pos.x, pos.y + drop));
+                }
+            }
+        }
+    }
     set_panel_position(app, panel, x, y);
     remember_offset(app, (x, y));
+}
+
+/// Altura do painel aberto ao lado do Pipo (não conta expandido nem com o Pipo em ilha).
+fn open_panel_height(app: &AppHandle) -> Option<i32> {
+    if PANEL_EXPANDED.load(Ordering::SeqCst) || island::active() {
+        return None;
+    }
+    let panel = app.get_webview_window(PANEL).filter(|w| w.is_visible().unwrap_or(false))?;
+    panel.outer_size().ok().map(|s| s.height as i32)
 }
 
 /// Margem transparente fixa (px lógicos) em volta do Pipo, onde aparecem os botões
@@ -191,7 +214,13 @@ fn move_pet_clamped(app: &AppHandle, x: i32, y: i32, cursor: Option<PhysicalPosi
     let (right, bottom) = (left + area.size.width as i32, top + area.size.height as i32);
 
     let x = x.clamp(left - inset_x, right - w + inset_x);
-    let y = y.clamp(top - inset_y, bottom - h + inset_y);
+    let mut y = y.clamp(top - inset_y, bottom - h + inset_y);
+    // Com o painel aberto, o Pipo não sobe além do ponto em que o painel ainda cabe
+    // alinhado pela base (a base do corpo fica pelo menos a uma altura de painel do topo).
+    if let Some(panel_h) = open_panel_height(app) {
+        let min_y = top + panel_h - (h - inset_y);
+        y = y.max(min_y).min(bottom - h + inset_y);
+    }
     let _ = pet.set_position(PhysicalPosition::new(x, y));
 }
 

@@ -46,6 +46,7 @@ export default function PetApp() {
   const [settings, setSettings] = useState<Settings | null>(null);
   // Modo ilha: borda em que a pílula está (null = Pipo normal).
   const [island, setIsland] = useState<Edge | null>(null);
+  const [islandScale, setIslandScale] = useState(1);
 
   const press = useRef<{ x: number; y: number } | null>(null);
   const petRef = useRef<HTMLDivElement>(null);
@@ -59,11 +60,15 @@ export default function PetApp() {
     const refreshLife = () => void api.lifeStatus().then(setLife);
     refreshLife();
     void api.getSettings().then(setSettings);
-    void api.islandStatus().then((s) => setIsland(s.active ? (s.edge as Edge) : null));
+    void api.islandStatus().then((s) => {
+      setIslandScale(s.scale);
+      setIsland(s.active ? (s.edge as Edge) : null);
+    });
     const unlistenGaze = listen<[number, number]>("pipo-gaze", (e) => setGaze(e.payload));
     const unlistenLife = listen("life-changed", refreshLife);
     const unlistenSettings = listen<Settings>("settings-changed", (e) => setSettings(e.payload));
-    const unlistenIsland = listen<{ active: boolean; edge: string }>("island", (e) => {
+    const unlistenIsland = listen<{ active: boolean; edge: string; scale: number }>("island", (e) => {
+      setIslandScale(e.payload.scale);
       setIsland((was) => {
         if (Boolean(was) !== e.payload.active) (e.payload.active ? sfx.shrink : sfx.grow)();
         return e.payload.active ? (e.payload.edge as Edge) : null;
@@ -152,7 +157,7 @@ export default function PetApp() {
   const state: PipoState = override ?? base;
   openRef.current = Boolean(radial) && !closing;
 
-  if (island) return <Island edge={island} state={state} />;
+  if (island) return <Island edge={island} state={state} scale={islandScale} />;
 
   return (
     <main
