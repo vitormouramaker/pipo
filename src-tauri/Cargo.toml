@@ -1,6 +1,6 @@
 [package]
 name = "pipo"
-version = "0.2.1"
+version = "0.3.0"
 description = "Pipo, bichinho virtual de desktop"
 authors = ["vitormouramaker"]
 edition = "2024"
@@ -37,6 +37,7 @@ tauri-plugin-notification = "2.8.0"
 tokio = { version = "1.54.1", features = ["sync", "time"] }
 whisper-rs = "0.16.0"
 cpal = "0.18.2"
+tauri-plugin-updater = "2"
 
 
 [target.'cfg(windows)'.dependencies]

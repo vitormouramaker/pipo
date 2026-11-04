@@ -1,12 +1,68 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, MODELS, type Settings, type VoiceStatus } from "../api";
+import { api, MODELS, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
 import { loadVoices, speak } from "./speech";
 
 const VOICE_MODELS = [
   { value: "base", label: "Rápido (142 MB)" },
   { value: "small", label: "Mais preciso (466 MB, mais lento)" },
 ] as const;
+
+function UpdateSettings() {
+  const [status, setStatus] = useState<UpdateStatus | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void api.updateStatus().then(setStatus);
+    const unlisten = listen("update-changed", () => void api.updateStatus().then(setStatus));
+    const unlistenProgress = listen<[number, number | null]>("update-progress", (e) => {
+      const [done, total] = e.payload;
+      setProgress(total ? Math.floor((100 * done) / total) : null);
+    });
+    return () => {
+      void unlisten.then((fn) => fn());
+      void unlistenProgress.then((fn) => fn());
+    };
+  }, []);
+
+  if (!status) return null;
+  const install = () => {
+    setError(null);
+    setProgress(0);
+    void api.updateInstall().catch((e) => {
+      setError(String(e));
+      setProgress(null);
+    });
+  };
+
+  return (
+    <fieldset>
+      <legend>Atualizações</legend>
+      <p className="hint">
+        Versão {status.current}. O Pipo procura versões novas sozinho e avisa; seus dados não são apagados ao atualizar.
+      </p>
+      {status.available ? (
+        <>
+          <p className="hint ok">Versão {status.available} disponível.</p>
+          {status.notes && <p className="hint">{status.notes}</p>}
+          <div className="row">
+            <button className="primary" disabled={progress !== null} onClick={install}>
+              {progress !== null ? `Atualizando… ${progress}%` : "Atualizar e reiniciar"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="row">
+          <button disabled={status.checking} onClick={() => void api.updateCheck().then(setStatus)}>
+            {status.checking ? "Procurando…" : "Procurar atualização"}
+          </button>
+        </div>
+      )}
+      {(error ?? status.error) && <p className="hint">{error ?? status.error}</p>}
+    </fieldset>
+  );
+}
 
 function VoiceSettings({ settings, update }: { settings: Settings; update: (patch: Partial<Settings>) => void }) {
   const [status, setStatus] = useState<VoiceStatus | null>(null);
@@ -285,6 +341,8 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           Iniciar com o Windows
         </label>
       </fieldset>
+
+      <UpdateSettings />
 
       <VoiceSettings settings={settings} update={update} />
 

@@ -28,9 +28,10 @@ jobs:
 
       - name: Compilar app e gerar instaladores
         # whisper.cpp (voz) usa o CMake e o LLVM que já vêm na imagem do Windows.
+        # Sem a chave de assinatura (só local), gera os instaladores sem os arquivos de atualização.
         env:
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
-        run: npm run tauri build
+        run: npm run tauri build -- --config src-tauri/tauri.ci.conf.json
 
       - name: Publicar instaladores
         uses: actions/upload-artifact@v4

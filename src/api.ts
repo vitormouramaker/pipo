@@ -61,6 +61,14 @@ export type VoiceStatus = {
   hasMicrophone: boolean;
 };
 export type Toast = { id: number; kind: string; title: string; body: string; url: string | null; view: string | null };
+export type UpdateStatus = {
+  current: string;
+  available: string | null;
+  notes: string | null;
+  checking: boolean;
+  installing: boolean;
+  error: string | null;
+};
 export type VoiceState = { phase: "idle" | "listening" | "transcribing" | "error" | "nomodel"; message: string | null };
 
 /** Acessórios em uso: os liberados que o usuário não escondeu. */
@@ -270,6 +278,9 @@ export const api = {
   menuLayout: (width: number, height: number) => invoke<void>("menu_layout", { width, height }),
   menuHide: () => invoke<void>("menu_hide"),
   islandToggle: () => invoke<void>("island_toggle"),
+  updateStatus: () => invoke<UpdateStatus>("update_status"),
+  updateCheck: () => invoke<UpdateStatus>("update_check"),
+  updateInstall: () => invoke<void>("update_install"),
   islandStatus: () => invoke<{ active: boolean; edge: string; scale: number }>("island_status"),
   toastTake: () => invoke<Toast[]>("toast_take"),
   toastLayout: (height: number) => invoke<void>("toast_layout", { height }),

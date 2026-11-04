@@ -12,6 +12,7 @@ mod sensors;
 mod settings;
 mod tools;
 mod toast;
+mod updater;
 mod usage;
 mod voice;
 mod windows;
@@ -84,6 +85,7 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -153,6 +155,7 @@ pub fn run() {
                 std::thread::sleep(std::time::Duration::from_secs(300));
                 handle.state::<AppState>().db.lock().unwrap().checkpoint();
             });
+            updater::start(app.handle().clone());
             sensors::start(app.handle().clone());
             world::lives::start(app.handle().clone());
             Ok(())
@@ -200,6 +203,9 @@ pub fn run() {
             actions::ocr::ocr_start,
             world::open_url,
             life::life_status,
+            updater::update_status,
+            updater::update_check,
+            updater::update_install,
             toast::toast_take,
             toast::toast_layout,
             toast::toast_open,
