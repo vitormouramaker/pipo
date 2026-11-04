@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type PanelView, type Settings } from "../api";
+import { api, wornAccessories, type LifeStatus, type PanelView, type Settings } from "../api";
 import { Pipo } from "../pipo/Pipo";
 import Actions from "./actions/Actions";
 import Chat from "./Chat";
@@ -8,6 +8,7 @@ import Clipboard from "./Clipboard";
 import SettingsView from "./Settings";
 import SystemView from "./System";
 import Today from "./Today";
+import Life from "./Life";
 import Usage from "./Usage";
 import "./panel.css";
 
@@ -27,6 +28,7 @@ export default function PanelApp() {
   const [settings, setSettings] = useState<Settings | null>(null);
   // Texto levado para a caixa do chat sem enviar (ex.: "Perguntar ao Pipo" no Clipboard).
   const [draft, setDraft] = useState<string | null>(null);
+  const [life, setLife] = useState<LifeStatus | null>(null);
 
   const refreshKey = () => void api.keyStatus().then(setHasKey);
 
@@ -38,18 +40,30 @@ export default function PanelApp() {
       refreshKey();
     });
     const unlistenSettings = listen<Settings>("settings-changed", (e) => setSettings(e.payload));
+    const refreshLife = () => void api.lifeStatus().then(setLife);
+    refreshLife();
+    const unlistenLife = listen("life-changed", refreshLife);
     return () => {
       void unlistenView.then((fn) => fn());
       void unlistenSettings.then((fn) => fn());
+      void unlistenLife.then((fn) => fn());
     };
   }, []);
 
   return (
     <div className="panel">
       <header className="panel-header" data-tauri-drag-region>
-        <span className="brand-icon" data-tauri-drag-region>
-          <Pipo state="idle" />
-        </span>
+        <button
+          className="brand"
+          title="Nível, evolução e conquistas do Pipo"
+          aria-pressed={view === "pipo"}
+          onClick={() => setView("pipo")}
+        >
+          <span className="brand-icon">
+            <Pipo state="idle" stage={life?.stage ?? 0} accessories={wornAccessories(life, settings)} />
+          </span>
+          {life && <span className="brand-level">nv {life.level}</span>}
+        </button>
         <nav className="tabs">
           {TABS.map((t) => (
             <button key={t.view} title={t.title} aria-pressed={view === t.view} onClick={() => setView(t.view)}>
@@ -62,6 +76,7 @@ export default function PanelApp() {
         </button>
       </header>
 
+      {view === "pipo" && <Life />}
       {view === "chat" && (
         <Chat
           hasKey={hasKey}
@@ -70,7 +85,7 @@ export default function PanelApp() {
           onOpenSettings={() => setView("settings")}
         />
       )}
-      {view === "today" && <Today onAsk={(prompt) => void api.chatPrefill(prompt)} />}
+      {view === "today" && <Today onAsk={(prompt) => void api.chatPrefill(prompt, true)} />}
       {view === "actions" && <Actions onAsk={(prompt) => void api.chatPrefill(prompt)} />}
       {view === "clipboard" && (
         <Clipboard

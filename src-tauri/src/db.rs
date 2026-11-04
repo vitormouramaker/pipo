@@ -57,6 +57,19 @@ impl Db {
                  text   TEXT NOT NULL,
                  due_at TEXT NOT NULL,
                  done   INTEGER NOT NULL DEFAULT 0
+             );
+             CREATE TABLE IF NOT EXISTS xp_log (
+                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                 day        TEXT NOT NULL,
+                 kind       TEXT NOT NULL,
+                 times      INTEGER NOT NULL DEFAULT 1,
+                 xp         INTEGER NOT NULL,
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
+             CREATE INDEX IF NOT EXISTS xp_log_kind_day ON xp_log (kind, day);
+             CREATE TABLE IF NOT EXISTS achievements (
+                 id          TEXT PRIMARY KEY,
+                 unlocked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
              );",
         )?;
         // Colunas acrescentadas depois da primeira versão (o erro de coluna repetida é esperado).

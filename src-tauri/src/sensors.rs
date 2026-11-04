@@ -30,6 +30,10 @@ pub struct SenseState {
     pub gaming: bool,
     /// O Pipo foi escondido pelo modo jogo (e não pelo usuário).
     pub hidden_by_game: bool,
+    /// O usuário chamou o Pipo durante o jogo: não esconde de novo até o jogo acabar.
+    pub game_override: bool,
+    /// O modo jogo já agiu nesta tela cheia (não repete a cada leitura).
+    pub game_hide_done: bool,
     pub idle: u64,
 }
 
@@ -53,25 +57,40 @@ fn notify(app: &AppHandle, title: &str, body: &str) {
     let _ = app.notification().builder().title(title).body(body).show();
 }
 
-fn set_game_mode(app: &AppHandle, on: bool) {
+/// Modo jogo: com um app em tela cheia o Pipo fica "jogando"; se a tela cheia estiver
+/// no mesmo monitor que ele, some da frente (o painel também) e volta quando acabar.
+fn set_game_mode(app: &AppHandle, on: bool, monitor: Option<(i32, i32, i32, i32)>) {
     let state = app.state::<AppState>();
+    let same_monitor = on && monitor.is_some_and(|m| windows::pet_inside(app, m));
     // As janelas são mexidas fora da trava: esconder/mostrar espera a thread principal,
     // que pode estar esperando esta mesma trava (ex.: comando `sense_status`).
-    let show_again = {
+    let (hide, show) = {
         let mut sense = state.sense.lock().unwrap();
-        if sense.gaming == on {
-            return;
-        }
         sense.gaming = on;
-        !on && std::mem::take(&mut sense.hidden_by_game)
+        if !on {
+            sense.game_override = false;
+        }
+        let want_hidden = same_monitor && !sense.game_override;
+        let hide = want_hidden && !sense.game_hide_done;
+        sense.game_hide_done = want_hidden;
+        (hide, !want_hidden && std::mem::take(&mut sense.hidden_by_game))
     };
-    if on {
-        // Some da frente do jogo; o painel também.
+    if hide {
         let hidden = windows::hide_pet_for_game(app);
         windows::hide_panel(app);
         state.sense.lock().unwrap().hidden_by_game = hidden;
-    } else if show_again {
+    } else if show {
         windows::show_pet(app);
+    }
+}
+
+/// O usuário pediu o Pipo (bandeja, atalho): mostra mesmo com jogo aberto.
+pub fn user_wants_pet(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let mut sense = state.sense.lock().unwrap();
+    sense.hidden_by_game = false;
+    if sense.gaming {
+        sense.game_override = true;
     }
 }
 
@@ -103,7 +122,8 @@ pub fn start(app: AppHandle) {
                 }
                 let idle = context::idle_seconds();
 
-                set_game_mode(&app, settings.game_mode && current.as_ref().is_some_and(|c| c.fullscreen));
+                let fullscreen = current.as_ref().filter(|c| c.fullscreen);
+                set_game_mode(&app, settings.game_mode && fullscreen.is_some(), fullscreen.map(|c| c.monitor));
 
                 let developing = current.as_ref().is_some_and(|c| c.category == Category::Dev);
                 dev_since = if developing { dev_since.or(Some(Instant::now())) } else { None };
@@ -170,6 +190,9 @@ pub fn start(app: AppHandle) {
             focus::tick(&app, idle, gaming);
             if tick % 60 == 30 {
                 crate::world::briefing::maybe_run(&app, idle, gaming);
+            }
+            if tick % 60 == 10 && idle < 120 {
+                crate::life::checkin_if_new_day(&app);
             }
 
             tick += 1;

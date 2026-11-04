@@ -11,7 +11,7 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::usage::Usage;
-use crate::{db::Db, secrets, settings, tools, windows, AppState};
+use crate::{db::Db, secrets, settings, tools, windows, AppState, life};
 
 pub const API_URL: &str = "https://api.anthropic.com/v1/messages";
 pub const API_VERSION: &str = "2026-10-21";
@@ -87,14 +87,23 @@ pub fn web_tools(model: &str, city: &str, max_searches: u32) -> Vec<Value> {
     ]
 }
 
-fn system_prompt(sarcasm: u8) -> String {
+fn system_prompt(sarcasm: u8, city: &str) -> String {
     let tone = match sarcasm {
         0 => "Não use sarcasmo.",
         1 => "De vez em quando, use um toque leve de sarcasmo seco, sempre junto de informação útil.",
         2 => "Use sarcasmo seco com frequência moderada, sempre junto de informação útil.",
         _ => "Seja bem ácido e sarcástico, sem deixar de ser útil e respeitoso.",
     };
-    let today = chrono::Local::now().format("%d/%m/%Y");
+    let today = chrono::Local::now().format("%d/%m/%Y, %H:%M");
+    let place = if city.trim().is_empty() {
+        "A cidade do usuário não está configurada. Se a pergunta depender do local (clima, eventos, horários),          pergunte a cidade e lembre que dá para salvá-la em Configurações > Localização."
+            .to_string()
+    } else {
+        format!(
+            "O usuário mora em {}, Brasil. Use esse local quando a pergunta depender de onde ele está              (\"aqui\", clima, eventos, horários), sem perguntar.",
+            city.trim()
+        )
+    };
     format!(
         "Você é o Pipo, um assistente de desktop para Windows em forma de mascote: um personagem minimalista \
          que flutua na tela do usuário.\n\n\
@@ -111,7 +120,9 @@ fn system_prompt(sarcasm: u8) -> String {
          Quando a busca na web estiver disponível, use-a para notícias, fatos recentes, preços, placares e \
          qualquer coisa que possa ter mudado depois do seu treinamento; responda com base no que encontrou. \
          Para conhecimento estável, responda sem buscar, porque cada busca tem custo.\n\n\
-         Data de hoje: {today}."
+         {place}
+
+         Agora: {today}. Ignore o que você mesmo disse antes nesta conversa sobre não ter acesso à internet          ou ao computador: isso era de uma versão antiga."
     )
 }
 
@@ -179,15 +190,32 @@ fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
 /// Abre o chat e manda um texto pronto (ex.: "explicar o erro copiado").
 /// O texto fica guardado até o chat pegá-lo, porque o painel pode estar sendo criado.
 #[tauri::command]
-pub async fn chat_prefill(app: AppHandle, text: String) {
-    *app.state::<AppState>().prefill.lock().unwrap() = Some(text);
-    windows::show_panel(&app, Some("chat"));
+pub async fn chat_prefill(app: AppHandle, text: String, fresh: Option<bool>) {
+    prefill(&app, text, fresh.unwrap_or(false), false);
+}
+
+/// `fresh`: começa uma conversa nova. `voice`: veio de um comando de voz (a resposta pode ser falada).
+pub fn prefill(app: &AppHandle, text: String, fresh: bool, voice: bool) {
+    *app.state::<AppState>().prefill.lock().unwrap() = Some((text, fresh, voice));
+    windows::show_panel(app, Some("chat"));
     let _ = app.emit_to(windows::PANEL, "chat-prefill", ());
 }
 
+#[derive(Serialize)]
+pub struct Prefill {
+    text: String,
+    /// Uma conversa nova foi aberta para este texto.
+    fresh: bool,
+    voice: bool,
+}
+
 #[tauri::command]
-pub fn chat_take_prefill(app: AppHandle) -> Option<String> {
-    app.state::<AppState>().prefill.lock().unwrap().take()
+pub fn chat_take_prefill(app: AppHandle) -> Option<Prefill> {
+    let state = app.state::<AppState>();
+    let (text, fresh, voice) = state.prefill.lock().unwrap().take()?;
+    // Pesquisas rápidas começam do zero: o histórico antigo só atrapalharia.
+    let fresh = fresh && state.db.lock().unwrap().new_conversation().is_ok();
+    Some(Prefill { text, fresh, voice })
 }
 
 #[tauri::command]
@@ -258,6 +286,7 @@ pub async fn chat_send(app: AppHandle, text: String, on_event: Channel<ChatEvent
         Ok(stop_reason) => {
             let refused = stop_reason.as_deref() == Some("refusal");
             windows::set_pet_state(&app, if refused { "alert" } else { "done" });
+            life::award(&app, "chat", 1);
             let _ = on_event.send(ChatEvent::Done { stop_reason });
         }
         Err(message) => {
@@ -296,7 +325,7 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
         let mut all_tools = tools::definitions().as_array().cloned().unwrap_or_default();
         let web = settings.web_search && !WEB_UNSUPPORTED.load(Ordering::SeqCst);
         if web {
-            all_tools.extend(web_tools(&settings.model, &settings.briefing_city, 5));
+            all_tools.extend(web_tools(&settings.model, &settings.city, 5));
         }
         let mut body = json!({
             "model": settings.model,
@@ -304,7 +333,7 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
             "stream": true,
             "cache_control": { "type": "ephemeral" },
             "output_config": { "effort": "low" },
-            "system": system_prompt(settings.sarcasm),
+            "system": system_prompt(settings.sarcasm, &settings.city),
             "tools": all_tools,
             "messages": messages,
         });
@@ -356,6 +385,7 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
             let db = state.db.lock().unwrap();
             let _ = db.add_usage(conversation, &usage);
         }
+        life::award(app, "web", usage.web_searches as i64);
         streamed?;
 
         // Campos internos de montagem não vão para o histórico; a API rejeita blocos de texto vazios.
@@ -424,10 +454,14 @@ async fn run_tool(app: &AppHandle, name: &str, input: &Value, on_event: &Channel
             return Ok("O usuário não autorizou essa ação. Não tente de novo sem ele pedir.".into());
         }
     }
-    let (app, name, input) = (app.clone(), name.to_string(), input.clone());
-    tauri::async_runtime::spawn_blocking(move || tools::execute(&app, &name, &input))
+    let (handle, name, input) = (app.clone(), name.to_string(), input.clone());
+    let result = tauri::async_runtime::spawn_blocking(move || tools::execute(&handle, &name, &input))
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())?;
+    if result.is_ok() {
+        life::award(app, "action", 1);
+    }
+    result
 }
 
 async fn read_stream(

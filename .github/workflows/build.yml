@@ -27,6 +27,9 @@ jobs:
         run: npm ci
 
       - name: Compilar app e gerar instaladores
+        # whisper.cpp (voz) usa o CMake e o LLVM que já vêm na imagem do Windows.
+        env:
+          LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
         run: npm run tauri build
 
       - name: Publicar instaladores

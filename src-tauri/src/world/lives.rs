@@ -1,4 +1,4 @@
-//! Avisa quando canais favoritos da Twitch ou do YouTube entram ao vivo.
+//! Avisa quando canais favoritos da Twitch, do YouTube ou da Kick entram ao vivo.
 //! Lê a página pública de cada canal a cada 2 minutos (sem chave de API).
 
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ const INTERVAL: Duration = Duration::from_secs(120);
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Channel {
-    /// "twitch" ou "youtube"
+    /// "twitch", "youtube" ou "kick"
     pub platform: String,
     /// Twitch: login ("gaules"). YouTube: "@handle" ou id do canal ("UC…").
     pub handle: String,
@@ -32,6 +32,7 @@ impl Channel {
     pub fn url(&self) -> String {
         match self.platform.as_str() {
             "twitch" => format!("https://www.twitch.tv/{}", self.handle),
+            "kick" => format!("https://kick.com/{}", self.handle),
             _ if self.handle.starts_with('@') => format!("https://www.youtube.com/{}/live", self.handle),
             _ => format!("https://www.youtube.com/channel/{}/live", self.handle),
         }
@@ -91,8 +92,39 @@ fn parse(platform: &str, input: &str) -> Result<Channel, String> {
             let bare = handle.trim_start_matches('@');
             valid(bare).then(|| Channel { platform: "youtube".into(), handle }).ok_or("Canal do YouTube inválido. Use o @nome ou o link.".into())
         }
+        "kick" => {
+            let slug = input.rsplit('/').next().unwrap_or(input).trim_start_matches('@').to_lowercase();
+            valid(&slug).then(|| Channel { platform: "kick".into(), handle: slug }).ok_or("Nome de canal da Kick inválido.".into())
+        }
         _ => Err("Plataforma não suportada.".into()),
     }
+}
+
+pub fn platform_name(platform: &str) -> &'static str {
+    match platform {
+        "twitch" => "Twitch",
+        "kick" => "Kick",
+        _ => "YouTube",
+    }
+}
+
+/// Kick: a API pública do site devolve {"data": null} fora do ar e o título da live quando ao vivo.
+async fn kick_status(client: &reqwest::Client, slug: &str) -> Result<(bool, Option<String>), String> {
+    let response = client
+        .get(format!("https://kick.com/api/v2/channels/{slug}/livestream"))
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| format!("Sem conexão: {e}"))?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err("Canal não encontrado na Kick.".into());
+    }
+    if !response.status().is_success() {
+        return Err(format!("A Kick respondeu {}.", response.status().as_u16()));
+    }
+    let body: Value = response.json().await.map_err(|_| "Resposta inesperada da Kick.".to_string())?;
+    let data = &body["data"];
+    Ok((!data.is_null(), data["session_title"].as_str().map(String::from)))
 }
 
 /// Twitch: dados estruturados da página (BroadcastEvent com isLiveBroadcast) e o título da live.
@@ -121,6 +153,9 @@ fn youtube_status(html: &str) -> (bool, Option<String>) {
 }
 
 async fn check(client: &reqwest::Client, channel: &Channel) -> Result<(bool, Option<String>), String> {
+    if channel.platform == "kick" {
+        return kick_status(client, &channel.handle).await;
+    }
     let html = client
         .get(channel.url())
         .header("Accept-Language", "pt-BR,pt;q=0.9")
@@ -161,7 +196,7 @@ pub async fn check_all(app: &AppHandle) {
         if became_live {
             let title = app.state::<AppState>().lives.lock().unwrap().get(&channel.key()).and_then(|s| s.title.clone());
             let name = channel.handle.trim_start_matches('@');
-            let platform = if channel.platform == "twitch" { "Twitch" } else { "YouTube" };
+            let platform = platform_name(&channel.platform);
             let body = match title {
                 Some(t) => format!("{name} entrou ao vivo na {platform}: {t}"),
                 None => format!("{name} entrou ao vivo na {platform}."),

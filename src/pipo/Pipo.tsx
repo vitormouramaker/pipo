@@ -11,6 +11,9 @@ export const PIPO_STATES = [
   "focused",
   "gaming",
   "sleep",
+  "listening",
+  "speaking",
+  "levelup",
 ] as const;
 export type PipoState = (typeof PIPO_STATES)[number];
 
@@ -83,7 +86,7 @@ function arcs(up: boolean, color: string) {
   ));
 }
 
-type Look = { eyes: ReactNode; back?: ReactNode; badge?: ReactNode; blinks?: boolean };
+type Look = { eyes: ReactNode; back?: ReactNode; badge?: ReactNode; blinks?: boolean; gaze?: boolean };
 
 function look(state: PipoState): Look {
   switch (state) {
@@ -155,6 +158,46 @@ function look(state: PipoState): Look {
           </g>
         ),
       };
+    case "listening":
+      return {
+        blinks: false,
+        gaze: false,
+        eyes: [EL, ER].map((x) => (
+          <g key={x} className="listen">
+            <Pill x={x - 11} y={EY} w={7} h={18} color={C.eye} />
+            <Pill x={x} y={EY} w={7} h={30} color={C.eye} />
+            <Pill x={x + 11} y={EY} w={7} h={18} color={C.eye} />
+          </g>
+        )),
+        badge: (
+          <g fill="none" stroke={C.eye} strokeWidth="4" strokeLinecap="round">
+            <rect x="172" y="0" width="12" height="20" rx="6" fill={C.eye} stroke="none" />
+            <path d="M166 14 a12 12 0 0 0 24 0 M178 26 v5" />
+          </g>
+        ),
+      };
+    case "speaking":
+      return {
+        eyes: pair(13, 32, C.eye),
+        badge: (
+          <g className="pulse" fill="none" stroke={C.eye} strokeWidth="4" strokeLinecap="round">
+            <path d="M168 8 a10 10 0 0 1 0 16" />
+            <path d="M178 2 a18 18 0 0 1 0 28" />
+          </g>
+        ),
+      };
+    case "levelup":
+      return {
+        blinks: false,
+        gaze: false,
+        eyes: arcs(true, C.eye),
+        badge: (
+          <path
+            d="M178 0 l5 10 11 1.5 -8 7.5 2 11 -10 -5.5 -10 5.5 2 -11 -8 -7.5 11 -1.5z"
+            fill={C.warn}
+          />
+        ),
+      };
     case "sleep":
       return {
         blinks: false,
@@ -189,13 +232,74 @@ function useBlink(enabled: boolean) {
   return enabled && closed;
 }
 
-export function Pipo({ state }: { state: PipoState }) {
+// Borda do corpo em cada estágio de evolução (Alpha, Beta, Release, LTS).
+const RIMS = [
+  { stroke: C.edge, width: 1, opacity: 1 },
+  { stroke: "#56606C", width: 2, opacity: 1 },
+  { stroke: C.eye, width: 2, opacity: 0.55 },
+  { stroke: C.warn, width: 2.5, opacity: 0.75 },
+];
+
+// Acessórios liberados por nível. "behind" fica atrás do corpo (só aparece o que sobra fora dele).
+function accessory(id: string, part: "behind" | "front") {
+  switch (id) {
+    case "antenna":
+      return part === "front" ? (
+        <g key={id}>
+          <path d="M100 27 V10" stroke="#56606C" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="100" cy="7" r="6" fill={C.eye} />
+        </g>
+      ) : null;
+    case "headset":
+      return part === "behind" ? (
+        <path key={id} d="M8 92 C8 -12 192 -12 192 92" fill="none" stroke="#3A3F47" strokeWidth="7" strokeLinecap="round" />
+      ) : (
+        <g key={id}>
+          <rect x="-2" y="78" width="18" height="46" rx="8" fill="#2C2F35" stroke={C.edge} strokeWidth="1.5" />
+          <rect x="184" y="78" width="18" height="46" rx="8" fill="#2C2F35" stroke={C.edge} strokeWidth="1.5" />
+          <rect x="4" y="90" width="4" height="22" rx="2" fill={C.eye} opacity="0.8" />
+          <rect x="192" y="90" width="4" height="22" rx="2" fill={C.eye} opacity="0.8" />
+        </g>
+      );
+    case "bowtie":
+      return part === "front" ? (
+        <g key={id} fill={C.eye}>
+          <path d="M100 178 L80 166 Q76 178 80 190 Z" />
+          <path d="M100 178 L120 166 Q124 178 120 190 Z" />
+          <rect x="93" y="171" width="14" height="14" rx="4" fill="#1F9FB0" />
+        </g>
+      ) : null;
+    case "crown":
+      return part === "front" ? (
+        <path key={id} d="M24 30 L27 12 L36 21 L43 8 L50 21 L59 12 L62 30 Z" fill={C.warn} stroke="#C48A2C" strokeWidth="1.5" strokeLinejoin="round" />
+      ) : null;
+    default:
+      return null;
+  }
+}
+
+type PipoProps = {
+  state: PipoState;
+  /** Direção do olhar, de -4 a 4 em cada eixo. */
+  gaze?: [number, number];
+  stage?: number;
+  accessories?: string[];
+};
+
+export function Pipo({ state, gaze = [0, 0], stage = 0, accessories = [] }: PipoProps) {
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const l = look(state);
   const blinking = useBlink(l.blinks !== false);
+  const rim = RIMS[Math.min(Math.max(stage, 0), RIMS.length - 1)];
+  const [gx, gy] = l.gaze === false ? [0, 0] : gaze;
 
   return (
-    <svg viewBox="0 0 200 200" className="pipo" role="img" aria-label={`Pipo: ${state}`}>
+    <svg
+      viewBox="0 0 200 200"
+      className={state === "levelup" ? "pipo hop" : "pipo"}
+      role="img"
+      aria-label={`Pipo: ${state}`}
+    >
       <defs>
         <linearGradient id={`${id}g`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={C.top} />
@@ -203,10 +307,14 @@ export function Pipo({ state }: { state: PipoState }) {
         </linearGradient>
       </defs>
       {l.back}
+      {accessories.map((a) => accessory(a, "behind"))}
       <g>
-        <path d={BODY} fill={`url(#${id}g)`} stroke={C.edge} strokeWidth="1" />
-        <g className={blinking ? "eyes blinking" : "eyes"}>{l.eyes}</g>
+        <path d={BODY} fill={`url(#${id}g)`} stroke={rim.stroke} strokeWidth={rim.width} strokeOpacity={rim.opacity} />
+        <g className="gaze" style={{ transform: `translate(${gx * 2}px, ${gy * 1.5}px)` }}>
+          <g className={blinking ? "eyes blinking" : "eyes"}>{l.eyes}</g>
+        </g>
       </g>
+      {accessories.map((a) => accessory(a, "front"))}
       {l.badge}
     </svg>
   );

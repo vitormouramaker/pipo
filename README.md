@@ -2,7 +2,7 @@
 
 Bichinho virtual de desktop para Windows 11. Um personagem minimalista e tecnológico, intelectual e com um leve toque de sarcasmo, que flutua na tela e ajuda no dia a dia com atalhos, dicas e tarefas: desenvolvimento, documentos, jogos, lives e notícias.
 
-> Projeto pessoal. Fases 1 (MVP), 2 (sensores) e 3 (ações) concluídas: Pipo flutuante, chat com a Claude API que age no computador (com confirmação), gastos por conversa, modo jogo, hardware, área de transferência, projetos, scripts, Git, portas, Docker, jogos, rotinas, notas, lembretes, pomodoro e OCR. Fase 4 (mundo externo) concluída: pesquisa na web com fontes, briefing diário e avisos de lives. Próxima etapa: Fase 5 (voz, XP e evolução).
+> Projeto pessoal. Fases 1 (MVP), 2 (sensores) e 3 (ações) concluídas: Pipo flutuante, chat com a Claude API que age no computador (com confirmação), gastos por conversa, modo jogo, hardware, área de transferência, projetos, scripts, Git, portas, Docker, jogos, rotinas, notas, lembretes, pomodoro e OCR. Fase 4 (mundo externo) concluída: pesquisa na web com fontes, briefing diário e avisos de lives. Fase 5 (vida) concluída: comandos de voz com transcrição local (Whisper), respostas faladas, XP, níveis, evolução, acessórios, conquistas e olhos que seguem o mouse.
 
 ## Prévia
 
@@ -14,7 +14,15 @@ O plano completo está em [`docs/Pipo - Plano de Implementacao.docx`](docs/). El
 
 ## Como rodar
 
-Pré-requisitos no Windows: Node.js 22+, Rust (stable, via rustup), Visual Studio Build Tools com C++ e WebView2.
+Pré-requisitos no Windows: Node.js 22+, Rust (stable, via rustup), Visual Studio Build Tools 2022 com C++ (inclui CMake e Clang/LLVM) e WebView2.
+
+A voz usa o whisper.cpp, compilado com CMake e Clang. Se o `cmake` não estiver no PATH ou o Clang não for encontrado, aponte para os do Build Tools:
+
+```powershell
+$vs = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
+$env:PATH += ";$vs\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin"
+$env:LIBCLANG_PATH = "$vs\VC\Tools\Llvm\x64\bin"
+```
 
 ```bash
 npm install
@@ -26,17 +34,21 @@ npm run tauri build   # gera os instaladores em src-tauri/target/release/bundle/
 
 - **Clique no Pipo**: abre o menu radial (chat, área de transferência, sistema, gastos, configurações, ocultar). Quando você copia um erro ou um texto longo, aparece também um atalho para o Pipo explicar ou resumir.
 - **Ctrl + Alt + Shift + Espaço**: abre e fecha o chat.
-- **Arrastar**: move o Pipo, que para nas bordas da tela (e passa para outro monitor); a posição é lembrada.
+- **Ctrl + Alt + Shift + V**: fala com o Pipo (também pelo 🎙 do chat ou pelo menu dele). Ele ouve até você fazer uma pausa, transcreve no próprio computador e responde em voz alta.
+- **Ícone do Pipo no topo do painel**: nível, evolução, acessórios e conquistas.
+- **Arrastar**: move o Pipo, que para nas bordas da tela (e passa para outro monitor); a posição é lembrada. Com o painel aberto, Pipo e painel andam juntos (arrastando qualquer um dos dois).
 - **Botão direito no Pipo** ou **ícone na bandeja**: chat, configurações, ocultar o Pipo e sair.
 - **X** no canto do painel: fecha o painel.
 - **Histórico** (no topo do chat): todas as conversas anteriores; clique para reabrir ou exclua as que não quiser. **+ Nova conversa** guarda a atual no histórico.
 
-O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquanto responde, satisfeito quando termina e em alerta quando algo dá errado. Também fica focado depois de alguns minutos programando, dorme com o computador parado e some sozinho quando um jogo ou vídeo está em tela cheia (modo jogo).
+O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquanto responde, satisfeito quando termina e em alerta quando algo dá errado. Também fica focado depois de alguns minutos programando, dorme com o computador parado e some sozinho quando um jogo ou vídeo está em tela cheia no mesmo monitor que ele (modo jogo; janela maximizada não conta).
+
+**Evolução:** o Pipo ganha XP quando você conversa, pede ações, conclui pomodoros, pesquisa, usa a voz e aparece todo dia. A cada nível ele fica mais completo: estágios Alpha, Beta (nível 5), Release (10) e LTS (20), com borda própria e acessórios liberados (antena, fone, gravata-borboleta e coroa), que podem ser guardados.
 
 **Abas do painel:**
 
 - **Chat**: conversa com a IA, com histórico. Pesquisa na web quando a pergunta depende de informação atual, com as fontes clicáveis.
-- **Hoje**: briefing do dia (clima, notícias dos seus temas e lembretes; pode montar sozinho no horário), lives da Twitch e do YouTube com aviso quando entram ao vivo, e pesquisa rápida. O Pipo usa ferramentas para agir (rodar scripts, ver portas, commit, lembretes…); tudo o que muda algo no computador pede **Permitir/Negar** antes.
+- **Hoje**: briefing do dia (clima, notícias dos seus temas e lembretes; pode montar sozinho no horário), lives da Twitch, do YouTube e da Kick com aviso quando entram ao vivo, e pesquisa rápida. O Pipo usa ferramentas para agir (rodar scripts, ver portas, commit, lembretes…); tudo o que muda algo no computador pede **Permitir/Negar** antes.
 - **Ações**:
   - **Dev**: projetos recentes do VS Code/Cursor (abrir, terminal, scripts no terminal ou em segundo plano com aviso ao terminar, mensagem de commit pela IA), tarefas em execução, portas em uso (com encerrar) e containers do Docker.
   - **Foco**: pomodoro, lembretes, pausas para água e postura e notas rápidas.
@@ -68,7 +80,9 @@ src-tauri/        backend (Rust) e configuração do app
   src/clipboard.rs histórico da área de transferência
   src/tools.rs    ferramentas que a IA pode usar no chat
   src/actions/    projetos, tarefas, Git, portas, Docker, jogos, rotinas, arquivos, notas, foco e OCR
-  src/world/      lives (Twitch/YouTube) e briefing diário
+  src/world/      lives (Twitch/YouTube/Kick) e briefing diário
+  src/voice.rs    microfone e transcrição local (Whisper)
+  src/life.rs     XP, níveis, evolução e conquistas
   src/secrets.rs  chave no Gerenciador de Credenciais
   src/windows.rs  janelas, bandeja e atalhos
 assets/           prévia visual e ícone
@@ -93,8 +107,8 @@ docs/             plano de implementação
 | 2 | Sensores: janela ativa, modo jogo, hardware, humor reativo |
 | 3 | Ações: atalhos de dev, documentos, rotinas, lembretes, OCR |
 | 4 | Mundo externo: lives, notícias, briefing matinal |
-| 5 | Vida: voz, XP, evolução, acessórios |
+| 5 | Vida: voz, XP, evolução, acessórios (concluída) |
 
 ## Privacidade
 
-Os dados de contexto ficam no computador. A chave da API nunca entra no repositório: a pasta `api/` está no `.gitignore`, e o app guarda a chave no Gerenciador de Credenciais do Windows.
+Os dados de contexto ficam no computador. O microfone só abre quando você pede, e o áudio é transcrito localmente; só o texto vai para o chat. A chave da API nunca entra no repositório: a pasta `api/` está no `.gitignore`, e o app guarda a chave no Gerenciador de Credenciais do Windows.

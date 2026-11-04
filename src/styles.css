@@ -49,9 +49,34 @@ body,
   50% { opacity: 1; }
 }
 
+/* Fase 5: olhar segue o cursor, escuta (barras), subida de nível (pulinho) */
+.gaze {
+  transition: transform 180ms ease-out;
+}
+.listen rect {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: listen 0.9s ease-in-out infinite;
+}
+.listen rect:nth-child(2) { animation-delay: 0.15s; }
+.listen rect:nth-child(3) { animation-delay: 0.3s; }
+@keyframes listen {
+  0%, 100% { transform: scaleY(0.45); }
+  50% { transform: scaleY(1); }
+}
+.pipo.hop {
+  animation: hop 0.9s ease-out 2;
+}
+@keyframes hop {
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-8%); }
+  55% { transform: translateY(0); }
+  70% { transform: translateY(-3%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .dots circle, .pulse { animation: none; }
-  .eyes { transition: none; }
+  .dots circle, .pulse, .listen rect, .pipo.hop { animation: none; }
+  .eyes, .gaze { transition: none; }
 }
 
 /* Menu radial: a janela cresce em volta do Pipo e os botões aparecem em círculo */

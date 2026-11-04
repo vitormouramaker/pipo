@@ -11,7 +11,7 @@ use tauri::{
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 use crate::context::Category;
-use crate::{clipboard, AppState};
+use crate::{clipboard, sensors, AppState};
 
 pub const MAIN: &str = "main";
 pub const PANEL: &str = "panel";
@@ -50,7 +50,57 @@ fn panel(app: &AppHandle) -> tauri::Result<WebviewWindow> {
         .visible(false)
         .additional_browser_args(BROWSER_ARGS)
         .build()?;
+    // Arrastar o painel leva o Pipo junto.
+    let handle = app.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::Moved(p) = event {
+            panel_moved(&handle, *p);
+        }
+    });
     Ok(window)
+}
+
+fn panel_moved(app: &AppHandle, p: PhysicalPosition<i32>) {
+    let state = app.state::<AppState>();
+    if state.dragging.load(Ordering::SeqCst) || *state.panel_expected.lock().unwrap() == Some((p.x, p.y)) {
+        return; // movimento feito pelo próprio Pipo
+    }
+    let Some((dx, dy)) = *state.panel_offset.lock().unwrap() else { return };
+    move_pet_clamped(app, p.x - dx, p.y - dy, None);
+}
+
+fn set_panel_position(app: &AppHandle, panel: &WebviewWindow, x: i32, y: i32) {
+    *app.state::<AppState>().panel_expected.lock().unwrap() = Some((x, y));
+    let _ = panel.set_position(PhysicalPosition::new(x, y));
+}
+
+/// Guarda a distância atual entre painel e Pipo.
+fn remember_offset(app: &AppHandle, panel_pos: (i32, i32)) {
+    let Some(pet) = app.get_webview_window(MAIN).and_then(|w| w.outer_position().ok()) else { return };
+    *app.state::<AppState>().panel_offset.lock().unwrap() = Some((panel_pos.0 - pet.x, panel_pos.1 - pet.y));
+}
+
+/// O painel acompanha o Pipo; se não couber mais na tela daquele lado, troca de lado.
+fn follow_pet(app: &AppHandle) {
+    let Some(panel) = app.get_webview_window(PANEL).filter(|w| w.is_visible().unwrap_or(false)) else { return };
+    let Some((dx, dy)) = *app.state::<AppState>().panel_offset.lock().unwrap() else { return };
+    let (Some(pet), Ok(size)) = (app.get_webview_window(MAIN).and_then(|w| w.outer_position().ok()), panel.outer_size()) else {
+        return;
+    };
+    let (x, y) = (pet.x + dx, pet.y + dy);
+    let (w, h) = (size.width as i32, size.height as i32);
+    let fits = app.monitor_from_point((x + w / 2) as f64, (y + h / 2) as f64).ok().flatten().is_some_and(|m| {
+        let a = m.work_area();
+        x >= a.position.x
+            && y >= a.position.y
+            && x + w <= a.position.x + a.size.width as i32
+            && y + h <= a.position.y + a.size.height as i32
+    });
+    if fits {
+        set_panel_position(app, &panel, x, y);
+    } else {
+        place_panel(app, &panel);
+    }
 }
 
 /// Posiciona o painel ao lado do Pipo, dentro da área útil do monitor.
@@ -76,7 +126,8 @@ fn place_panel(app: &AppHandle, panel: &WebviewWindow) {
         (pet_pos.x + pet_size.width as i32 + gap).min(right - w)
     };
     let y = (pet_pos.y + pet_size.height as i32 - h).clamp(top, (bottom - h).max(top));
-    let _ = panel.set_position(PhysicalPosition::new(x, y));
+    set_panel_position(app, panel, x, y);
+    remember_offset(app, (x, y));
 }
 
 /// Margem transparente fixa (px lógicos) em volta do Pipo, onde aparecem os botões
@@ -103,8 +154,10 @@ fn body_insets(size: PhysicalSize<u32>, scale: f64) -> (f64, f64) {
 fn move_pet_clamped(app: &AppHandle, x: i32, y: i32, cursor: Option<PhysicalPosition<f64>>) {
     let Some(pet) = app.get_webview_window(MAIN) else { return };
     let Ok(size) = pet.outer_size() else { return };
+    let center = ((x + size.width as i32 / 2) as f64, (y + size.height as i32 / 2) as f64);
     let monitor = cursor
         .and_then(|c| app.monitor_from_point(c.x, c.y).ok().flatten())
+        .or_else(|| app.monitor_from_point(center.0, center.1).ok().flatten())
         .or_else(|| pet.current_monitor().ok().flatten())
         .or_else(|| pet.primary_monitor().ok().flatten());
     let Some(monitor) = monitor else { return };
@@ -129,6 +182,9 @@ pub fn clamp_pet(app: &AppHandle) {
 }
 
 pub fn show_panel(app: &AppHandle, view: Option<&str>) {
+    // O painel nunca aparece sem o Pipo.
+    sensors::user_wants_pet(app);
+    show_pet(app);
     let Ok(window) = panel(app) else { return };
     place_panel(app, &window);
     let _ = window.show();
@@ -145,6 +201,7 @@ pub fn hide_panel(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(PANEL) {
         let _ = window.hide();
     }
+    *app.state::<AppState>().panel_offset.lock().unwrap() = None;
     if !app.state::<AppState>().busy.load(Ordering::SeqCst) {
         set_pet_state(app, "clear");
     }
@@ -161,8 +218,18 @@ pub fn hide_pet_for_game(app: &AppHandle) -> bool {
 
 pub fn show_pet(app: &AppHandle) {
     if let Some(pet) = app.get_webview_window(MAIN) {
-        let _ = pet.show();
+        if !pet.is_visible().unwrap_or(false) {
+            let _ = pet.show();
+            clamp_pet(app);
+        }
     }
+}
+
+/// O centro do Pipo está dentro do retângulo (esquerda, topo, direita, base) em px físicos.
+pub fn pet_inside(app: &AppHandle, (left, top, right, bottom): (i32, i32, i32, i32)) -> bool {
+    let Some((pos, size, _)) = *app.state::<AppState>().pet_frame.lock().unwrap() else { return true };
+    let (cx, cy) = (pos.x + size.width as i32 / 2, pos.y + size.height as i32 / 2);
+    cx >= left && cx < right && cy >= top && cy < bottom
 }
 
 pub fn toggle_panel(app: &AppHandle) {
@@ -180,9 +247,12 @@ pub fn toggle_panel(app: &AppHandle) {
 pub fn toggle_pet(app: &AppHandle) {
     if let Some(pet) = app.get_webview_window(MAIN) {
         if pet.is_visible().unwrap_or(true) {
+            close_radial(app);
+            hide_panel(app);
             let _ = pet.hide();
         } else {
-            let _ = pet.show();
+            sensors::user_wants_pet(app);
+            show_pet(app);
         }
     }
 }
@@ -274,6 +344,7 @@ pub fn pet_drag_start(app: AppHandle) {
                 let y = window.y + (now.y - cursor.y).round() as i32;
                 if (x, y) != (last.x, last.y) {
                     move_pet_clamped(&app, x, y, Some(now));
+                    follow_pet(&app);
                     last = PhysicalPosition::new(x, y);
                 }
             }
@@ -330,15 +401,44 @@ pub fn track_pet_frame(app: &AppHandle) {
     });
 }
 
+/// Para onde os olhos olham: direção do cursor em passos de 1/4, de -1 a 1.
+fn gaze(pos: PhysicalPosition<i32>, size: PhysicalSize<u32>, cursor: (f64, f64)) -> (i8, i8) {
+    let (cx, cy) = (pos.x as f64 + size.width as f64 / 2.0, pos.y as f64 + size.height as f64 / 2.0);
+    let (dx, dy) = (cursor.0 - cx, cursor.1 - cy);
+    let dist = dx.hypot(dy);
+    // Cursor em cima do Pipo: olha para a frente.
+    if dist < size.width as f64 * 0.3 {
+        return (0, 0);
+    }
+    // Quanto mais longe, mais os olhos vão para o canto (satura a ~600 px).
+    let reach = (dist / 600.0).min(1.0).max(0.35);
+    let q = |v: f64| ((v / dist) * reach * 4.0).round() as i8;
+    (q(dx), q(dy))
+}
+
 /// A margem transparente não pode bloquear cliques nos apps de trás: a janela só
 /// recebe o mouse com o cursor sobre o corpo do Pipo, durante o arrasto ou com o menu aberto.
+/// O mesmo laço avisa a direção do cursor para os olhos do Pipo o seguirem.
 pub fn start_hit_test(app: AppHandle) {
     std::thread::spawn(move || {
         let mut interactive: Option<bool> = None;
+        let mut last_gaze = (0i8, 0i8);
+        let mut last_emit = std::time::Instant::now();
         loop {
             std::thread::sleep(Duration::from_millis(40));
             let state = app.state::<AppState>();
             let Some((pos, size, scale)) = *state.pet_frame.lock().unwrap() else { continue };
+            let follow = state.settings.lock().unwrap().follow_cursor;
+            let looking = follow && !state.dragging.load(Ordering::SeqCst) && !state.radial_open.load(Ordering::SeqCst);
+            let target = match (looking, cursor_point()) {
+                (true, Some(c)) => gaze(pos, size, c),
+                _ => (0, 0),
+            };
+            if target != last_gaze && last_emit.elapsed() >= Duration::from_millis(120) {
+                last_gaze = target;
+                last_emit = std::time::Instant::now();
+                let _ = app.emit_to(MAIN, "pipo-gaze", [target.0, target.1]);
+            }
             let want = state.radial_open.load(Ordering::SeqCst)
                 || state.dragging.load(Ordering::SeqCst)
                 || cursor_point().is_some_and(|(x, y)| {
@@ -447,6 +547,14 @@ pub fn radial_open(app: AppHandle) -> Result<RadialLayout, String> {
 #[tauri::command]
 pub fn radial_close(app: AppHandle) {
     close_radial(&app);
+}
+
+/// Expressão pedida pela interface (ex.: "speaking" enquanto lê a resposta em voz alta).
+#[tauri::command]
+pub fn pet_express(app: AppHandle, state: String) {
+    if matches!(state.as_str(), "speaking" | "clear") {
+        set_pet_state(&app, &state);
+    }
 }
 
 #[tauri::command]

@@ -3,12 +3,14 @@ mod chat;
 mod clipboard;
 mod context;
 mod db;
+mod life;
 mod hardware;
 mod secrets;
 mod sensors;
 mod settings;
 mod tools;
 mod usage;
+mod voice;
 mod windows;
 mod world;
 
@@ -30,8 +32,12 @@ pub struct AppState {
     pub radial_open: AtomicBool,
     /// Posição, tamanho e escala da janela do Pipo (atualizados a cada mudança).
     pub pet_frame: Mutex<Option<(PhysicalPosition<i32>, PhysicalSize<u32>, f64)>>,
-    /// Texto pronto esperando o chat abrir.
-    pub prefill: Mutex<Option<String>>,
+    /// Texto pronto esperando o chat abrir (e se deve começar uma conversa nova).
+    pub prefill: Mutex<Option<(String, bool, bool)>>,
+    /// Distância (px físicos) do painel até a janela do Pipo: os dois andam juntos.
+    pub panel_offset: Mutex<Option<(i32, i32)>>,
+    /// Última posição em que o próprio Pipo colocou o painel (para ignorar o eco desse movimento).
+    pub panel_expected: Mutex<Option<(i32, i32)>>,
     /// Fase 3: tarefas em segundo plano, foco (pomodoro/pausas) e OCR.
     pub jobs: Mutex<actions::jobs::Jobs>,
     pub focus: Mutex<actions::focus::FocusState>,
@@ -68,8 +74,14 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_handler(|app, _shortcut, event| {
-                    if event.state() == ShortcutState::Pressed {
+                .with_handler(|app, shortcut, event| {
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    let voice = app.state::<AppState>().settings.lock().unwrap().voice_shortcut.clone();
+                    if voice.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|v| v == *shortcut) {
+                        voice::toggle(app);
+                    } else {
                         windows::toggle_panel(app);
                     }
                 })
@@ -89,6 +101,8 @@ pub fn run() {
                 radial_open: AtomicBool::new(false),
                 pet_frame: Mutex::new(None),
                 prefill: Mutex::new(None),
+                panel_offset: Mutex::new(None),
+                panel_expected: Mutex::new(None),
                 jobs: Mutex::new(Default::default()),
                 focus: Mutex::new(Default::default()),
                 ocr_busy: AtomicBool::new(false),
@@ -153,6 +167,12 @@ pub fn run() {
             actions::focus::pomodoro_stop,
             actions::ocr::ocr_start,
             world::open_url,
+            life::life_status,
+            voice::voice_status,
+            voice::voice_download,
+            voice::voice_toggle,
+            windows::pet_express,
+            world::detect_city,
             world::lives::lives_list,
             world::lives::live_add,
             world::lives::live_remove,

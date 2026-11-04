@@ -1,5 +1,91 @@
 import { useEffect, useState } from "react";
-import { api, MODELS, type Settings } from "../api";
+import { listen } from "@tauri-apps/api/event";
+import { api, MODELS, type Settings, type VoiceStatus } from "../api";
+import { loadVoices, speak } from "./speech";
+
+const VOICE_MODELS = [
+  { value: "base", label: "Rápido (142 MB)" },
+  { value: "small", label: "Mais preciso (466 MB, mais lento)" },
+] as const;
+
+function VoiceSettings({ settings, update }: { settings: Settings; update: (patch: Partial<Settings>) => void }) {
+  const [status, setStatus] = useState<VoiceStatus | null>(null);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const refresh = () => void api.voiceStatus(settings.voiceModel).then(setStatus);
+
+  useEffect(() => {
+    void loadVoices().then(setVoices);
+  }, []);
+  useEffect(() => {
+    refresh();
+    const unlisten = listen("voice-download", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, [settings.voiceModel]);
+
+  const download = () => {
+    setError(null);
+    void api
+      .voiceDownload(settings.voiceModel)
+      .catch((e) => setError(String(e)))
+      .finally(refresh);
+    window.setTimeout(refresh, 300);
+  };
+  const percent = status && status.total > 0 ? Math.floor((100 * status.downloaded) / status.total) : 0;
+
+  return (
+    <fieldset>
+      <legend>Voz</legend>
+      <p className="hint">
+        Fale com o Pipo pelo atalho, pelo botão 🎙 do chat ou pelo menu dele. O áudio é transcrito aqui no computador
+        (Whisper) e não é enviado para lugar nenhum; só o texto vai para o chat.
+      </p>
+      {status && !status.hasMicrophone && <p className="hint">Nenhum microfone encontrado.</p>}
+      <label>
+        Modelo de transcrição
+        <select value={settings.voiceModel} onChange={(e) => update({ voiceModel: e.target.value as Settings["voiceModel"] })}>
+          {VOICE_MODELS.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="row">
+        {status?.modelReady ? (
+          <span className="hint">Modelo baixado e pronto.</span>
+        ) : status?.downloading ? (
+          <span className="hint">Baixando… {percent}%</span>
+        ) : (
+          <button onClick={download}>Baixar modelo de voz</button>
+        )}
+      </div>
+      {error && <p className="hint">{error}</p>}
+      <label>
+        Atalho para falar
+        <input value={settings.voiceShortcut} onChange={(e) => update({ voiceShortcut: e.target.value })} />
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={settings.speakReplies} onChange={(e) => update({ speakReplies: e.target.checked })} />
+        Ler em voz alta as respostas de perguntas feitas por voz
+      </label>
+      <label>
+        Voz do Pipo
+        <div className="inline-form">
+          <select className="grow" value={settings.voiceName} onChange={(e) => update({ voiceName: e.target.value })}>
+            <option value="">Automática (português)</option>
+            {voices.map((v) => (
+              <option key={v.name} value={v.name}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+          <button onClick={() => void speak("Olá! Eu sou o Pipo. É assim que eu falo.", settings.voiceName)}>Testar</button>
+        </div>
+      </label>
+    </fieldset>
+  );
+}
 
 const SARCASM_LABELS = ["Nenhum", "Leve", "Moderado", "Ácido"];
 const SIZES = [
@@ -14,6 +100,7 @@ type Status = { kind: "ok" | "error"; text: string } | null;
 export default function SettingsView({ onKeyChange }: { onKeyChange: () => void }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [hasKey, setHasKey] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [keyInput, setKeyInput] = useState("");
   const [status, setStatus] = useState<Status>(null);
 
@@ -121,6 +208,30 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
       </fieldset>
 
       <fieldset>
+        <legend>Localização</legend>
+        <label>
+          Sua cidade
+          <div className="inline-form">
+            <input className="grow" placeholder="ex.: São Paulo" value={settings.city} onChange={(e) => update({ city: e.target.value })} />
+            <button
+              disabled={detecting}
+              onClick={() => {
+                setDetecting(true);
+                void api
+                  .detectCity()
+                  .then((city) => update({ city }))
+                  .catch(() => undefined)
+                  .finally(() => setDetecting(false));
+              }}
+            >
+              {detecting ? "Detectando…" : "Detectar"}
+            </button>
+          </div>
+        </label>
+        <p className="hint">Usada quando você pergunta algo como "como está o clima aqui?" e no briefing. "Detectar" estima pela sua conexão (consulta o ipwho.is).</p>
+      </fieldset>
+
+      <fieldset>
         <legend>Internet</legend>
         <label className="check">
           <input type="checkbox" checked={settings.webSearch} onChange={(e) => update({ webSearch: e.target.checked })} />
@@ -153,6 +264,17 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           />
           Iniciar com o Windows
         </label>
+      </fieldset>
+
+      <VoiceSettings settings={settings} update={update} />
+
+      <fieldset>
+        <legend>Aparência</legend>
+        <label className="check">
+          <input type="checkbox" checked={settings.followCursor} onChange={(e) => update({ followCursor: e.target.checked })} />
+          Olhos do Pipo seguem o mouse
+        </label>
+        <p className="hint">Acessórios e evolução ficam na aba do Pipo (clique no ícone dele no topo).</p>
       </fieldset>
 
       <fieldset>

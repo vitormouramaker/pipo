@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { Menu, PredefinedMenuItem } from "@tauri-apps/api/menu";
-import { api, type PanelView, type RadialLayout } from "../api";
+import { api, wornAccessories, type LifeStatus, type PanelView, type RadialLayout, type Settings } from "../api";
 import { Pipo, PIPO_STATES, type PipoState } from "../pipo/Pipo";
 
 // Até quantos pixels de movimento ainda conta como clique (e não arrasto).
 const CLICK_TOLERANCE = 4;
 // Expressões passageiras voltam sozinhas ao humor de base.
-const TRANSIENT: Partial<Record<PipoState, number>> = { done: 2500, alert: 6000 };
+const TRANSIENT: Partial<Record<PipoState, number>> = { done: 2500, alert: 6000, levelup: 3500 };
 // Espaço mínimo entre dois botões do menu radial, em graus.
 const MIN_SPACING = 34;
 
@@ -40,6 +40,7 @@ const ICONS = {
   settings: icon(<><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" /></>),
   spark: icon(<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />),
   hide: icon(<><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z" /><path d="M4 20 20 4" /></>),
+  mic: icon(<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>),
 };
 
 type Item = { id: string; label: string; icon: ReactNode; action: () => void };
@@ -67,7 +68,24 @@ export default function PetApp() {
   const [base, setBase] = useState<PipoState>("idle");
   const [override, setOverride] = useState<PipoState | null>(null);
   const [radial, setRadial] = useState<RadialLayout | null>(null);
+  const [gaze, setGaze] = useState<[number, number]>([0, 0]);
+  const [life, setLife] = useState<LifeStatus | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const press = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const refreshLife = () => void api.lifeStatus().then(setLife);
+    refreshLife();
+    void api.getSettings().then(setSettings);
+    const unlistenGaze = listen<[number, number]>("pipo-gaze", (e) => setGaze(e.payload));
+    const unlistenLife = listen("life-changed", refreshLife);
+    const unlistenSettings = listen<Settings>("settings-changed", (e) => setSettings(e.payload));
+    return () => {
+      void unlistenGaze.then((fn) => fn());
+      void unlistenLife.then((fn) => fn());
+      void unlistenSettings.then((fn) => fn());
+    };
+  }, []);
 
   useEffect(() => {
     const unlistenBase = listen<string>("pipo-base", (e) => {
@@ -115,6 +133,7 @@ export default function PetApp() {
   const items: Item[] = radial
     ? [
         { id: "chat", label: "Chat", icon: ICONS.chat, action: open("chat") },
+        { id: "mic", label: "Falar com o Pipo", icon: ICONS.mic, action: () => void api.voiceToggle() },
         ...(suggestion
           ? [{ id: "spark", label: suggestion.label, icon: ICONS.spark, action: () => void api.chatPrefill(suggestion.prompt) }]
           : []),
@@ -157,7 +176,12 @@ export default function PetApp() {
           else void api.radialOpen().then(setRadial);
         }}
       >
-        <Pipo state={state} />
+        <Pipo
+          state={state}
+          gaze={state === "sleep" || state === "gaming" ? [0, 0] : gaze}
+          stage={life?.stage ?? 0}
+          accessories={wornAccessories(life, settings)}
+        />
       </div>
 
       {radial &&

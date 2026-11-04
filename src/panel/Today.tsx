@@ -92,8 +92,8 @@ function BriefingCard() {
               <input value={settings.briefingTopics} onChange={(e) => save({ briefingTopics: e.target.value })} />
             </label>
             <label>
-              Cidade para o clima (opcional)
-              <input placeholder="ex.: São Paulo" value={settings.briefingCity} onChange={(e) => save({ briefingCity: e.target.value })} />
+              Sua cidade (para o clima)
+              <input placeholder="ex.: São Paulo" value={settings.city} onChange={(e) => save({ city: e.target.value })} />
             </label>
             <p className="hint">Cada briefing usa algumas buscas na web: custa por volta de US$ 0,05 a 0,10. Aparece em Gastos.</p>
           </div>
@@ -127,9 +127,11 @@ function BriefingCard() {
   );
 }
 
+const PLATFORMS: Record<LiveChannel["platform"], string> = { twitch: "Twitch", youtube: "YouTube", kick: "Kick" };
+
 function Lives() {
   const [channels, setChannels] = useState<LiveChannel[]>([]);
-  const [platform, setPlatform] = useState<"twitch" | "youtube">("twitch");
+  const [platform, setPlatform] = useState<LiveChannel["platform"]>("twitch");
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -164,13 +166,14 @@ function Lives() {
         </button>
       </div>
       <div className="inline-form">
-        <select value={platform} onChange={(e) => setPlatform(e.target.value as "twitch" | "youtube")}>
+        <select value={platform} onChange={(e) => setPlatform(e.target.value as LiveChannel["platform"])}>
           <option value="twitch">Twitch</option>
           <option value="youtube">YouTube</option>
+          <option value="kick">Kick</option>
         </select>
         <input
           className="grow"
-          placeholder={platform === "twitch" ? "nome do canal ou link" : "@canal ou link"}
+          placeholder={platform === "youtube" ? "@canal ou link" : "nome do canal ou link"}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && input.trim() && add()}
@@ -189,7 +192,7 @@ function Lives() {
             <span className="grow live-title" title={c.title ?? undefined}>
               {c.error ? c.error : c.live ? c.title ?? "ao vivo" : c.live === false ? "offline" : "verificando…"}
             </span>
-            <span className="row-meta">{c.platform === "twitch" ? "Twitch" : "YouTube"}</span>
+            <span className="row-meta">{PLATFORMS[c.platform]}</span>
             {c.live && (
               <button className="link" onClick={() => void api.openUrl(c.url)}>
                 ▶ Assistir

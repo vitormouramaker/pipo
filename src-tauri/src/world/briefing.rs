@@ -69,10 +69,10 @@ fn prompt(app: &AppHandle) -> String {
         .filter(|r| !r.due.contains('/')) // só os de hoje (os outros vêm com a data)
         .map(|r| format!("{} — {}", r.due, r.text))
         .collect();
-    let weather = if settings.briefing_city.trim().is_empty() {
+    let weather = if settings.city.trim().is_empty() {
         String::new()
     } else {
-        format!("## Clima\nPrevisão de hoje para {}: temperatura mínima e máxima e chance de chuva, em uma linha.\n\n", settings.briefing_city.trim())
+        format!("## Clima\nPrevisão de hoje para {}: temperatura mínima e máxima e chance de chuva, em uma linha.\n\n", settings.city.trim())
     };
     let day = if reminders.is_empty() { "Sem lembretes para hoje.".to_string() } else { reminders.join("\n") };
     format!(
@@ -92,6 +92,9 @@ pub async fn generate(app: &AppHandle) -> Result<Briefing, String> {
     }
     let result = run(app).await;
     RUNNING.store(false, Ordering::SeqCst);
+    if result.is_ok() {
+        crate::life::award(app, "briefing", 1);
+    }
     let _ = app.emit("briefing-changed", ());
     result
 }
@@ -114,7 +117,7 @@ async fn run(app: &AppHandle) -> Result<Briefing, String> {
             "max_tokens": 8000,
             "output_config": { "effort": "low" },
             "system": "Você é o Pipo, assistente de desktop. Escreva briefings curtos, objetivos e em português do Brasil.",
-            "tools": chat::web_tools(&settings.model, &settings.briefing_city, 8),
+            "tools": chat::web_tools(&settings.model, &settings.city, 8),
             "messages": messages,
         });
         let mut request = client

@@ -1,0 +1,4 @@
+# O whisper.cpp (voz, Fase 5) é compilado com CMake. O CMake do Visual Studio 2022
+# não conhece o gerador do VS 2026 que o crate `cmake` tenta usar por padrão.
+[env]
+CMAKE_GENERATOR = "Visual Studio 17 2022"

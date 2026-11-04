@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type ChatMessage, type Conversation } from "../api";
+import { api, type ChatMessage, type Conversation, type VoiceState } from "../api";
+import { speak, stopSpeaking } from "./speech";
 import { sqliteDate } from "../format";
 
 type Props = {
@@ -36,6 +37,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<Conversation[] | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [voice, setVoice] = useState<VoiceState>({ phase: "idle", message: null });
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -46,15 +48,20 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     inputRef.current?.focus();
     // Texto pronto vindo do menu do Pipo: pode ter chegado antes deste painel existir.
     const takePrefill = () =>
-      void api.chatTakePrefill().then((text) => {
-        if (text) void sendText(text);
+      void api.chatTakePrefill().then((prefill) => {
+        if (!prefill) return;
+        if (prefill.fresh) setMessages([]);
+        void sendText(prefill.text, prefill.voice);
       });
     takePrefill();
     const unlistenView = listen("panel-view", () => inputRef.current?.focus());
     const unlistenPrefill = listen("chat-prefill", takePrefill);
+    const unlistenVoice = listen<VoiceState>("voice-state", (e) => setVoice(e.payload));
     return () => {
       void unlistenView.then((fn) => fn());
       void unlistenPrefill.then((fn) => fn());
+      void unlistenVoice.then((fn) => fn());
+      stopSpeaking();
     };
   }, []);
 
@@ -76,8 +83,10 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     void sendText(text);
   };
 
-  const sendText = async (text: string) => {
+  const sendText = async (text: string, spoken = false) => {
     if (busyRef.current) return;
+    stopSpeaking();
+    let reply = "";
     busyRef.current = true;
     setHistory(null);
     setError(null);
@@ -108,7 +117,10 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
       });
 
     await api.chatSend(text, (event) => {
-      if (event.type === "delta") appendText(event.text);
+      if (event.type === "delta") {
+        reply += event.text;
+        appendText(event.text);
+      }
       else if (event.type === "tool") pushStep({ role: "tool", text: event.label });
       else if (event.type === "confirm") pushStep({ role: "confirm", text: event.question, confirmId: event.id });
       else if (event.type === "source") addSource({ title: event.title, url: event.url });
@@ -121,6 +133,11 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     busyRef.current = false;
     setBusy(false);
     inputRef.current?.focus();
+    // Pergunta feita por voz: a resposta também pode ser falada.
+    if (spoken && reply.trim()) {
+      const settings = await api.getSettings();
+      if (settings.speakReplies) void speak(reply, settings.voiceName);
+    }
   };
 
   const decide = (id: string, approved: boolean) => {
@@ -270,7 +287,22 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
           }}
         />
         <div className="composer-row">
-          <span />
+          <span className={voice.phase === "error" ? "voice-status error" : "voice-status"}>
+            {voice.phase === "listening" && "Ouvindo… fale e faça uma pausa para enviar"}
+            {voice.phase === "transcribing" && "Transcrevendo…"}
+            {voice.phase === "error" && voice.message}
+          </span>
+          <button
+            className={voice.phase === "listening" ? "mic on" : "mic"}
+            title="Falar com o Pipo (o áudio é transcrito no computador)"
+            disabled={busy || voice.phase === "transcribing"}
+            onClick={() => {
+              stopSpeaking();
+              void api.voiceToggle();
+            }}
+          >
+            {voice.phase === "listening" ? "■ Parar" : "🎙"}
+          </button>
           <button className="primary" onClick={() => void send()} disabled={busy || !input.trim()}>
             {busy ? "Respondendo…" : "Enviar"}
           </button>

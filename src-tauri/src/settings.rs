@@ -31,8 +31,20 @@ pub struct Settings {
     /// "HH:MM"
     pub briefing_time: String,
     pub briefing_topics: String,
-    /// Cidade para o clima do briefing (vazio = sem clima).
-    pub briefing_city: String,
+    /// Cidade do usuário: local padrão do chat, da busca e do clima do briefing.
+    #[serde(alias = "briefingCity")]
+    pub city: String,
+    /// Fase 5: voz, aparência e evolução.
+    /// "base" (rápido, 142 MB) ou "small" (mais preciso, 466 MB).
+    pub voice_model: String,
+    pub voice_shortcut: String,
+    /// Ler em voz alta as respostas de comandos de voz.
+    pub speak_replies: bool,
+    /// Nome da voz do Windows ("" = primeira voz em português).
+    pub voice_name: String,
+    pub follow_cursor: bool,
+    /// Acessórios liberados que o usuário preferiu não usar.
+    pub hidden_accessories: Vec<String>,
 }
 
 impl Default for Settings {
@@ -54,7 +66,13 @@ impl Default for Settings {
             briefing_enabled: false,
             briefing_time: "08:00".into(),
             briefing_topics: "tecnologia, games, inteligência artificial".into(),
-            briefing_city: String::new(),
+            city: String::new(),
+            voice_model: "base".into(),
+            voice_shortcut: "Ctrl+Alt+Shift+V".into(),
+            speak_replies: true,
+            voice_name: String::new(),
+            follow_cursor: true,
+            hidden_accessories: Vec::new(),
         }
     }
 }
@@ -65,19 +83,24 @@ pub fn load(db: &Db) -> Settings {
         .unwrap_or_default()
 }
 
-fn register_shortcut(app: &AppHandle, shortcut: &str) -> Result<(), String> {
+fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
-    gs.register(shortcut)
-        .map_err(|e| format!("Atalho inválido ou em uso por outro app ({shortcut}): {e}"))
+    gs.register(s.shortcut.as_str())
+        .map_err(|e| format!("Atalho inválido ou em uso por outro app ({}): {e}", s.shortcut))?;
+    if !s.voice_shortcut.trim().is_empty() {
+        gs.register(s.voice_shortcut.as_str())
+            .map_err(|e| format!("Atalho de voz inválido ou em uso por outro app ({}): {e}", s.voice_shortcut))?;
+    }
+    Ok(())
 }
 
 /// Aplica as configurações no sistema. Na inicialização `old` é `None`.
 pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<(), String> {
-    if old.map_or(true, |o| o.shortcut != new.shortcut) {
-        if let Err(e) = register_shortcut(app, &new.shortcut) {
+    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut) {
+        if let Err(e) = register_shortcuts(app, new) {
             if let Some(o) = old {
-                let _ = register_shortcut(app, &o.shortcut);
+                let _ = register_shortcuts(app, o);
             }
             return Err(e);
         }

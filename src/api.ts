@@ -17,14 +17,55 @@ export type Settings = {
   briefingEnabled: boolean;
   briefingTime: string;
   briefingTopics: string;
-  briefingCity: string;
+  city: string;
+  voiceModel: "base" | "small";
+  voiceShortcut: string;
+  speakReplies: boolean;
+  voiceName: string;
+  followCursor: boolean;
+  hiddenAccessories: string[];
 };
+
+export type LifeStatus = {
+  totalXp: number;
+  level: number;
+  levelXp: number;
+  levelNeed: number;
+  stage: number;
+  stageName: string;
+  stages: { name: string; fromLevel: number; detail: string }[];
+  accessories: { id: string; name: string; level: number; unlocked: boolean }[];
+  achievements: { id: string; title: string; detail: string; unlockedAt: string | null }[];
+  streak: number;
+  days: number;
+  since: string | null;
+  chats: number;
+  actions: number;
+  pomodoros: number;
+  searches: number;
+  voice: number;
+};
+
+export type VoiceStatus = {
+  model: string;
+  modelReady: boolean;
+  downloading: boolean;
+  downloaded: number;
+  total: number;
+  listening: boolean;
+  hasMicrophone: boolean;
+};
+export type VoiceState = { phase: "idle" | "listening" | "transcribing" | "error"; message: string | null };
+
+/** Acessórios em uso: os liberados que o usuário não escondeu. */
+export const wornAccessories = (life: LifeStatus | null, settings: Settings | null) =>
+  (life?.accessories ?? []).filter((a) => a.unlocked && !settings?.hiddenAccessories.includes(a.id)).map((a) => a.id);
 
 export type Source = { title: string; url: string };
 export type Briefing = { day: string; content: string; sources: Source[]; createdAt: string };
 export type LiveChannel = {
   key: string;
-  platform: "twitch" | "youtube";
+  platform: "twitch" | "youtube" | "kick";
   handle: string;
   url: string;
   live: boolean | null;
@@ -83,7 +124,7 @@ export type ChatEvent =
   | { type: "done"; stopReason: string | null }
   | { type: "error"; message: string };
 
-export type PanelView = "chat" | "today" | "actions" | "clipboard" | "system" | "usage" | "settings";
+export type PanelView = "pipo" | "chat" | "today" | "actions" | "clipboard" | "system" | "usage" | "settings";
 
 export type UsageSummary = {
   today: number;
@@ -144,8 +185,8 @@ export const api = {
   chatConversations: () => invoke<Conversation[]>("chat_conversations"),
   chatOpen: (id: number) => invoke<ChatMessage[]>("chat_open", { id }),
   chatDelete: (id: number) => invoke<void>("chat_delete", { id }),
-  chatPrefill: (text: string) => invoke<void>("chat_prefill", { text }),
-  chatTakePrefill: () => invoke<string | null>("chat_take_prefill"),
+  chatPrefill: (text: string, fresh = false) => invoke<void>("chat_prefill", { text, fresh }),
+  chatTakePrefill: () => invoke<{ text: string; fresh: boolean; voice: boolean } | null>("chat_take_prefill"),
   chatConfirm: (id: string, approved: boolean) => invoke<void>("chat_confirm", { id, approved }),
   projectsRecent: () => invoke<Project[]>("projects_recent"),
   projectDetails: (path: string) => invoke<ProjectInfo>("project_details", { path }),
@@ -178,6 +219,7 @@ export const api = {
   pomodoroStop: () => invoke<void>("pomodoro_stop"),
   ocrStart: () => invoke<void>("ocr_start"),
   openUrl: (url: string) => invoke<void>("open_url", { url }),
+  detectCity: () => invoke<string>("detect_city"),
   livesList: () => invoke<LiveChannel[]>("lives_list"),
   liveAdd: (platform: string, input: string) => invoke<void>("live_add", { platform, input }),
   liveRemove: (key: string) => invoke<void>("live_remove", { key }),
@@ -208,6 +250,11 @@ export const api = {
   panelToggle: () => invoke<void>("panel_toggle"),
   panelHide: () => invoke<void>("panel_hide"),
   petToggle: () => invoke<void>("pet_toggle"),
+  petExpress: (state: "speaking" | "clear") => invoke<void>("pet_express", { state }),
+  lifeStatus: () => invoke<LifeStatus>("life_status"),
+  voiceStatus: (model?: string) => invoke<VoiceStatus>("voice_status", { model }),
+  voiceDownload: (model?: string) => invoke<void>("voice_download", { model }),
+  voiceToggle: () => invoke<void>("voice_toggle"),
   petDragStart: () => invoke<void>("pet_drag_start"),
   radialOpen: () => invoke<RadialLayout>("radial_open"),
   radialClose: () => invoke<void>("radial_close"),

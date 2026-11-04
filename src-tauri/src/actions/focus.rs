@@ -206,12 +206,14 @@ pub fn tick(app: &AppHandle, idle: u64, gaming: bool) {
     }
 
     // Pomodoro
+    let mut completed = false;
     let transition = {
         let mut focus = state.focus.lock().unwrap();
         match focus.pomodoro.as_mut() {
             Some(p) if Instant::now() >= p.ends => {
                 let message = match p.phase {
                     Phase::Focus => {
+                        completed = true;
                         p.phase = Phase::Break;
                         p.ends = Instant::now() + Duration::from_secs(p.break_min * 60);
                         format!("Fim do foco {}. Pausa de {} minutos.", p.cycle, p.break_min)
@@ -234,6 +236,9 @@ pub fn tick(app: &AppHandle, idle: u64, gaming: bool) {
         }
         windows::set_pet_state(app, "done");
         changed = true;
+    }
+    if completed {
+        crate::life::award(app, "pomodoro", 1);
     }
 
     // Pausas: conta o tempo de uso; ficar parado 5 min já vale como pausa.

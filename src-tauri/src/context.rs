@@ -24,6 +24,9 @@ pub struct ActiveApp {
     pub category: Category,
     pub project: Option<String>,
     pub fullscreen: bool,
+    /// Retângulo (px físicos) do monitor onde está a janela: esquerda, topo, direita, base.
+    #[serde(skip)]
+    pub monitor: (i32, i32, i32, i32),
 }
 
 /// Nome amigável e categoria a partir do executável.
@@ -119,7 +122,8 @@ mod win {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
     use windows_sys::Win32::UI::Shell::{SHQueryUserNotificationState, QUNS_RUNNING_D3D_FULL_SCREEN};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetDesktopWindow, GetForegroundWindow, GetShellWindow, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId,
+        GetClassNameW, GetDesktopWindow, GetForegroundWindow, GetShellWindow, GetWindowRect, GetWindowTextW,
+        GetWindowThreadProcessId, IsZoomed,
     };
 
     pub struct Foreground {
@@ -127,6 +131,7 @@ mod win {
         pub exe: String,
         pub title: String,
         pub fullscreen: bool,
+        pub monitor: (i32, i32, i32, i32),
     }
 
     fn exe_name(pid: u32) -> Option<String> {
@@ -147,23 +152,39 @@ mod win {
         }
     }
 
-    /// A janela ocupa o monitor inteiro (inclusive a área da barra de tarefas).
-    fn covers_monitor(hwnd: HWND) -> bool {
+    fn monitor_rect(hwnd: HWND) -> Option<RECT> {
+        unsafe {
+            let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            let mut info: MONITORINFO = std::mem::zeroed();
+            info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+            (GetMonitorInfoW(monitor, &mut info) != 0).then_some(info.rcMonitor)
+        }
+    }
+
+    /// Área de trabalho e barra de tarefas também ocupam o monitor inteiro, mas não são tela cheia.
+    fn is_shell(hwnd: HWND) -> bool {
         unsafe {
             if hwnd == GetShellWindow() || hwnd == GetDesktopWindow() {
+                return true;
+            }
+            let mut buf = [0u16; 64];
+            let len = GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+            let class = String::from_utf16_lossy(&buf[..len.max(0) as usize]);
+            matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd")
+        }
+    }
+
+    /// A janela ocupa o monitor inteiro (inclusive a área da barra de tarefas).
+    /// Janela maximizada não conta: num monitor sem barra de tarefas ela também cobre tudo.
+    fn covers_monitor(hwnd: HWND, m: &RECT) -> bool {
+        unsafe {
+            if is_shell(hwnd) || IsZoomed(hwnd) != 0 {
                 return false;
             }
             let mut rect: RECT = std::mem::zeroed();
             if GetWindowRect(hwnd, &mut rect) == 0 {
                 return false;
             }
-            let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-            let mut info: MONITORINFO = std::mem::zeroed();
-            info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-            if GetMonitorInfoW(monitor, &mut info) == 0 {
-                return false;
-            }
-            let m = info.rcMonitor;
             rect.left <= m.left && rect.top <= m.top && rect.right >= m.right && rect.bottom >= m.bottom
         }
     }
@@ -185,8 +206,11 @@ mod win {
             let len = GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
             let title = String::from_utf16_lossy(&buf[..len.max(0) as usize]);
             let exe = exe_name(pid).unwrap_or_default();
-            let fullscreen = exe.to_lowercase() != "explorer.exe" && (covers_monitor(hwnd) || exclusive_fullscreen());
-            Some(Foreground { pid, exe, title, fullscreen })
+            let m = monitor_rect(hwnd).unwrap_or(RECT { left: 0, top: 0, right: 0, bottom: 0 });
+            let fullscreen = exe.to_lowercase() != "explorer.exe"
+                && !is_shell(hwnd)
+                && (covers_monitor(hwnd, &m) || exclusive_fullscreen());
+            Some(Foreground { pid, exe, title, fullscreen, monitor: (m.left, m.top, m.right, m.bottom) })
         }
     }
 
@@ -210,7 +234,7 @@ pub fn active_app(own_pid: u32) -> Option<ActiveApp> {
     }
     let (name, category) = classify(&fg.exe, &fg.title);
     let project = project_from_title(category, &name, &fg.title);
-    Some(ActiveApp { exe: fg.exe, name, title: fg.title, category, project, fullscreen: fg.fullscreen })
+    Some(ActiveApp { exe: fg.exe, name, title: fg.title, category, project, fullscreen: fg.fullscreen, monitor: fg.monitor })
 }
 
 /// O próprio Pipo (painel ou personagem) está em primeiro plano.
