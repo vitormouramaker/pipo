@@ -32,6 +32,10 @@ npm run tauri dev     # abre o Pipo em modo desenvolvimento
 npm run tauri build   # gera os instaladores em src-tauri/target/release/bundle/
 ```
 
+## Instalar e atualizar
+
+O jeito certo de usar no dia a dia é instalado, como qualquer app: rode `src-tauri\target\release\bundle\nsis\Pipo_<versão>_x64-setup.exe`. Ele instala só para o seu usuário (sem pedir administrador) em `%LOCALAPPDATA%\Pipo` e cria atalhos no Menu Iniciar e na Área de Trabalho. Para atualizar, gere o instalador da versão nova e rode por cima (`Pipo_<versão>_x64-setup.exe /S` instala em silêncio). Seus dados ficam em `%APPDATA%\com.vitormouramaker.pipo`, separados do programa, então atualizar não apaga nada.
+
 ## Como usar
 
 - **Clique no Pipo**: abre o menu radial (chat, área de transferência, sistema, gastos, configurações, ocultar). Quando você copia um erro ou um texto longo, aparece também um atalho para o Pipo explicar ou resumir.

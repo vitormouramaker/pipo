@@ -407,8 +407,6 @@ pub fn pet_drag_start(app: AppHandle) {
         let (mut origin, mut grab) = (window, cursor);
         let mut last = window;
         let mut moved = false;
-        // Prévia de ilha mostrada pelo Pipo enquanto ele está perto de uma borda.
-        let mut preview: Option<String> = None;
         // Velocidade do arrasto (px lógicos/s, suavizada) para a animação de física do Pipo.
         let scale = app.get_webview_window(MAIN).and_then(|w| w.scale_factor().ok()).unwrap_or(1.0);
         let mut tick = std::time::Instant::now();
@@ -420,24 +418,23 @@ pub fn pet_drag_start(app: AppHandle) {
                 if (now.x - cursor.x).abs() + (now.y - cursor.y).abs() > 6.0 {
                     moved = true;
                 }
-                let zone = if moved { island::dock_zone(&app, now, island::active()) } else { None };
-                if island::active() && moved && zone.is_none() {
-                    // Puxou a ilha para longe da borda: vira o Pipo de novo, sem soltar o mouse.
-                    if let Some(p) = island::undock_at(&app, now) {
-                        (origin, grab, last) = (p, now, p);
+                if moved {
+                    match island::dock_zone(&app, now, island::active()) {
+                        // Perto de uma borda ou canto: a janela já é a ilha, no lugar exato.
+                        Some(edge) => island::preview(&app, &edge, now),
+                        // Longe das bordas: volta a ser o Pipo, seguindo o cursor.
+                        None if island::active() => {
+                            if let Some(p) = island::undock_at(&app, now) {
+                                (origin, grab, last) = (p, now, p);
+                            }
+                        }
+                        None => {}
                     }
-                } else if !island::active() && zone != preview {
-                    preview = zone.clone();
-                    let _ = app.emit_to(MAIN, "island-preview", preview.clone());
                 }
                 let x = origin.x + (now.x - grab.x).round() as i32;
                 let y = origin.y + (now.y - grab.y).round() as i32;
-                if (x, y) != (last.x, last.y) {
-                    if island::active() {
-                        island::move_clamped(&app, x, y, now);
-                    } else {
-                        move_pet_clamped(&app, x, y, Some(now));
-                    }
+                if !island::active() && (x, y) != (last.x, last.y) {
+                    move_pet_clamped(&app, x, y, Some(now));
                     follow_pet(&app);
                     last = PhysicalPosition::new(x, y);
                 }
@@ -457,16 +454,9 @@ pub fn pet_drag_start(app: AppHandle) {
         }
         app.state::<AppState>().dragging.store(false, Ordering::SeqCst);
         let _ = app.emit_to(MAIN, "pipo-drag", (velocity.0.round(), velocity.1.round(), false));
-        // Soltou perto de uma borda ou canto: vira (ou continua) ilha ali.
-        if moved {
-            if let Ok(now) = app.cursor_position() {
-                if let Some(edge) = island::dock_zone(&app, now, island::active()) {
-                    island::dock(&app, &edge, now);
-                }
-            }
-        }
-        if preview.is_some() {
-            let _ = app.emit_to(MAIN, "island-preview", None::<String>);
+        // Soltou com a ilha na borda: ela fica ali.
+        if moved && island::active() {
+            island::commit(&app);
         }
     });
 }

@@ -1,6 +1,7 @@
 //! Modo ilha: o Pipo encolhe para uma pílula discreta (como a ilha dinâmica do iPhone)
-//! grudada numa borda da tela. Arrastar leva a pílula para qualquer borda; ela gruda
-//! na mais próxima ao soltar. Bom para quando o usuário precisa de concentração.
+//! grudada numa borda ou canto da tela. Ao arrastar o Pipo até uma borda, a própria janela
+//! já vira a ilha naquele lugar (a prévia é a ilha de verdade); ao soltar, ela fica.
+//! Bom para quando o usuário precisa de concentração.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -14,6 +15,8 @@ static ACTIVE: AtomicBool = AtomicBool::new(false);
 static HOVER: AtomicBool = AtomicBool::new(false);
 /// Onde o Pipo estava antes de virar ilha.
 static HOME: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+/// Borda e posição da ilha durante o arrasto (ainda não salvas nas configurações).
+static LIVE: Mutex<Option<(String, f64)>> = Mutex::new(None);
 
 /// Tamanho da janela da ilha (px lógicos): deitada no topo, na base e nos cantos; em pé nas laterais.
 fn dims(edge: &str) -> (f64, f64) {
@@ -48,6 +51,9 @@ pub fn active() -> bool {
 }
 
 fn edge_of(app: &AppHandle) -> String {
+    if let Some((edge, _)) = LIVE.lock().unwrap().as_ref() {
+        return edge.clone();
+    }
     app.state::<AppState>().settings.lock().unwrap().island_edge.clone()
 }
 
@@ -81,8 +87,12 @@ fn place(app: &AppHandle, edge: &str, pos: f64) {
         .or_else(|| app.primary_monitor().ok().flatten());
     let Some(monitor) = monitor else { return };
     let (w, h) = dims(edge);
-    let _ = pet.set_size(LogicalSize::new(w, h));
     let scale = monitor.scale_factor();
+    // Só redimensiona quando muda (durante o arrasto isto roda a cada movimento).
+    let target = ((w * scale).round() as u32, (h * scale).round() as u32);
+    if pet.outer_size().ok().map(|s| (s.width, s.height)) != Some(target) {
+        let _ = pet.set_size(LogicalSize::new(w, h));
+    }
     let (w, h) = ((w * scale) as i32, (h * scale) as i32);
     let area = monitor.work_area();
     let (left, top) = (area.position.x, area.position.y);
@@ -132,6 +142,7 @@ pub fn exit(app: &AppHandle) {
     if !ACTIVE.swap(false, Ordering::SeqCst) {
         return;
     }
+    *LIVE.lock().unwrap() = None;
     HOVER.store(false, Ordering::SeqCst);
     let Some(pet) = app.get_webview_window(windows::MAIN) else { return };
     let island_pos = pet.outer_position().ok();
@@ -190,8 +201,8 @@ fn zone_for(dt: f64, db: f64, dl: f64, dr: f64, zone: f64) -> Option<String> {
     (nearest.1 <= zone).then(|| nearest.0.to_string())
 }
 
-/// Solta como ilha na borda `edge`, na altura (ou largura) do cursor, com um brilho para ser notada.
-pub fn dock(app: &AppHandle, edge: &str, cursor: PhysicalPosition<f64>) {
+/// Durante o arrasto, perto de uma borda: a janela já vira a ilha exatamente onde vai ficar.
+pub fn preview(app: &AppHandle, edge: &str, cursor: PhysicalPosition<f64>) {
     let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y).ok().flatten() else { return };
     let area = monitor.work_area();
     let scale = monitor.scale_factor();
@@ -212,13 +223,23 @@ pub fn dock(app: &AppHandle, edge: &str, cursor: PhysicalPosition<f64>) {
         windows::close_radial(app);
         windows::hide_panel(app);
     }
+    let previous = LIVE.lock().unwrap().replace((edge.to_string(), pos));
+    let edge_changed = previous.as_ref().map(|(e, _)| e.as_str()) != Some(edge);
+    place(app, edge, pos);
+    if !was_island || edge_changed {
+        emit(app);
+    }
+}
+
+/// Soltou o mouse com a ilha na borda: ela fica ali (salva) e brilha para ser notada.
+pub fn commit(app: &AppHandle) {
+    let Some((edge, pos)) = LIVE.lock().unwrap().clone() else { return };
     save(app, |s| {
         s.island = true;
-        s.island_edge = edge.into();
+        s.island_edge = edge.clone();
         s.island_pos = pos;
     });
-    place(app, edge, pos);
-    emit(app);
+    *LIVE.lock().unwrap() = None;
     let _ = app.emit_to(windows::MAIN, "island-glow", ());
 }
 
@@ -230,6 +251,7 @@ pub fn undock_at(app: &AppHandle, cursor: PhysicalPosition<f64>) -> Option<Physi
     }
     HOVER.store(false, Ordering::SeqCst);
     *HOME.lock().unwrap() = None;
+    *LIVE.lock().unwrap() = None;
     let pet = app.get_webview_window(windows::MAIN)?;
     let logical = windows::window_size(app.state::<AppState>().settings.lock().unwrap().pet_size);
     let _ = pet.set_size(LogicalSize::new(logical, logical));
@@ -240,18 +262,6 @@ pub fn undock_at(app: &AppHandle, cursor: PhysicalPosition<f64>) -> Option<Physi
     emit(app);
     save(app, |s| s.island = false);
     Some(pos)
-}
-
-/// Durante o arrasto a pílula anda livre, mas sem sair da área útil do monitor.
-pub fn move_clamped(app: &AppHandle, x: i32, y: i32, cursor: PhysicalPosition<f64>) {
-    let Some(pet) = app.get_webview_window(windows::MAIN) else { return };
-    let Ok(size) = pet.outer_size() else { return };
-    let Some(monitor) = app.monitor_from_point(cursor.x, cursor.y).ok().flatten() else { return };
-    let area = monitor.work_area();
-    let (w, h) = (size.width as i32, size.height as i32);
-    let x = x.clamp(area.position.x, area.position.x + area.size.width as i32 - w);
-    let y = y.clamp(area.position.y, area.position.y + area.size.height as i32 - h);
-    let _ = pet.set_position(PhysicalPosition::new(x, y));
 }
 
 /// O cursor está sobre a pílula? (com folga quando ela já está expandida)

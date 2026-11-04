@@ -46,8 +46,7 @@ export default function PetApp() {
   const [settings, setSettings] = useState<Settings | null>(null);
   // Modo ilha: borda em que a pílula está (null = Pipo normal).
   const [island, setIsland] = useState<Edge | null>(null);
-  // Arrastando perto de uma borda: o Pipo mostra que vai virar ilha ao soltar.
-  const [preview, setPreview] = useState<Edge | null>(null);
+
   const press = useRef<{ x: number; y: number } | null>(null);
   const petRef = useRef<HTMLDivElement>(null);
   const physics = useDragPhysics(petRef, { onLift: sfx.pick, onDrop: sfx.drop });
@@ -64,14 +63,7 @@ export default function PetApp() {
     const unlistenGaze = listen<[number, number]>("pipo-gaze", (e) => setGaze(e.payload));
     const unlistenLife = listen("life-changed", refreshLife);
     const unlistenSettings = listen<Settings>("settings-changed", (e) => setSettings(e.payload));
-    const unlistenPreview = listen<string | null>("island-preview", (e) => {
-      setPreview((was) => {
-        if (e.payload && !was) sfx.tick();
-        return (e.payload as Edge | null) ?? null;
-      });
-    });
     const unlistenIsland = listen<{ active: boolean; edge: string }>("island", (e) => {
-      setPreview(null);
       setIsland((was) => {
         if (Boolean(was) !== e.payload.active) (e.payload.active ? sfx.shrink : sfx.grow)();
         return e.payload.active ? (e.payload.edge as Edge) : null;
@@ -82,7 +74,6 @@ export default function PetApp() {
       void unlistenLife.then((fn) => fn());
       void unlistenSettings.then((fn) => fn());
       void unlistenIsland.then((fn) => fn());
-      void unlistenPreview.then((fn) => fn());
     };
   }, []);
 
@@ -178,7 +169,7 @@ export default function PetApp() {
     >
       <div
         ref={petRef}
-        className={preview ? `pet dock-preview dock-${preview}` : "pet"}
+        className="pet"
         title={radial ? undefined : "Clique para o menu · arraste para mover · botão direito para mais opções"}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
