@@ -114,23 +114,31 @@ fn unlocked(conn: &rusqlite::Connection) -> Vec<(String, String)> {
     stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).map(|rows| rows.flatten().collect()).unwrap_or_default()
 }
 
+/// (quanto já foi feito, meta) de cada conquista.
+fn progress(conn: &rusqlite::Connection, id: &str) -> (i64, i64) {
+    let days = || conn.query_row("SELECT COUNT(DISTINCT day) FROM xp_log", [], |r| r.get(0)).unwrap_or(0);
+    let (done, goal) = match id {
+        "first-chat" => (count(conn, "chat"), 1),
+        "chat-100" => (count(conn, "chat"), 100),
+        "first-action" => (count(conn, "action"), 1),
+        "action-50" => (count(conn, "action"), 50),
+        "pomodoro-10" => (count(conn, "pomodoro"), 10),
+        "web-25" => (count(conn, "web"), 25),
+        "first-voice" => (count(conn, "voice"), 1),
+        "streak-7" => (streak(conn), 7),
+        "days-30" => (days(), 30),
+        "level-10" => (level_of(total_xp(conn)).0, 10),
+        _ => (0, 1),
+    };
+    (done.min(goal), goal)
+}
+
 /// Conquistas que acabaram de ser alcançadas.
 fn check_achievements(conn: &rusqlite::Connection) -> Vec<&'static Achievement> {
     let have: Vec<String> = unlocked(conn).into_iter().map(|(id, _)| id).collect();
-    let days: i64 = conn.query_row("SELECT COUNT(DISTINCT day) FROM xp_log", [], |r| r.get(0)).unwrap_or(0);
-    let level = level_of(total_xp(conn)).0;
-    let reached = |id: &str| match id {
-        "first-chat" => count(conn, "chat") >= 1,
-        "chat-100" => count(conn, "chat") >= 100,
-        "first-action" => count(conn, "action") >= 1,
-        "action-50" => count(conn, "action") >= 50,
-        "pomodoro-10" => count(conn, "pomodoro") >= 10,
-        "web-25" => count(conn, "web") >= 25,
-        "first-voice" => count(conn, "voice") >= 1,
-        "streak-7" => streak(conn) >= 7,
-        "days-30" => days >= 30,
-        "level-10" => level >= 10,
-        _ => false,
+    let reached = |id: &str| {
+        let (done, goal) = progress(conn, id);
+        done >= goal
     };
     let new: Vec<&Achievement> = ACHIEVEMENTS.iter().filter(|a| !have.iter().any(|h| h == a.id) && reached(a.id)).collect();
     for a in &new {
@@ -226,6 +234,8 @@ pub struct AchievementView {
     title: &'static str,
     detail: &'static str,
     unlocked_at: Option<String>,
+    progress: i64,
+    goal: i64,
 }
 
 #[derive(Serialize)]
@@ -273,11 +283,16 @@ pub fn life_status(app: AppHandle) -> LifeStatus {
             .collect(),
         achievements: ACHIEVEMENTS
             .iter()
-            .map(|a| AchievementView {
-                id: a.id,
-                title: a.title,
-                detail: a.detail,
-                unlocked_at: have.iter().find(|(id, _)| id == a.id).map(|(_, at)| at.clone()),
+            .map(|a| {
+                let (progress, goal) = progress(conn, a.id);
+                AchievementView {
+                    id: a.id,
+                    title: a.title,
+                    detail: a.detail,
+                    unlocked_at: have.iter().find(|(id, _)| id == a.id).map(|(_, at)| at.clone()),
+                    progress,
+                    goal,
+                }
             })
             .collect(),
         streak: streak(conn),

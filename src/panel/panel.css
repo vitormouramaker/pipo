@@ -97,8 +97,6 @@
   padding: 8px 14px; border-bottom: 1px solid var(--line); font-size: 13px;
 }
 .history { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
-.history::-webkit-scrollbar { width: 8px; }
-.history::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 .history .empty { margin: 40px auto; }
 .history-item { display: flex; align-items: center; gap: 6px; border-radius: 8px; }
 .history-item:hover { background: var(--surface); }
@@ -117,8 +115,6 @@
 .history-delete:hover, .history-delete.confirm { color: var(--danger); background: rgba(248, 113, 113, 0.1); }
 
 .messages { flex: 1; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; }
-.messages::-webkit-scrollbar { width: 8px; }
-.messages::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 .empty { margin: auto 8px; color: var(--muted); text-align: center; }
 .empty-title { color: var(--ink); font-size: 16px; font-weight: 600; margin-bottom: 4px; }
 .msg { max-width: 88%; padding: 9px 12px; border-radius: 10px; white-space: pre-wrap; word-wrap: break-word; user-select: text; }
@@ -216,8 +212,6 @@
 .subtabs button { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 999px; padding: 4px 14px; cursor: pointer; font-size: 13px; }
 .subtabs button[aria-pressed="true"] { background: var(--surface-2); color: var(--ink); border-color: var(--surface-2); }
 .actions-body { flex: 1; overflow-y: auto; padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 18px; }
-.actions-body::-webkit-scrollbar { width: 8px; }
-.actions-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 .block { display: flex; flex-direction: column; gap: 6px; }
 .block-head { display: flex; justify-content: space-between; align-items: baseline; }
 .block-head h4 { margin-bottom: 4px; }
@@ -320,3 +314,57 @@
 .status { font-size: 13px; }
 .status.ok { color: var(--ok); }
 .status.error { color: var(--danger); }
+
+/* Campos nativos (data, hora, número) no tema escuro */
+.panel input, .panel select { color-scheme: dark; }
+.panel .hint.ok { color: var(--ok); }
+
+/* Lembretes: modo de quando avisar */
+.inline-form.when { margin-top: 6px; align-items: center; }
+.segmented { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.panel .segmented button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 5px 10px; font-size: 12.5px; cursor: pointer; }
+.panel .segmented button + button { border-left: 1px solid var(--line); }
+.panel .segmented button[aria-pressed="true"] { background: var(--surface-2); color: var(--accent); }
+
+/* Guarda-roupa: prévia de cada acessório */
+.wardrobe { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.panel .wardrobe-item {
+  position: relative; display: grid; justify-items: center; gap: 2px; padding: 8px 6px 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; color: var(--ink);
+  transition: border-color 120ms, transform 120ms;
+}
+.panel .wardrobe-item:hover { border-color: #444a54; transform: translateY(-2px); }
+.panel .wardrobe-item.on { border-color: var(--accent); }
+.panel .wardrobe-item.locked { cursor: default; }
+.wardrobe-pet { width: 64px; height: 64px; padding: 6px; }
+.wardrobe-item.locked .wardrobe-pet { opacity: 0.55; }
+.wardrobe-item strong { font-size: 12.5px; font-weight: 600; }
+.wardrobe-item span { font-size: 11.5px; color: var(--muted); }
+.wardrobe-item.on span { color: var(--accent); }
+.wardrobe-lock { position: absolute; top: 6px; right: 6px; color: var(--muted); }
+.wardrobe-lock svg { width: 14px; height: 14px; }
+
+/* Conquistas: emblema com a carinha do Pipo e progresso */
+.achievements { grid-template-columns: 1fr; }
+.achievement { display: flex; align-items: center; gap: 12px; opacity: 1; }
+.achievement:not(.on) .achievement-text strong { color: var(--muted); }
+.achievement-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.achievement-progress { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.achievement-progress .meter-bar { flex: 1; height: 5px; }
+.achievement-progress span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.emblem {
+  --ring: #3a3f47;
+  position: relative; width: 50px; height: 50px; flex-shrink: 0; border-radius: 50%;
+  border: 2px solid var(--ring); background: radial-gradient(circle at 50% 35%, #2a2e35, #17191d);
+  display: grid; place-items: center;
+}
+.emblem.on.cyan { --ring: #2dd4e8; box-shadow: 0 0 0 3px rgba(45, 212, 232, 0.12); }
+.emblem.on.gold { --ring: #f5b544; box-shadow: 0 0 0 3px rgba(245, 181, 68, 0.14); }
+.emblem-face { width: 34px; height: 34px; }
+.emblem:not(.on) .emblem-face { filter: grayscale(1); opacity: 0.45; }
+.emblem-badge {
+  position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; background: #1f2227; border: 1.5px solid var(--ring); color: var(--ring);
+}
+.emblem:not(.on) .emblem-badge { color: var(--muted); }
+.emblem-badge svg { width: 12px; height: 12px; }

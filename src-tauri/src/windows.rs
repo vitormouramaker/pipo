@@ -20,10 +20,13 @@ const PANEL_WIDTH: f64 = 500.0;
 const PANEL_HEIGHT: f64 = 640.0;
 const PANEL_GAP: f64 = 12.0;
 
+/// Painel expandido para a tela toda: deixa de acompanhar o Pipo.
+static PANEL_EXPANDED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Mesmos argumentos da janela principal (tauri.conf.json): janelas com argumentos
 /// diferentes não compartilham o WebView2. Sem GPU o Pipo usa ~40% menos memória.
 pub const BROWSER_ARGS: &str =
-    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --disable-gpu-compositing";
+    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --disable-gpu-compositing --autoplay-policy=no-user-gesture-required";
 
 /// Avisa a janela do Pipo para mostrar uma expressão passageira por cima do humor
 /// de base ("clear" volta ao humor de base).
@@ -61,6 +64,9 @@ fn panel(app: &AppHandle) -> tauri::Result<WebviewWindow> {
 }
 
 fn panel_moved(app: &AppHandle, p: PhysicalPosition<i32>) {
+    if PANEL_EXPANDED.load(Ordering::SeqCst) {
+        return;
+    }
     let state = app.state::<AppState>();
     if state.dragging.load(Ordering::SeqCst) || *state.panel_expected.lock().unwrap() == Some((p.x, p.y)) {
         return; // movimento feito pelo próprio Pipo
@@ -186,7 +192,9 @@ pub fn show_panel(app: &AppHandle, view: Option<&str>) {
     sensors::user_wants_pet(app);
     show_pet(app);
     let Ok(window) = panel(app) else { return };
-    place_panel(app, &window);
+    if !PANEL_EXPANDED.load(Ordering::SeqCst) {
+        place_panel(app, &window);
+    }
     let _ = window.show();
     let _ = window.set_focus();
     if let Some(view) = view {
@@ -311,6 +319,33 @@ pub async fn panel_toggle(app: AppHandle) {
 #[tauri::command]
 pub async fn panel_open(app: AppHandle, view: String) {
     show_panel(&app, Some(&view));
+}
+
+/// Expande o painel para a área útil do monitor (sem cobrir a barra de tarefas) ou volta
+/// ao tamanho normal, ao lado do Pipo. Devolve se ficou expandido.
+#[tauri::command]
+pub fn panel_expand(app: AppHandle) -> bool {
+    let Some(window) = app.get_webview_window(PANEL) else { return false };
+    let expand = !PANEL_EXPANDED.load(Ordering::SeqCst);
+    if expand {
+        let Some(monitor) = window.current_monitor().ok().flatten() else { return false };
+        let area = monitor.work_area();
+        PANEL_EXPANDED.store(true, Ordering::SeqCst);
+        *app.state::<AppState>().panel_offset.lock().unwrap() = None;
+        let _ = window.set_size(PhysicalSize::new(area.size.width, area.size.height));
+        set_panel_position(&app, &window, area.position.x, area.position.y);
+    } else {
+        PANEL_EXPANDED.store(false, Ordering::SeqCst);
+        let _ = window.set_size(tauri::LogicalSize::new(PANEL_WIDTH, PANEL_HEIGHT));
+        place_panel(&app, &window);
+    }
+    let _ = app.emit_to(PANEL, "panel-expanded", expand);
+    expand
+}
+
+#[tauri::command]
+pub fn panel_is_expanded() -> bool {
+    PANEL_EXPANDED.load(Ordering::SeqCst)
 }
 
 #[tauri::command]

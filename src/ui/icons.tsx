@@ -67,4 +67,31 @@ export const ICONS = {
     </>,
   ),
   close: icon(<path d="M6 6l12 12M18 6 6 18" />, 14),
+  clock: icon(
+    <>
+      <circle cx="12" cy="13" r="8" />
+      <path d="M12 9v4l2.5 2.5M9 2h6" />
+    </>,
+  ),
+  search: icon(
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+    </>,
+  ),
+  flame: icon(<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.4 2.6-5.6 3.8-8.8.4 2 1.6 3.2 2.7 3.6C12 6.8 13.5 4.4 15.5 3c-.3 2.7.9 4.6 2 6.2.9 1.4 1.5 2.8 1.5 4.6 0 4.2-3 7.2-7 7.2z" />),
+  calendar: icon(
+    <>
+      <rect x="4" y="5" width="16" height="16" rx="2" />
+      <path d="M4 10h16M9 3v4M15 3v4" />
+    </>,
+  ),
+  lock: icon(
+    <>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </>,
+  ),
+  expand: icon(<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />, 16),
+  collapse: icon(<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />, 16),
 };

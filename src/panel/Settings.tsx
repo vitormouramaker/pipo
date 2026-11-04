@@ -274,6 +274,22 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           <input type="checkbox" checked={settings.followCursor} onChange={(e) => update({ followCursor: e.target.checked })} />
           Olhos do Pipo seguem o mouse
         </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.sounds} onChange={(e) => update({ sounds: e.target.checked })} />
+          Efeitos sonoros
+        </label>
+        <label>
+          Volume dos efeitos: {settings.soundVolume}%
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={settings.soundVolume}
+            disabled={!settings.sounds}
+            onChange={(e) => update({ soundVolume: Number(e.target.value) })}
+          />
+        </label>
         <p className="hint">Acessórios e evolução ficam na aba do Pipo (clique no ícone dele no topo).</p>
       </fieldset>
 

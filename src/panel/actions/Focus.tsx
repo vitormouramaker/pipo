@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { sfx } from "../../ui/sound";
 import { api, type FocusStatus, type Note, type Settings } from "../../api";
 
 const mmss = (secs: number) => `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
@@ -53,19 +54,31 @@ function Pomodoro({ status }: { status: FocusStatus | null }) {
 
 function Reminders({ status }: { status: FocusStatus | null }) {
   const [text, setText] = useState("");
-  const [when, setWhen] = useState("15");
+  const [mode, setMode] = useState<"minutes" | "time" | "date">("minutes");
+  const [minutes, setMinutes] = useState("15");
+  const [time, setTime] = useState("18:00");
+  const [date, setDate] = useState(() => {
+    const d = new Date(Date.now() + 24 * 3600 * 1000);
+    d.setHours(9, 0, 0, 0);
+    return `${d.toLocaleDateString("sv-SE")}T09:00`;
+  });
   const [message, setMessage] = useState<string | null>(null);
 
   const add = () => {
-    const at = when.includes(":") ? when : undefined;
-    const minutes = at ? undefined : Number(when);
-    void api
-      .reminderAdd(text, minutes, at)
+    const call =
+      mode === "minutes"
+        ? api.reminderAdd(text, Number(minutes))
+        : api.reminderAdd(text, undefined, mode === "time" ? time : date);
+    void call
       .then((due) => {
         setText("");
         setMessage(`Marcado para ${due}.`);
+        sfx.done();
       })
-      .catch((e) => setMessage(String(e)));
+      .catch((e) => {
+        setMessage(String(e));
+        sfx.error();
+      });
   };
 
   return (
@@ -73,12 +86,34 @@ function Reminders({ status }: { status: FocusStatus | null }) {
       <h4>Lembretes</h4>
       <div className="inline-form">
         <input className="grow" placeholder="Lembrar de…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
-        <input className="short" title="Minutos (ex.: 15) ou horário (ex.: 18:30)" value={when} onChange={(e) => setWhen(e.target.value)} />
         <button className="primary" disabled={!text.trim()} onClick={add}>
           Lembrar
         </button>
       </div>
-      <p className="hint">Em minutos (ex.: 15) ou num horário (ex.: 18:30). Também dá para pedir no chat.</p>
+      <div className="inline-form when">
+        <div className="segmented">
+          {(
+            [
+              ["minutes", "Daqui a"],
+              ["time", "Hoje/amanhã"],
+              ["date", "Data"],
+            ] as const
+          ).map(([m, label]) => (
+            <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {mode === "minutes" && (
+          <>
+            <input className="short" type="number" min={1} max={10080} value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+            <span className="hint">min</span>
+          </>
+        )}
+        {mode === "time" && <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />}
+        {mode === "date" && <input type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} />}
+      </div>
+      <p className="hint">Também dá para pedir no chat, por exemplo: "me lembra de pagar a conta dia 10 às 9h".</p>
       {message && <p className="hint">{message}</p>}
       {status?.reminders.map((r) => (
         <div key={r.id} className="trow">

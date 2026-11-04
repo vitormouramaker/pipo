@@ -12,6 +12,7 @@ import Life from "./Life";
 import Usage from "./Usage";
 import "./panel.css";
 import { ICONS } from "../ui/icons";
+import { sfx } from "../ui/sound";
 
 const TABS: { view: PanelView; icon: keyof typeof ICONS; title: string }[] = [
   { view: "chat", icon: "chat", title: "Chat" },
@@ -30,6 +31,7 @@ export default function PanelApp() {
   // Texto levado para a caixa do chat sem enviar (ex.: "Perguntar ao Pipo" no Clipboard).
   const [draft, setDraft] = useState<string | null>(null);
   const [life, setLife] = useState<LifeStatus | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const refreshKey = () => void api.keyStatus().then(setHasKey);
 
@@ -41,6 +43,8 @@ export default function PanelApp() {
       refreshKey();
     });
     const unlistenSettings = listen<Settings>("settings-changed", (e) => setSettings(e.payload));
+    void api.panelIsExpanded().then(setExpanded);
+    const unlistenExpanded = listen<boolean>("panel-expanded", (e) => setExpanded(e.payload));
     const refreshLife = () => void api.lifeStatus().then(setLife);
     refreshLife();
     const unlistenLife = listen("life-changed", refreshLife);
@@ -48,6 +52,7 @@ export default function PanelApp() {
       void unlistenView.then((fn) => fn());
       void unlistenSettings.then((fn) => fn());
       void unlistenLife.then((fn) => fn());
+      void unlistenExpanded.then((fn) => fn());
     };
   }, []);
 
@@ -58,7 +63,10 @@ export default function PanelApp() {
           className="brand"
           title="Nível, evolução e conquistas do Pipo"
           aria-pressed={view === "pipo"}
-          onClick={() => setView("pipo")}
+          onClick={() => {
+            if (view !== "pipo") sfx.tick();
+            setView("pipo");
+          }}
         >
           <span className="brand-icon">
             <Pipo state="idle" stage={life?.stage ?? 0} accessories={wornAccessories(life, settings)} />
@@ -73,12 +81,26 @@ export default function PanelApp() {
               title={t.title}
               aria-label={t.title}
               aria-pressed={view === t.view}
-              onClick={() => setView(t.view)}
+              onClick={() => {
+                if (view !== t.view) sfx.tick();
+                setView(t.view);
+              }}
             >
               {ICONS[t.icon]}
             </button>
           ))}
         </nav>
+        <button
+          className="icon-btn tab-icon"
+          title={expanded ? "Voltar ao tamanho normal" : "Expandir para a tela toda"}
+          aria-label={expanded ? "Voltar ao tamanho normal" : "Expandir para a tela toda"}
+          onClick={() => {
+            sfx.tick();
+            void api.panelExpand().then(setExpanded);
+          }}
+        >
+          {expanded ? ICONS.collapse : ICONS.expand}
+        </button>
         <button className="icon-btn tab-icon" title="Fechar" aria-label="Fechar" onClick={() => void api.panelHide()}>
           {ICONS.close}
         </button>

@@ -63,8 +63,8 @@ pub fn definitions() -> Value {
         tool("search_notes", "Busca nas notas do usuário (sem query, lista as mais recentes).", json!({ "query": { "type": "string" } }), &[]),
         tool(
             "add_reminder",
-            "Cria um lembrete que aparece como notificação. Informe minutes (daqui a quantos minutos) ou at (horário HH:MM).",
-            json!({ "text": { "type": "string" }, "minutes": { "type": "integer" }, "at": { "type": "string", "description": "HH:MM" } }),
+            "Cria um lembrete que aparece como aviso do Pipo. Informe minutes (daqui a quantos minutos) ou at: horário \"HH:MM\" (hoje ou amanhã) ou data e hora \"AAAA-MM-DD HH:MM\".",
+            json!({ "text": { "type": "string" }, "minutes": { "type": "integer" }, "at": { "type": "string", "description": "HH:MM ou AAAA-MM-DD HH:MM" } }),
             &["text"],
         ),
         tool("list_reminders", "Lembretes pendentes.", json!({}), &[]),

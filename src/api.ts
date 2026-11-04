@@ -24,6 +24,8 @@ export type Settings = {
   voiceName: string;
   followCursor: boolean;
   hiddenAccessories: string[];
+  sounds: boolean;
+  soundVolume: number;
 };
 
 export type LifeStatus = {
@@ -35,7 +37,7 @@ export type LifeStatus = {
   stageName: string;
   stages: { name: string; fromLevel: number; detail: string }[];
   accessories: { id: string; name: string; level: number; unlocked: boolean }[];
-  achievements: { id: string; title: string; detail: string; unlockedAt: string | null }[];
+  achievements: { id: string; title: string; detail: string; unlockedAt: string | null; progress: number; goal: number }[];
   streak: number;
   days: number;
   since: string | null;
@@ -222,7 +224,7 @@ export const api = {
   openUrl: (url: string) => invoke<void>("open_url", { url }),
   detectCity: () => invoke<string>("detect_city"),
   livesList: () => invoke<LiveChannel[]>("lives_list"),
-  liveAdd: (platform: string, input: string) => invoke<void>("live_add", { platform, input }),
+  liveAdd: (input: string) => invoke<string>("live_add", { input }),
   liveRemove: (key: string) => invoke<void>("live_remove", { key }),
   livesRefresh: () => invoke<void>("lives_refresh"),
   briefingLatest: () => invoke<Briefing | null>("briefing_latest"),
@@ -250,6 +252,8 @@ export const api = {
   panelOpen: (view: PanelView) => invoke<void>("panel_open", { view }),
   panelToggle: () => invoke<void>("panel_toggle"),
   panelHide: () => invoke<void>("panel_hide"),
+  panelExpand: () => invoke<boolean>("panel_expand"),
+  panelIsExpanded: () => invoke<boolean>("panel_is_expanded"),
   petToggle: () => invoke<void>("pet_toggle"),
   petExpress: (state: "speaking" | "clear") => invoke<void>("pet_express", { state }),
   lifeStatus: () => invoke<LifeStatus>("life_status"),

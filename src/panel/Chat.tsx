@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { api, type ChatMessage, type Conversation, type VoiceState } from "../api";
 import { speak, stopSpeaking } from "./speech";
 import { ICONS } from "../ui/icons";
+import { sfx } from "../ui/sound";
 import { sqliteDate } from "../format";
 
 type Props = {
@@ -106,7 +107,9 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
   const sendText = async (text: string, spoken = false) => {
     if (busyRef.current) return;
     stopSpeaking();
+    sfx.send();
     let reply = "";
+    let failed = false;
     busyRef.current = true;
     setHistory(null);
     setError(null);
@@ -144,7 +147,10 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
       else if (event.type === "tool") pushStep({ role: "tool", text: event.label });
       else if (event.type === "confirm") pushStep({ role: "confirm", text: event.question, confirmId: event.id });
       else if (event.type === "source") addSource({ title: event.title, url: event.url });
-      else if (event.type === "error") setError(event.message);
+      else if (event.type === "error") {
+        failed = true;
+        setError(event.message);
+      }
       else if (event.stopReason === "refusal") setError("O Pipo não pode responder a esse pedido.");
       else if (event.stopReason === "max_tokens") setError("A resposta foi cortada por ser longa demais.");
     });
@@ -153,6 +159,8 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     busyRef.current = false;
     setBusy(false);
     inputRef.current?.focus();
+    if (failed) sfx.error();
+    else sfx.reply();
     // Pergunta feita por voz: a resposta também pode ser falada.
     if (spoken && reply.trim()) {
       const settings = await api.getSettings();

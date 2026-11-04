@@ -74,7 +74,26 @@ pub fn pomodoro_focusing(app: &AppHandle) -> bool {
     focus.pomodoro.as_ref().is_some_and(|p| p.phase == Phase::Focus)
 }
 
-/// Agenda um lembrete daqui a `minutes` minutos ou no horário "HH:MM" (hoje ou amanhã).
+use chrono::Datelike as _;
+
+/// Data e hora locais em vários formatos: "AAAA-MM-DDTHH:MM" (campo de data do painel),
+/// "AAAA-MM-DD HH:MM", "DD/MM/AAAA HH:MM" ou "DD/MM HH:MM" (este ano ou o próximo).
+fn parse_date_time(text: &str, now: chrono::DateTime<chrono::Local>) -> Option<chrono::DateTime<chrono::Local>> {
+    use chrono::{Datelike, NaiveDateTime};
+    let text = text.trim().replace(" às ", " ");
+    let full = ["%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%d/%m/%Y %H:%M"]
+        .iter()
+        .find_map(|f| NaiveDateTime::parse_from_str(&text, f).ok());
+    let naive = full.or_else(|| {
+        let with_year = format!("{} {}", now.year(), text);
+        let this_year = NaiveDateTime::parse_from_str(&with_year, "%Y %d/%m %H:%M").ok()?;
+        Some(if this_year < now.naive_local() { this_year.with_year(now.year() + 1)? } else { this_year })
+    })?;
+    naive.and_local_timezone(chrono::Local).single()
+}
+
+/// Agenda um lembrete daqui a `minutes` minutos, no horário "HH:MM" (hoje ou amanhã)
+/// ou numa data e hora específicas.
 pub fn add_reminder(app: &AppHandle, text: &str, minutes: Option<i64>, at: Option<&str>) -> Result<String, String> {
     let text = text.trim();
     if text.is_empty() {
@@ -83,12 +102,22 @@ pub fn add_reminder(app: &AppHandle, text: &str, minutes: Option<i64>, at: Optio
     let now = chrono::Local::now();
     let due = match (minutes, at) {
         (Some(m), _) if m > 0 && m <= 7 * 24 * 60 => now + chrono::Duration::minutes(m),
-        (_, Some(at)) => {
+        (_, Some(at)) if at.trim().len() <= 5 => {
             let time = chrono::NaiveTime::parse_from_str(at.trim(), "%H:%M").map_err(|_| "Use o horário no formato HH:MM.")?;
             let today = now.date_naive().and_time(time).and_local_timezone(chrono::Local).single().ok_or("Horário inválido.")?;
             if today > now { today } else { today + chrono::Duration::days(1) }
         }
-        _ => return Err("Diga em quantos minutos (1 a 10080) ou em que horário (HH:MM).".into()),
+        (_, Some(at)) => {
+            let due = parse_date_time(at, now).ok_or("Use a data no formato DD/MM/AAAA HH:MM.")?;
+            if due <= now {
+                return Err("Essa data já passou.".into());
+            }
+            if due > now + chrono::Duration::days(3 * 365) {
+                return Err("Escolha uma data nos próximos 3 anos.".into());
+            }
+            due
+        }
+        _ => return Err("Diga em quantos minutos (1 a 10080), em que horário (HH:MM) ou em que data (DD/MM/AAAA HH:MM).".into()),
     };
     let utc = due.with_timezone(&chrono::Utc).format("%Y-%m-%d %H:%M:%S").to_string();
     let state = app.state::<AppState>();
@@ -97,16 +126,19 @@ pub fn add_reminder(app: &AppHandle, text: &str, minutes: Option<i64>, at: Optio
         .execute("INSERT INTO reminders (text, due_at) VALUES (?1, ?2)", params![text, utc])
         .map_err(|e| e.to_string())?;
     let _ = app.emit("focus-changed", ());
-    Ok(due.format("%d/%m %H:%M").to_string())
+    Ok(if due.year_ce() == now.year_ce() { due.format("%d/%m %H:%M") } else { due.format("%d/%m/%Y %H:%M") }.to_string())
 }
 
 fn local_due(utc: &str) -> String {
     let Ok(naive) = chrono::NaiveDateTime::parse_from_str(utc, "%Y-%m-%d %H:%M:%S") else { return utc.to_string() };
     let local = naive.and_utc().with_timezone(&chrono::Local);
-    if local.date_naive() == chrono::Local::now().date_naive() {
+    let today = chrono::Local::now().date_naive();
+    if local.date_naive() == today {
         local.format("%H:%M").to_string()
-    } else {
+    } else if local.format("%Y").to_string() == today.format("%Y").to_string() {
         local.format("%d/%m %H:%M").to_string()
+    } else {
+        local.format("%d/%m/%Y %H:%M").to_string()
     }
 }
 
@@ -290,4 +322,22 @@ pub fn pomodoro_start(app: AppHandle, focus_min: Option<u64>, break_min: Option<
 #[tauri::command]
 pub fn pomodoro_stop(app: AppHandle) {
     stop_pomodoro(&app);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_date_time;
+    use chrono::TimeZone;
+
+    #[test]
+    fn le_datas_dos_lembretes() {
+        let now = chrono::Local.with_ymd_and_hms(2026, 11, 3, 20, 0, 0).unwrap();
+        let fmt = |s: &str| parse_date_time(s, now).map(|d| d.format("%Y-%m-%d %H:%M").to_string());
+        assert_eq!(fmt("2026-12-25T09:30").as_deref(), Some("2026-12-25 09:30"));
+        assert_eq!(fmt("25/12/2026 09:30").as_deref(), Some("2026-12-25 09:30"));
+        assert_eq!(fmt("25/12 às 09:30").as_deref(), Some("2026-12-25 09:30"));
+        // Data deste ano que já passou vai para o ano que vem.
+        assert_eq!(fmt("10/01 08:00").as_deref(), Some("2027-01-10 08:00"));
+        assert!(fmt("amanhã").is_none());
+    }
 }

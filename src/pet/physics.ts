@@ -16,8 +16,13 @@ const resting = (s: Spring, eps: number) => Math.abs(s.x - s.target) < eps && Ma
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-export function useDragPhysics(el: RefObject<HTMLElement | null>) {
+type Callbacks = { onLift?: () => void; onDrop?: () => void };
+
+export function useDragPhysics(el: RefObject<HTMLElement | null>, callbacks: Callbacks = {}) {
+  const cb = useRef(callbacks);
+  cb.current = callbacks;
   const state = useRef({
+    moving: false,
     tilt: spring(0, 0.09, 0.8),
     stretch: spring(0, 0.12, 0.78),
     lift: spring(1, 0.16, 0.74),
@@ -52,11 +57,18 @@ export function useDragPhysics(el: RefObject<HTMLElement | null>) {
       const p = state.current;
       const speed = Math.hypot(vx, vy);
       if (active) {
+        // Só conta como arrasto (com som) quando o Pipo realmente se mexe.
+        if (!p.moving && speed > 120) {
+          p.moving = true;
+          cb.current.onLift?.();
+        }
         if (speed > 60) p.dir = Math.round((Math.atan2(vy, vx) * 180) / Math.PI);
         p.tilt.target = clamp(vx / 110, -14, 14);
         p.stretch.target = clamp(speed / 4000, 0, 0.16);
       } else {
         // Soltou: tudo volta ao lugar com um balanço; quanto mais rápido, mais ele chacoalha.
+        if (p.moving) cb.current.onDrop?.();
+        p.moving = false;
         p.held = false;
         p.tilt.target = 0;
         p.stretch.target = 0;

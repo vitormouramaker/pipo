@@ -177,6 +177,8 @@ pub fn run() {
             toast::toast_open,
             toast::toast_done,
             windows::pet_menu_open,
+            windows::panel_expand,
+            windows::panel_is_expanded,
             voice::voice_status,
             voice::voice_download,
             voice::voice_toggle,

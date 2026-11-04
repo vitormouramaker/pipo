@@ -45,6 +45,9 @@ pub struct Settings {
     pub follow_cursor: bool,
     /// Acessórios liberados que o usuário preferiu não usar.
     pub hidden_accessories: Vec<String>,
+    /// Efeitos sonoros (0 a 100).
+    pub sounds: bool,
+    pub sound_volume: u8,
 }
 
 impl Default for Settings {
@@ -73,6 +76,8 @@ impl Default for Settings {
             voice_name: String::new(),
             follow_cursor: true,
             hidden_accessories: Vec::new(),
+            sounds: true,
+            sound_volume: 60,
         }
     }
 }

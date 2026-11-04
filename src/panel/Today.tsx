@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, type Briefing, type LiveChannel, type Settings } from "../api";
 import { sqliteDate } from "../format";
+import { sfx } from "../ui/sound";
 
 type Props = { onAsk: (prompt: string) => void };
 
@@ -131,9 +132,9 @@ const PLATFORMS: Record<LiveChannel["platform"], string> = { twitch: "Twitch", y
 
 function Lives() {
   const [channels, setChannels] = useState<LiveChannel[]>([]);
-  const [platform, setPlatform] = useState<LiveChannel["platform"]>("twitch");
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const refresh = () => void api.livesList().then(setChannels);
 
@@ -145,14 +146,20 @@ function Lives() {
 
   const add = () => {
     setError(null);
+    setAdded(null);
     setChecking(true);
     void api
-      .liveAdd(platform, input)
-      .then(() => {
+      .liveAdd(input)
+      .then((name) => {
         setInput("");
+        setAdded(`Seguindo ${name}.`);
+        sfx.done();
         refresh();
       })
-      .catch((e) => setError(String(e)))
+      .catch((e) => {
+        setError(String(e));
+        sfx.error();
+      })
       .finally(() => setChecking(false));
   };
 
@@ -166,14 +173,9 @@ function Lives() {
         </button>
       </div>
       <div className="inline-form">
-        <select value={platform} onChange={(e) => setPlatform(e.target.value as LiveChannel["platform"])}>
-          <option value="twitch">Twitch</option>
-          <option value="youtube">YouTube</option>
-          <option value="kick">Kick</option>
-        </select>
         <input
           className="grow"
-          placeholder={platform === "youtube" ? "@canal ou link" : "nome do canal ou link"}
+          placeholder="Cole o link do canal (Twitch, YouTube ou Kick)"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && input.trim() && add()}
@@ -183,6 +185,7 @@ function Lives() {
         </button>
       </div>
       {error && <p className="hint">{error}</p>}
+      {added && <p className="hint ok">{added}</p>}
       {channels.length === 0 && <p className="hint">Siga canais e o Pipo avisa quando entrarem ao vivo (verifica a cada 2 minutos).</p>}
       <div className="table">
         {channels.map((c) => (

@@ -71,28 +71,49 @@ fn save(app: &AppHandle, list: &[Channel]) -> Result<(), String> {
     db.set_setting(KEY, &serde_json::to_string(list).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
 }
 
+/// Descobre a plataforma pelo link (ou pelo @, que é do YouTube).
+fn detect(input: &str) -> Result<&'static str, String> {
+    let lower = input.trim().to_lowercase();
+    if lower.contains("twitch.tv") {
+        Ok("twitch")
+    } else if lower.contains("kick.com") {
+        Ok("kick")
+    } else if lower.contains("youtube.com") || lower.contains("youtu.be") || lower.starts_with('@') {
+        Ok("youtube")
+    } else {
+        Err("Cole o link do canal (Twitch, YouTube ou Kick) para eu saber de onde ele é.".into())
+    }
+}
+
 /// Aceita o nome do canal ou o link dele.
 fn parse(platform: &str, input: &str) -> Result<Channel, String> {
-    let input = input.trim().trim_end_matches('/');
+    // Partes do caminho do link, sem domínio, "?si=…" nem "#…" (ou o próprio nome digitado).
+    let clean = input.trim().split(['?', '#']).next().unwrap_or("").trim_end_matches('/');
+    let path = clean.split_once("://").map_or(clean, |(_, rest)| rest);
+    let has_domain = path.split('/').next().is_some_and(|host| host.contains('.'));
+    let segments: Vec<&str> = path.split('/').skip(usize::from(has_domain)).filter(|s| !s.is_empty()).collect();
+    let first = segments.first().copied().unwrap_or("").trim_start_matches('@');
     let valid = |s: &str| !s.is_empty() && s.len() <= 60 && s.chars().all(|c| c.is_ascii_alphanumeric() || "_-.".contains(c));
     match platform {
+        // twitch.tv/gaules/videos -> "gaules"
         "twitch" => {
-            let login = input.rsplit('/').next().unwrap_or(input).trim_start_matches('@').to_lowercase();
+            let login = first.to_lowercase();
             valid(&login).then(|| Channel { platform: "twitch".into(), handle: login }).ok_or("Nome de canal da Twitch inválido.".into())
         }
+        // youtube.com/@canal/streams -> "@canal"; youtube.com/channel/UC… -> "UC…"
         "youtube" => {
-            let path = input.split("youtube.com/").nth(1).unwrap_or(input).trim_end_matches("/live");
-            let handle = if let Some(id) = path.strip_prefix("channel/") {
-                id.to_string()
-            } else {
-                let name = path.trim_start_matches('@');
-                format!("@{name}")
+            let handle = match segments.as_slice() {
+                ["channel", id, ..] => id.to_string(),
+                [seg, ..] if seg.starts_with('@') => seg.to_string(),
+                [name] if !has_domain => format!("@{}", name.trim_start_matches('@')),
+                _ => return Err("Use o link do canal no formato youtube.com/@nome.".into()),
             };
             let bare = handle.trim_start_matches('@');
             valid(bare).then(|| Channel { platform: "youtube".into(), handle }).ok_or("Canal do YouTube inválido. Use o @nome ou o link.".into())
         }
+        // kick.com/gaules -> "gaules"
         "kick" => {
-            let slug = input.rsplit('/').next().unwrap_or(input).trim_start_matches('@').to_lowercase();
+            let slug = first.to_lowercase();
             valid(&slug).then(|| Channel { platform: "kick".into(), handle: slug }).ok_or("Nome de canal da Kick inválido.".into())
         }
         _ => Err("Plataforma não suportada.".into()),
@@ -234,8 +255,13 @@ pub fn lives_list(app: AppHandle) -> Vec<ChannelView> {
 }
 
 #[tauri::command]
-pub async fn live_add(app: AppHandle, platform: String, input: String) -> Result<(), String> {
+pub async fn live_add(app: AppHandle, platform: Option<String>, input: String) -> Result<String, String> {
+    let platform = match platform.filter(|p| !p.is_empty() && p != "auto") {
+        Some(p) => p,
+        None => detect(&input)?.to_string(),
+    };
     let channel = parse(&platform, &input)?;
+    let added = format!("{} ({})", channel.handle.trim_start_matches('@'), platform_name(&channel.platform));
     let mut list = channels(&app);
     if list.iter().any(|c| c.key() == channel.key()) {
         return Err("Esse canal já está na lista.".into());
@@ -243,7 +269,7 @@ pub async fn live_add(app: AppHandle, platform: String, input: String) -> Result
     list.push(channel);
     save(&app, &list)?;
     check_all(&app).await;
-    Ok(())
+    Ok(added)
 }
 
 #[tauri::command]
@@ -257,4 +283,26 @@ pub fn live_remove(app: AppHandle, key: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn lives_refresh(app: AppHandle) {
     check_all(&app).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn add(input: &str) -> (String, String) {
+        let platform = detect(input).unwrap();
+        let c = parse(platform, input).unwrap();
+        (c.platform, c.handle)
+    }
+
+    #[test]
+    fn detecta_plataforma_pelo_link() {
+        assert_eq!(add("https://www.twitch.tv/Gaules"), ("twitch".into(), "gaules".into()));
+        assert_eq!(add("twitch.tv/gaules/videos?filter=all"), ("twitch".into(), "gaules".into()));
+        assert_eq!(add("https://kick.com/xqc"), ("kick".into(), "xqc".into()));
+        assert_eq!(add("https://www.youtube.com/@LofiGirl/streams?si=abc"), ("youtube".into(), "@LofiGirl".into()));
+        assert_eq!(add("https://youtube.com/channel/UCSJ4gkVC6NrvII8umztf0Ow"), ("youtube".into(), "UCSJ4gkVC6NrvII8umztf0Ow".into()));
+        assert_eq!(add("@BaianoTV1"), ("youtube".into(), "@BaianoTV1".into()));
+        assert!(detect("gaules").is_err());
+    }
 }

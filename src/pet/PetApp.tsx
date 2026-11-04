@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { ICONS } from "../ui/icons";
 import { useDragPhysics } from "./physics";
+import { sfx } from "../ui/sound";
 import { api, wornAccessories, type LifeStatus, type PanelView, type RadialLayout, type Settings } from "../api";
 import { Pipo, PIPO_STATES, type PipoState } from "../pipo/Pipo";
 
@@ -44,7 +45,11 @@ export default function PetApp() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const press = useRef<{ x: number; y: number } | null>(null);
   const petRef = useRef<HTMLDivElement>(null);
-  const physics = useDragPhysics(petRef);
+  const physics = useDragPhysics(petRef, { onLift: sfx.pick, onDrop: sfx.drop });
+  // Menus abertos agora (lido pelos ouvintes de eventos, que não veem o estado novo).
+  const openRef = useRef(false);
+  const [closing, setClosing] = useState(false);
+  const lastState = useRef<string>("idle");
   // Menu do botão direito, desenhado aqui mesmo com a identidade do Pipo.
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -69,13 +74,14 @@ export default function PetApp() {
       if (e.payload === "gaming") setRadial(null);
     });
     const unlistenState = listen<string>("pipo-state", (e) => {
+      // Microfone abrindo e fechando têm som próprio.
+      if (e.payload === "listening" && lastState.current !== "listening") sfx.listen();
+      else if (e.payload !== "listening" && lastState.current === "listening") sfx.stopListen();
+      lastState.current = e.payload;
       if (e.payload === "clear") setOverride(null);
       else if (isState(e.payload)) setOverride(e.payload);
     });
-    const unlistenRadial = listen("radial-close", () => {
-      setRadial(null);
-      setMenu(null);
-    });
+    const unlistenRadial = listen("radial-close", () => closeRadial());
     return () => {
       void unlistenBase.then((fn) => fn());
       void unlistenState.then((fn) => fn());
@@ -90,10 +96,18 @@ export default function PetApp() {
     return () => window.clearTimeout(timer);
   }, [override]);
 
+  // Fecha com animação: os botões voltam para dentro do Pipo antes de sumir.
   const closeRadial = () => {
-    setRadial(null);
-    setMenu(null);
     void api.radialClose();
+    if (!openRef.current) return;
+    openRef.current = false;
+    sfx.close();
+    setClosing(true);
+    window.setTimeout(() => {
+      setRadial(null);
+      setMenu(null);
+      setClosing(false);
+    }, 150);
   };
 
   // Os menus fecham com Esc ou ao clicar fora do Pipo (a janela perde o foco).
@@ -112,7 +126,9 @@ export default function PetApp() {
   useLayoutEffect(() => {
     const node = menuRef.current;
     if (!menu || !node) return;
-    const { width, height } = node.getBoundingClientRect();
+    // Tamanho de layout (sem a escala da animação de entrada).
+    const width = node.offsetWidth;
+    const height = node.offsetHeight;
     const x = Math.max(4, Math.min(menu.x, window.innerWidth - width - 4));
     const y = Math.max(4, Math.min(menu.y, window.innerHeight - height - 4));
     if (x !== menu.x || y !== menu.y) setMenu({ x, y });
@@ -145,14 +161,16 @@ export default function PetApp() {
     : [];
   const angles = radial ? placeItems(radial.angles, items.length) : [];
   const state: PipoState = override ?? base;
+  openRef.current = Boolean(radial || menu) && !closing;
 
   return (
     <main
       className={radial ? "stage radial-open" : "stage"}
       onContextMenu={(e) => {
         e.preventDefault();
-        if (radial) return;
+        if (radial || closing) return;
         setMenu({ x: e.clientX, y: e.clientY });
+        sfx.open();
         void api.petMenuOpen();
       }}
       onPointerDown={(e) => {
@@ -183,7 +201,11 @@ export default function PetApp() {
           physics.release();
           if (!p || Math.hypot(e.screenX - p.x, e.screenY - p.y) > CLICK_TOLERANCE) return;
           if (radial) closeRadial();
-          else void api.radialOpen().then(setRadial);
+          else if (!closing)
+            void api.radialOpen().then((layout) => {
+              sfx.open();
+              setRadial(layout);
+            });
         }}
       >
         <Pipo
@@ -200,14 +222,18 @@ export default function PetApp() {
           return (
             <button
               key={item.id}
-              className={`radial-btn${item.id === "spark" ? " suggestion" : ""}`}
+              className={`radial-btn${item.id === "spark" ? " suggestion" : ""}${closing ? " closing" : ""}`}
               title={item.label}
               aria-label={item.label}
-              style={{
-                left: `calc(50% + ${Math.cos(a) * radial.radius}px)`,
-                top: `calc(50% + ${Math.sin(a) * radial.radius}px)`,
-                animationDelay: `${i * 18}ms`,
-              }}
+              style={
+                {
+                  left: `calc(50% + ${Math.cos(a) * radial.radius}px)`,
+                  top: `calc(50% + ${Math.sin(a) * radial.radius}px)`,
+                  "--dx": `${Math.cos(a) * radial.radius}px`,
+                  "--dy": `${Math.sin(a) * radial.radius}px`,
+                  animationDelay: closing ? `${(items.length - 1 - i) * 10}ms` : `${i * 18}ms`,
+                } as CSSProperties
+              }
               onClick={() => {
                 closeRadial();
                 item.action();
@@ -219,7 +245,7 @@ export default function PetApp() {
         })}
 
       {menu && (
-        <div className="pet-menu" ref={menuRef} style={{ left: menu.x, top: menu.y }} role="menu">
+        <div className={closing ? "pet-menu closing" : "pet-menu"} ref={menuRef} style={{ left: menu.x, top: menu.y }} role="menu">
           {menuItems.map((item) => (
             <button
               key={item.id}

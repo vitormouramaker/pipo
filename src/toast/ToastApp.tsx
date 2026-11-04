@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { api, type Toast } from "../api";
 import { Pipo, type PipoState } from "../pipo/Pipo";
 import { ICONS } from "../ui/icons";
+import { sfx } from "../ui/sound";
 import "./toast.css";
 
 // Quanto tempo cada balão fica na tela (pausa com o mouse em cima).
@@ -80,7 +81,14 @@ export default function ToastApp() {
   useEffect(() => {
     const take = () =>
       void api.toastTake().then((fresh) => {
-        if (fresh.length) setToasts((t) => [...t, ...fresh].slice(-MAX));
+        if (fresh.length) {
+          const kinds = fresh.map((t) => t.kind);
+          if (kinds.includes("level")) sfx.level();
+          else if (kinds.includes("achievement")) sfx.achievement();
+          else if (kinds.includes("error")) sfx.error();
+          else sfx.notify();
+          setToasts((t) => [...t, ...fresh].slice(-MAX));
+        }
         setReady(true);
       });
     take();

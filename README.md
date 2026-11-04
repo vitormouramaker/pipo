@@ -41,7 +41,8 @@ npm run tauri build   # gera os instaladores em src-tauri/target/release/bundle/
 - **Arrastar**: move o Pipo, que para nas bordas da tela (e passa para outro monitor); a posição é lembrada. Com o painel aberto, Pipo e painel andam juntos (arrastando qualquer um dos dois). Ao ser arrastado, o Pipo se inclina, estica com a velocidade e balança como gelatina quando você solta.
 - **Botão direito no Pipo**: menu com a cara do Pipo (chat, falar, evolução, configurações, ocultar e sair). O **ícone na bandeja** tem as mesmas opções no menu do Windows.
 - **Avisos**: lembretes, lives, pomodoro, níveis e alertas aparecem como balões do próprio Pipo ao lado dele, sem roubar o foco (nem de um jogo). Clique no balão para abrir a live ou a aba certa.
-- **X** no canto do painel: fecha o painel.
+- **X** no canto do painel: fecha o painel. O botão ao lado expande o painel para a tela toda (e volta).
+- **Sons**: efeitos curtos e suaves em cada interação (menus, arrasto, mensagens, avisos, nível novo). Volume e desligar em ⚙ → Aparência.
 - **Histórico** (no topo do chat): todas as conversas anteriores; clique para reabrir ou exclua as que não quiser. **+ Nova conversa** guarda a atual no histórico.
 
 O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquanto responde, satisfeito quando termina e em alerta quando algo dá errado. Também fica focado depois de alguns minutos programando, dorme com o computador parado e some sozinho quando um jogo ou vídeo está em tela cheia no mesmo monitor que ele (modo jogo; janela maximizada não conta).
@@ -51,7 +52,7 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
 **Abas do painel:**
 
 - **Chat**: conversa com a IA, com histórico. Pesquisa na web quando a pergunta depende de informação atual, com as fontes clicáveis.
-- **Hoje**: briefing do dia (clima, notícias dos seus temas e lembretes; pode montar sozinho no horário), lives da Twitch, do YouTube e da Kick com aviso quando entram ao vivo, e pesquisa rápida. O Pipo usa ferramentas para agir (rodar scripts, ver portas, commit, lembretes…); tudo o que muda algo no computador pede **Permitir/Negar** antes.
+- **Hoje**: briefing do dia (clima, notícias dos seus temas e lembretes; pode montar sozinho no horário), lives da Twitch, do YouTube e da Kick (é só colar o link; o Pipo descobre a plataforma) com aviso quando entram ao vivo, e pesquisa rápida. O Pipo usa ferramentas para agir (rodar scripts, ver portas, commit, lembretes…); tudo o que muda algo no computador pede **Permitir/Negar** antes.
 - **Ações**:
   - **Dev**: projetos recentes do VS Code/Cursor (abrir, terminal, scripts no terminal ou em segundo plano com aviso ao terminar, mensagem de commit pela IA), tarefas em execução, portas em uso (com encerrar) e containers do Docker.
   - **Foco**: pomodoro, lembretes, pausas para água e postura e notas rápidas.
