@@ -241,6 +241,15 @@ async fn end_of_game(app: &AppHandle, client: &reqwest::Client, port: u16, passw
     let (k, d, a) = (n("CHAMPIONS_KILLED"), n("NUM_DEATHS"), n("ASSISTS"));
     let summary = format!("{champion}: {k}/{d}/{a} · {cs:.1} de farm por minuto · {minutes:.0} min");
     update(app, |s| s.last_game = Some(format!("{} — {summary}", if won { "Vitória" } else { "Derrota" })));
+    {
+        // Guarda a partida (relatório semanal e, depois, o histórico do LoL).
+        let state = app.state::<AppState>();
+        let db = state.db.lock().unwrap();
+        let _ = db.conn().execute(
+            "INSERT INTO lol_games (day, champion, position, won, kills, deaths, assists, cs_min, minutes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            rusqlite::params![chrono::Local::now().format("%Y-%m-%d").to_string(), champion, game.position, won as i64, k, d, a, cs, minutes],
+        );
+    }
     let role = if game.position.is_empty() { String::new() } else { format!(" no {}", game.position) };
     let prompt = format!(
         "prompt:Analise minha última partida de League of Legends: {champion}{role}, {} com {k}/{d}/{a} e {cs:.1} de farm por minuto em {minutes:.0} minutos. Me dê 3 coisas para melhorar.",

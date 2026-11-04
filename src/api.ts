@@ -50,6 +50,12 @@ export type Settings = {
   telegramChatId: string;
   telegramAwayOnly: boolean;
   telegramSources: string[];
+  telegramCommands: boolean;
+  telegramRemindersAlways: boolean;
+  weeklyReport: boolean;
+  weeklyReportDay: number;
+  weeklyReportTime: string;
+  weeklyReportAi: boolean;
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -111,6 +117,7 @@ export type UpdateStatus = {
 };
 export type Attachment = { path: string; name: string; kind: "pdf" | "image" | "docx" | "pptx" | "text"; size: number };
 export type AttachResult = { path: string; name: string; attachment: Attachment | null; error: string | null };
+export type WeeklyReport = { week: string; text: string; createdAt: string };
 export type MiniSource = { platform: string; handle: string; title: string | null; video: string | null; url: string };
 export type ModeStatus = { mode: string; reason: string };
 export type ModeRule = { mode: string; kind: "app" | "horario"; apps: string; days: number[]; from: string; to: string };
@@ -375,6 +382,9 @@ export const api = {
   telegramTest: () => invoke<void>("telegram_test"),
   telegramDisconnect: () => invoke<void>("telegram_disconnect"),
   emailStatus: () => invoke<MailStatus>("email_status"),
+  reportLatest: () => invoke<WeeklyReport | null>("report_latest"),
+  reportGenerate: () => invoke<WeeklyReport>("report_generate"),
+  reportSend: () => invoke<void>("report_send"),
   emailRefresh: () => invoke<MailStatus>("email_refresh"),
   emailConnect: (address: string, password: string) => invoke<number>("email_connect", { address, password }),
   emailDisconnect: () => invoke<void>("email_disconnect"),

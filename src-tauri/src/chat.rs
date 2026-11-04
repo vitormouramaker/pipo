@@ -328,7 +328,8 @@ pub async fn chat_send(
     state.busy.store(true, Ordering::SeqCst);
     windows::set_pet_state(&app, "thinking");
 
-    let result = run(&app, &text, &attachments.unwrap_or_default(), &on_event).await;
+    let mut reply = String::new();
+    let result = run(&app, &text, &attachments.unwrap_or_default(), &Sink::Panel(&on_event), None, "", &mut reply).await;
     state.busy.store(false, Ordering::SeqCst);
 
     match result {
@@ -346,7 +347,43 @@ pub async fn chat_send(
     Ok(())
 }
 
-async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Channel<ChatEvent>) -> Result<Option<String>, String> {
+/// Para onde vai a resposta: o chat do painel (com streaming) ou uma conversa remota
+/// (Telegram), que recebe o texto pronto e confirma ações por botão.
+pub enum Sink<'a> {
+    Panel(&'a Channel<ChatEvent>),
+    Remote(&'a crate::world::telegram::Remote),
+}
+
+impl Sink<'_> {
+    fn send(&self, event: ChatEvent) {
+        if let Sink::Panel(channel) = self {
+            let _ = channel.send(event);
+        }
+    }
+}
+
+/// Uma rodada de conversa vinda de fora do painel (ex.: celular), numa conversa própria.
+/// Devolve o texto da resposta.
+pub async fn run_remote(app: &AppHandle, text: &str, remote: &crate::world::telegram::Remote, conversation: i64, note: &str) -> Result<String, String> {
+    let mut reply = String::new();
+    let stop = run(app, text, &[], &Sink::Remote(remote), Some(conversation), note, &mut reply).await?;
+    if stop.as_deref() == Some("refusal") {
+        return Err("O Pipo não pode responder a esse pedido.".into());
+    }
+    life::award(app, "chat", 1);
+    Ok(reply.trim().to_string())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run(
+    app: &AppHandle,
+    text: &str,
+    attachments: &[String],
+    sink: &Sink<'_>,
+    conversation: Option<i64>,
+    extra_system: &str,
+    reply: &mut String,
+) -> Result<Option<String>, String> {
     let key = secrets::get().ok_or("Configure a chave da Claude API nas Configurações.")?;
     let state = app.state::<AppState>();
 
@@ -362,7 +399,10 @@ async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Cha
     let (settings, conversation) = {
         let db = state.db.lock().unwrap();
         let settings = settings::load(&db);
-        let conversation = db.current_conversation().map_err(|e| e.to_string())?;
+        let conversation = match conversation {
+            Some(id) => id,
+            None => db.current_conversation().map_err(|e| e.to_string())?,
+        };
         db.add_message(conversation, "user", &Value::Array(content))
             .map_err(|e| e.to_string())?;
         (settings, conversation)
@@ -391,7 +431,7 @@ async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Cha
             "stream": true,
             "cache_control": { "type": "ephemeral" },
             "output_config": { "effort": "low" },
-            "system": format!("{}\n\n{}", system_prompt(settings.sarcasm, &settings.city), crate::proactive::memory_prompt(app)).trim().to_string(),
+            "system": format!("{}\n\n{}\n\n{}", system_prompt(settings.sarcasm, &settings.city), crate::proactive::memory_prompt(app), extra_system).trim().to_string(),
             "tools": all_tools,
             "messages": messages,
         });
@@ -436,7 +476,7 @@ async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Cha
         let mut blocks: Vec<Value> = Vec::new();
         let mut stop_reason: Option<String> = None;
         let mut usage = Usage { model: settings.model.clone(), ..Default::default() };
-        let streamed = read_stream(response, &mut blocks, &mut stop_reason, &mut usage, on_event).await;
+        let streamed = read_stream(response, &mut blocks, &mut stop_reason, &mut usage, sink).await;
 
         // Registra o consumo mesmo se a resposta foi interrompida: os tokens já foram cobrados.
         if !usage.is_empty() {
@@ -459,6 +499,13 @@ async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Cha
             }
         }
         blocks.retain(|b| !b.is_null() && !(b["type"] == "text" && b["text"].as_str().unwrap_or("").is_empty()));
+        let said: String = blocks.iter().filter(|b| b["type"] == "text").filter_map(|b| b["text"].as_str()).collect();
+        if !said.trim().is_empty() {
+            if !reply.is_empty() {
+                reply.push_str("\n\n");
+            }
+            reply.push_str(said.trim());
+        }
         if !blocks.is_empty() {
             let db = state.db.lock().unwrap();
             db.add_message(conversation, "assistant", &Value::Array(blocks.clone()))
@@ -483,14 +530,14 @@ async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Cha
                 (json!("INVALID_JSON: a entrada da ferramenta veio incompleta. Tente de novo."), true)
             } else if name == "read_file" {
                 // Ler arquivo devolve o próprio documento (PDF, imagem ou texto) para a Claude.
-                let _ = on_event.send(ChatEvent::Tool { label: tools::label(&name, &input) });
+                sink.send(ChatEvent::Tool { label: tools::label(&name, &input) });
                 match documents::read_for_chat(input["path"].as_str().unwrap_or("")) {
                     Ok(blocks) => (Value::Array(blocks), false),
                     Err(e) => (json!(e), true),
                 }
             } else {
-                let _ = on_event.send(ChatEvent::Tool { label: tools::label(&name, &input) });
-                match run_tool(app, &name, &input, on_event).await {
+                sink.send(ChatEvent::Tool { label: tools::label(&name, &input) });
+                match run_tool(app, &name, &input, sink).await {
                     Ok(out) => (json!(out), false),
                     Err(e) => (json!(e), true),
                 }
@@ -504,17 +551,24 @@ async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Cha
 }
 
 /// Pede confirmação quando a ação tem efeito e executa fora da thread principal.
-async fn run_tool(app: &AppHandle, name: &str, input: &Value, on_event: &Channel<ChatEvent>) -> Result<String, String> {
+async fn run_tool(app: &AppHandle, name: &str, input: &Value, sink: &Sink<'_>) -> Result<String, String> {
     if tools::needs_confirmation(name) {
-        let state = app.state::<AppState>();
-        let id = format!("c{}", state.confirm_seq.fetch_add(1, Ordering::SeqCst));
-        let (sender, receiver) = tokio::sync::oneshot::channel();
-        state.confirms.lock().unwrap().insert(id.clone(), sender);
-        windows::set_pet_state(app, "attentive");
-        let _ = on_event.send(ChatEvent::Confirm { id: id.clone(), question: tools::confirmation(name, input) });
-        let approved = tokio::time::timeout(CONFIRM_TIMEOUT, receiver).await.ok().and_then(|r| r.ok()).unwrap_or(false);
-        state.confirms.lock().unwrap().remove(&id);
-        windows::set_pet_state(app, "thinking");
+        let question = tools::confirmation(name, input);
+        let approved = match sink {
+            Sink::Remote(remote) => remote.confirm(&question, CONFIRM_TIMEOUT).await,
+            Sink::Panel(_) => {
+                let state = app.state::<AppState>();
+                let id = format!("c{}", state.confirm_seq.fetch_add(1, Ordering::SeqCst));
+                let (sender, receiver) = tokio::sync::oneshot::channel();
+                state.confirms.lock().unwrap().insert(id.clone(), sender);
+                windows::set_pet_state(app, "attentive");
+                sink.send(ChatEvent::Confirm { id: id.clone(), question });
+                let approved = tokio::time::timeout(CONFIRM_TIMEOUT, receiver).await.ok().and_then(|r| r.ok()).unwrap_or(false);
+                state.confirms.lock().unwrap().remove(&id);
+                windows::set_pet_state(app, "thinking");
+                approved
+            }
+        };
         if !approved {
             return Ok("O usuário não autorizou essa ação. Não tente de novo sem ele pedir.".into());
         }
@@ -534,7 +588,7 @@ async fn read_stream(
     blocks: &mut Vec<Value>,
     stop_reason: &mut Option<String>,
     usage: &mut Usage,
-    on_event: &Channel<ChatEvent>,
+    sink: &Sink<'_>,
 ) -> Result<(), String> {
     let mut buffer: Vec<u8> = Vec::new();
     let mut stream = response.bytes_stream();
@@ -548,7 +602,7 @@ async fn read_stream(
             for line in String::from_utf8_lossy(&raw).lines() {
                 let Some(data) = line.strip_prefix("data: ") else { continue };
                 let Ok(event) = serde_json::from_str::<Value>(data) else { continue };
-                handle_event(&event, blocks, stop_reason, usage, on_event)?;
+                handle_event(&event, blocks, stop_reason, usage, sink)?;
             }
         }
     }
@@ -575,7 +629,7 @@ fn handle_event(
     blocks: &mut Vec<Value>,
     stop_reason: &mut Option<String>,
     usage: &mut Usage,
-    on_event: &Channel<ChatEvent>,
+    sink: &Sink<'_>,
 ) -> Result<(), String> {
     let index = event["index"].as_u64().unwrap_or(0) as usize;
     match event["type"].as_str().unwrap_or("") {
@@ -592,7 +646,7 @@ fn handle_event(
                 "text_delta" => {
                     let piece = delta["text"].as_str().unwrap_or("");
                     append(block, "text", piece);
-                    let _ = on_event.send(ChatEvent::Delta { text: piece.to_string() });
+                    sink.send(ChatEvent::Delta { text: piece.to_string() });
                 }
                 "thinking_delta" => append(block, "thinking", delta["thinking"].as_str().unwrap_or("")),
                 "signature_delta" => block["signature"] = delta["signature"].clone(),
@@ -601,7 +655,7 @@ fn handle_event(
                 "citations_delta" => {
                     let citation = delta["citation"].clone();
                     if let (Some(url), title) = (citation["url"].as_str(), citation["title"].as_str()) {
-                        let _ = on_event.send(ChatEvent::Source {
+                        sink.send(ChatEvent::Source {
                             title: title.filter(|t| !t.is_empty()).unwrap_or(url).to_string(),
                             url: url.to_string(),
                         });
@@ -626,7 +680,7 @@ fn handle_event(
                 }
             }
             if block["type"] == "server_tool_use" {
-                let _ = on_event.send(ChatEvent::Tool { label: web_label(block) });
+                sink.send(ChatEvent::Tool { label: web_label(block) });
             }
         }
         "message_start" => {

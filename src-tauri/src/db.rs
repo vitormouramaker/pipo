@@ -80,6 +80,19 @@ impl Db {
                  text       TEXT NOT NULL,
                  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
              );
+             CREATE TABLE IF NOT EXISTS lol_games (
+                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                 day       TEXT NOT NULL,
+                 champion  TEXT NOT NULL,
+                 position  TEXT NOT NULL,
+                 won       INTEGER NOT NULL,
+                 kills     INTEGER NOT NULL,
+                 deaths    INTEGER NOT NULL,
+                 assists   INTEGER NOT NULL,
+                 cs_min    REAL NOT NULL,
+                 minutes   REAL NOT NULL,
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
              CREATE TABLE IF NOT EXISTS achievements (
                  id          TEXT PRIMARY KEY,
                  unlocked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

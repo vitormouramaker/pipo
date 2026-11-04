@@ -197,6 +197,9 @@ pub fn start(app: AppHandle) {
             if tick % 60 == 30 {
                 crate::world::briefing::maybe_run(&app, idle, gaming);
             }
+            if tick % 60 == 45 {
+                crate::report::maybe_run(&app);
+            }
             if tick % 60 == 10 && idle < 120 {
                 crate::life::checkin_if_new_day(&app);
             }

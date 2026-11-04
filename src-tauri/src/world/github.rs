@@ -75,7 +75,7 @@ fn gh(args: &[&str]) -> Result<String, String> {
 }
 
 /// Contas logadas no `gh` (a ativa primeiro).
-fn accounts() -> Vec<String> {
+pub fn accounts() -> Vec<String> {
     let out = crate::actions::command("gh").args(["auth", "status", "--hostname", "github.com"]).output();
     let Ok(out) = out else { return Vec::new() };
     let text = format!("{}{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
@@ -97,7 +97,7 @@ fn accounts() -> Vec<String> {
 }
 
 /// Roda o `gh` como uma conta específica (pelo token dela, sem mudar a conta ativa).
-fn gh_as(account: &str, args: &[&str]) -> Result<String, String> {
+pub fn gh_as(account: &str, args: &[&str]) -> Result<String, String> {
     let token = gh(&["auth", "token", "--user", account])?.trim().to_string();
     let out = crate::actions::command("gh").args(args).env("GH_TOKEN", token).output().map_err(|e| e.to_string())?;
     if out.status.success() {

@@ -8,6 +8,7 @@ mod documents;
 mod island;
 mod life;
 mod proactive;
+mod report;
 mod menu;
 mod miniplayer;
 mod modes;
@@ -190,6 +191,7 @@ pub fn run() {
             world::calendar::start(app.handle().clone());
             world::lol::start(app.handle().clone());
             world::email::start(app.handle().clone());
+            world::telegram::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -270,6 +272,9 @@ pub fn run() {
             world::telegram::telegram_link,
             world::telegram::telegram_test,
             world::telegram::telegram_disconnect,
+            report::report_latest,
+            report::report_generate,
+            report::report_send,
             world::email::email_status,
             world::email::email_refresh,
             world::email::email_connect,

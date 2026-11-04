@@ -260,6 +260,11 @@ pub struct LifeStatus {
     voice: i64,
 }
 
+/// Nível atual (para o relatório semanal).
+pub fn level_now(conn: &rusqlite::Connection) -> i64 {
+    level_of(total_xp(conn)).0
+}
+
 #[tauri::command]
 pub fn life_status(app: AppHandle) -> LifeStatus {
     let state = app.state::<AppState>();

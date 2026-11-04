@@ -1,5 +1,5 @@
 import SettingsNav from "./SettingsNav";
-import { EmailSettings, LolSettings, ModesSettings, TelegramSettings } from "./settings7";
+import { EmailSettings, LolSettings, ModesSettings, ReportSettings, TelegramSettings } from "./settings7";
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
@@ -508,6 +508,8 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
       </fieldset>
 
       <ModesSettings settings={settings} update={update} />
+
+      <ReportSettings settings={settings} update={update} />
 
       <MemorySettings />
 

@@ -278,6 +278,25 @@ export function TelegramSettings({ settings, update }: { settings: Settings; upd
             <input type="checkbox" checked={settings.telegramAwayOnly} onChange={(e) => update({ telegramAwayOnly: e.target.checked })} />
             Só quando eu estiver longe do PC (5 min sem mexer)
           </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={settings.telegramRemindersAlways}
+              onChange={(e) => update({ telegramRemindersAlways: e.target.checked })}
+            />
+            Lembretes chegam no celular sempre (mesmo com você no PC)
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={settings.telegramCommands} onChange={(e) => update({ telegramCommands: e.target.checked })} />
+            Conversar com o Pipo pelo Telegram
+          </label>
+          {settings.telegramCommands && (
+            <p className="hint">
+              Escreva para @{status.bot} como no chat ("me lembra às 18h de…", "o build terminou?"). Ações que mudam algo no PC pedem
+              Permitir/Negar por botão. Comandos sem custo: /status, /lembretes, /apagar, /email, /semana, /novo e /ajuda. Só a sua
+              conversa é atendida.
+            </p>
+          )}
           <div className="chips">
             {SOURCES.map((s) => {
               const on = settings.telegramSources.includes(s.id);
@@ -409,5 +428,44 @@ export function LolSettings({ settings, update }: { settings: Settings; update: 
       </label>
       <p className="hint">Usa só as APIs locais que o próprio LoL abre no seu PC; não mexe no jogo nem na sua conta.</p>
     </div>
+  );
+}
+
+const WEEKDAYS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"];
+
+/** Fase 8.0: relatório semanal. */
+export function ReportSettings({ settings, update }: { settings: Settings; update: Update }) {
+  return (
+    <fieldset>
+      <legend>Relatório semanal</legend>
+      <label className="check">
+        <input type="checkbox" checked={settings.weeklyReport} onChange={(e) => update({ weeklyReport: e.target.checked })} />
+        Mandar um resumo da semana (aba Hoje e Telegram)
+      </label>
+      <div className={`inline-form${settings.weeklyReport ? "" : " disabled"}`}>
+        <label>
+          Dia
+          <select value={settings.weeklyReportDay} onChange={(e) => update({ weeklyReportDay: Number(e.target.value) })}>
+            {WEEKDAYS.map((d, i) => (
+              <option key={d} value={i + 1}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Horário
+          <input className="short" type="time" value={settings.weeklyReportTime} onChange={(e) => update({ weeklyReportTime: e.target.value })} />
+        </label>
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={settings.weeklyReportAi} disabled={!settings.weeklyReport} onChange={(e) => update({ weeklyReportAi: e.target.checked })} />
+        Com um comentário do Pipo (uma resposta curta da Claude, aparece em Gastos)
+      </label>
+      <p className="hint">
+        Tempo no PC por tipo de app, pomodoros, commits no GitHub, partidas de LoL, XP e gastos com a IA dos últimos 7 dias, comparado
+        com a semana anterior. Se o PC estiver desligado no horário, sai assim que ele ligar nesse dia.
+      </p>
+    </fieldset>
   );
 }

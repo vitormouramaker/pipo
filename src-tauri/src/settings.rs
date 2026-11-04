@@ -87,6 +87,14 @@ pub struct Settings {
     pub telegram_away_only: bool,
     /// Origens repetidas no celular: reminder, live, github, alert, email, lol, proactive.
     pub telegram_sources: Vec<String>,
+    /// Fase 8.0: conversar com o Pipo pelo Telegram e lembretes sempre no celular.
+    pub telegram_commands: bool,
+    pub telegram_reminders_always: bool,
+    /// Relatório semanal: dia (1 = segunda … 7 = domingo), hora e comentário da Claude.
+    pub weekly_report: bool,
+    pub weekly_report_day: u8,
+    pub weekly_report_time: String,
+    pub weekly_report_ai: bool,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -145,6 +153,12 @@ impl Default for Settings {
             telegram_chat_id: String::new(),
             telegram_away_only: true,
             telegram_sources: ["reminder", "live", "github", "alert", "email"].iter().map(|s| s.to_string()).collect(),
+            telegram_commands: true,
+            telegram_reminders_always: true,
+            weekly_report: true,
+            weekly_report_day: 7,
+            weekly_report_time: "19:00".into(),
+            weekly_report_ai: true,
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,

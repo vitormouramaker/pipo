@@ -69,7 +69,8 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
 - **Arquivos**: arraste um PDF, Word, PowerPoint, imagem ou arquivo de texto/código em cima do Pipo (ou do painel) e ele vira anexo do chat, com atalhos para resumir, traduzir, ver os pontos principais ou explicar. No chat, peça "acha o contrato que baixei semana passada": o Pipo procura nas pastas Documentos, Downloads, Desktop e Imagens, lê o arquivo e responde.
 - **Hoje** também mostra a **agenda** (Google Agenda pelo endereço secreto iCal, com aviso 10 min antes e botão "Entrar" em reuniões do Meet/Teams/Zoom), **o que está tocando** no Windows (com tocar/pausar e pular), **seu dia** (tempo em cada tipo de app, registrado só no computador) e o **GitHub** (seus PRs, revisões pedidas a você e a CI dos seus projetos, com aviso quando termina; vale para todas as contas logadas no `gh`, como trabalho e pessoal).
 - **League of Legends**: com o cliente aberto, ao travar o campeão chega uma dica curta da Claude (runas, plano de rota, cuidado principal); na partida, aviso 1 minuto antes de Dragão e Barão voltarem; no fim, resultado, KDA e farm por minuto, com atalho para pedir uma análise. Usa só as APIs locais que o próprio LoL abre no PC.
-- **Celular (Telegram)**: crie um bot no @BotFather, cole o token em ⚙ → Integrações e mande uma mensagem para ele: os avisos escolhidos (lembretes, lives, GitHub, e-mail…) chegam no Telegram, se quiser só quando você estiver longe do PC.
+- **Celular (Telegram)**: crie um bot no @BotFather, cole o token em ⚙ → Integrações e mande uma mensagem para ele: os avisos escolhidos (lembretes, lives, GitHub, e-mail…) chegam no Telegram, se quiser só quando você estiver longe do PC. E dá para **conversar com o Pipo pelo celular** como no chat ("me lembra às 18h de…", "o build terminou?"); ações no PC pedem Permitir/Negar por botão. Comandos sem custo: /status, /lembretes, /apagar, /email, /semana, /novo e /ajuda. Só a sua conversa é atendida.
+- **Relatório semanal** (domingo 19h, ajustável): tempo no PC por tipo de app comparado à semana anterior, pomodoros, commits, partidas de LoL, XP e gastos, com um comentário do Pipo, na aba Hoje e no Telegram.
 - **Gmail** (só leitura): com uma senha de app, a aba Hoje mostra os não lidos da caixa principal e o botão "Resumir com o Pipo"; no chat, pergunte "tenho e-mail importante?". Nada é marcado como lido.
 - **Pipo proativo** (nível equilibrado): no máximo 3 dicas por hora e nunca em jogo, foco ou com você longe: erro copiado, muitas mudanças sem commit, horas seguidas no PC, madrugada e o resumo do fim do dia. Ele também **lembra** do que você contar ("lembra que eu prefiro TypeScript"); a lista fica em ⚙ → Memória do Pipo.
 - **Clipboard**: últimos textos copiados (só em memória; senhas e tokens são ignorados), com Resumir, Traduzir e Revisar.
@@ -133,6 +134,7 @@ docs/             plano de implementação
 | 5 | Vida: voz, XP, evolução, acessórios (concluída) |
 | 6 | Assistente completo: atualização automática, documentos, Pipo proativo, GitHub, agenda e música (concluída) |
 | 7 | Mais completo: perguntar sobre a tela, Downloads, mini-player, modos, atalhos de texto, LoL, Telegram e Gmail (concluída) |
+| 8 | Ainda mais: Pipo pelo celular, relatório semanal, automações, busca inteligente, LoL avançado, legenda ao vivo, visual e backup (em andamento) |
 
 ## Privacidade
 

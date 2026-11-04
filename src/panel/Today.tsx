@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { ICONS } from "../ui/icons";
-import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus } from "../api";
+import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus, type WeeklyReport } from "../api";
 import { sqliteDate } from "../format";
 import { sfx } from "../ui/sound";
 
@@ -442,6 +442,73 @@ function Music() {
   );
 }
 
+function Weekly() {
+  const [report, setReport] = useState<WeeklyReport | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const refresh = () => void api.reportLatest().then(setReport);
+    refresh();
+    const unlisten = listen("report-changed", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  const generate = () => {
+    setBusy("gen");
+    setMessage(null);
+    void api
+      .reportGenerate()
+      .then((r) => {
+        setReport(r);
+        setOpen(true);
+        sfx.done();
+      })
+      .catch((e) => {
+        setMessage(String(e));
+        sfx.error();
+      })
+      .finally(() => setBusy(null));
+  };
+  const send = () => {
+    setBusy("send");
+    void api
+      .reportSend()
+      .then(() => setMessage("Enviado para o Telegram."))
+      .catch((e) => setMessage(String(e)))
+      .finally(() => setBusy(null));
+  };
+  const lines = report?.text.split("\n") ?? [];
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>Relatório da semana {report ? `· ${report.createdAt}` : ""}</h4>
+        <button className="link muted" disabled={busy !== null} onClick={generate}>
+          {busy === "gen" ? "Montando…" : report ? "Atualizar" : "Gerar agora"}
+        </button>
+      </div>
+      {!report && <p className="hint">Todo domingo à noite o Pipo resume sua semana aqui (dá para mudar em ⚙ → Relatório semanal).</p>}
+      {report && (
+        <>
+          <div className={`weekly${open ? " open" : ""}`}>
+            {(open ? lines : lines.slice(0, 4)).map((l, i) => (
+              <p key={i} className={l.startsWith("🐾") ? "weekly-comment" : undefined}>
+                {l || "\u00a0"}
+              </p>
+            ))}
+          </div>
+          <div className="btns">
+            {lines.length > 4 && <button onClick={() => setOpen(!open)}>{open ? "Mostrar menos" : "Ver tudo"}</button>}
+            <button disabled={busy !== null} onClick={send}>
+              {busy === "send" ? "Enviando…" : "Mandar no Telegram"}
+            </button>
+          </div>
+        </>
+      )}
+      {message && <p className="hint">{message}</p>}
+    </div>
+  );
+}
+
 function Email({ onAsk }: Props) {
   const [mail, setMail] = useState<MailStatus | null>(null);
   const [checking, setChecking] = useState(false);
@@ -549,6 +616,7 @@ export default function Today({ onAsk }: Props) {
         <Music />
         <MyDay onAsk={onAsk} />
         <League onAsk={onAsk} />
+        <Weekly />
         <Email onAsk={onAsk} />
         <Github />
         <BriefingCard />
