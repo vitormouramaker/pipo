@@ -22,6 +22,8 @@ A voz usa o whisper.cpp, compilado com CMake e Clang. Se o `cmake` não estiver 
 $vs = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
 $env:PATH += ";$vs\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin"
 $env:LIBCLANG_PATH = "$vs\VC\Tools\Llvm\x64\bin"
+# Se o VS 2026 também estiver instalado, fixe o gerador que esse CMake conhece:
+$env:CMAKE_GENERATOR = "Visual Studio 17 2022"
 ```
 
 ```bash
