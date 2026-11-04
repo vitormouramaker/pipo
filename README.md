@@ -65,7 +65,7 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
 
 Sensores e alertas são lidos só no computador; nada disso é enviado para a internet.
 
-**Seus dados:** as configurações são salvas sozinhas assim que você muda algo. A cada início o Pipo guarda uma cópia de segurança do banco (as 15 mais recentes ficam em `%APPDATA%\com.vitormouramaker.pipoackups`) e anota um resumo em `pipo.log` na mesma pasta.
+**Seus dados:** as configurações são salvas sozinhas assim que você muda algo. A cada início o Pipo guarda uma cópia de segurança do banco (as 15 mais recentes ficam em `%APPDATA%\com.vitormouramaker.pipo\backups`) e anota um resumo em `pipo.log` na mesma pasta.
 
 **Chave da API:** na primeira execução, o Pipo procura `api/api-pipo.txt` (ou o arquivo indicado em `PIPO_API_KEY_FILE`) e guarda a chave no Gerenciador de Credenciais do Windows. Também dá para colar a chave ou importar o arquivo em **Configurações**. Depois de importada, o arquivo pode ser apagado.
 
