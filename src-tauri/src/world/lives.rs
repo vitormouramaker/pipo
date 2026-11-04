@@ -7,7 +7,6 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use super::http;
 use crate::{windows, AppState};
@@ -197,11 +196,8 @@ pub async fn check_all(app: &AppHandle) {
             let title = app.state::<AppState>().lives.lock().unwrap().get(&channel.key()).and_then(|s| s.title.clone());
             let name = channel.handle.trim_start_matches('@');
             let platform = platform_name(&channel.platform);
-            let body = match title {
-                Some(t) => format!("{name} entrou ao vivo na {platform}: {t}"),
-                None => format!("{name} entrou ao vivo na {platform}."),
-            };
-            let _ = app.notification().builder().title("Pipo · ao vivo").body(body).show();
+            let body = title.unwrap_or_else(|| "Clique para assistir.".into());
+            crate::toast::notify(app, "live", &format!("{name} está ao vivo na {platform}"), &body, Some(&channel.url()));
             windows::set_pet_state(app, "done");
         }
     }

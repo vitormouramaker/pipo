@@ -9,6 +9,7 @@ mod secrets;
 mod sensors;
 mod settings;
 mod tools;
+mod toast;
 mod usage;
 mod voice;
 mod windows;
@@ -51,6 +52,8 @@ pub struct AppState {
     pub dragging: AtomicBool,
     /// O chat está gerando uma resposta: o Pipo fica em "processando".
     pub busy: AtomicBool,
+    /// Avisos esperando a janela de balões pegar.
+    pub toasts: Mutex<Vec<toast::Toast>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -111,6 +114,7 @@ pub fn run() {
                 lives: Mutex::new(HashMap::new()),
                 dragging: AtomicBool::new(false),
                 busy: AtomicBool::new(false),
+                toasts: Mutex::new(Vec::new()),
             });
 
             secrets::import_from_file_if_missing();
@@ -168,6 +172,11 @@ pub fn run() {
             actions::ocr::ocr_start,
             world::open_url,
             life::life_status,
+            toast::toast_take,
+            toast::toast_layout,
+            toast::toast_open,
+            toast::toast_done,
+            windows::pet_menu_open,
             voice::voice_status,
             voice::voice_download,
             voice::voice_toggle,

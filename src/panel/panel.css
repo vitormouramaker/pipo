@@ -66,8 +66,17 @@
 /* Voz */
 .voice-status { font-size: 12px; color: var(--accent); margin-right: auto; }
 .voice-status.error { color: var(--warn); }
-.panel .mic { padding: 6px 10px; }
-.panel .mic.on { border-color: var(--accent); color: var(--accent); }
+.panel .mic {
+  display: grid; place-items: center; width: 38px; height: 34px; padding: 0; flex-shrink: 0;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--accent); cursor: pointer;
+}
+.panel .mic:hover:not(:disabled) { border-color: var(--accent); }
+.panel .mic:disabled { opacity: 0.5; cursor: default; }
+.panel .mic.on { border-color: var(--danger); color: var(--danger); background: rgba(248, 113, 113, 0.1); }
+.voice-status { white-space: normal; line-height: 1.35; }
+.voice-status .link { font-size: 12px; padding: 0; }
+.tabs button.tab-icon, .icon-btn.tab-icon { display: grid; place-items: center; width: 34px; height: 32px; padding: 0; }
+.tabs button.tab-icon[aria-pressed="true"] { color: var(--accent); }
 .tabs { display: flex; gap: 2px; margin-left: auto; }
 .tabs button, .icon-btn {
   border: 0; background: transparent; color: var(--muted);

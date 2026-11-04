@@ -22,7 +22,7 @@ const PANEL_GAP: f64 = 12.0;
 
 /// Mesmos argumentos da janela principal (tauri.conf.json): janelas com argumentos
 /// diferentes não compartilham o WebView2. Sem GPU o Pipo usa ~40% menos memória.
-const BROWSER_ARGS: &str =
+pub const BROWSER_ARGS: &str =
     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-gpu --disable-gpu-compositing";
 
 /// Avisa a janela do Pipo para mostrar uma expressão passageira por cima do humor
@@ -338,6 +338,12 @@ pub fn pet_drag_start(app: AppHandle) {
 
     std::thread::spawn(move || {
         let mut last = window;
+        // Velocidade do arrasto (px lógicos/s, suavizada) para a animação de física do Pipo.
+        let scale = app.get_webview_window(MAIN).and_then(|w| w.scale_factor().ok()).unwrap_or(1.0);
+        let mut tick = std::time::Instant::now();
+        let mut last_emit = tick;
+        let mut prev = (window.x, window.y);
+        let mut velocity = (0.0f64, 0.0f64);
         while primary_button_down() {
             if let Ok(now) = app.cursor_position() {
                 let x = window.x + (now.x - cursor.x).round() as i32;
@@ -348,9 +354,21 @@ pub fn pet_drag_start(app: AppHandle) {
                     last = PhysicalPosition::new(x, y);
                 }
             }
+            let dt = tick.elapsed().as_secs_f64().max(0.001);
+            tick = std::time::Instant::now();
+            // Usa a posição real (com o limite da tela): bater na borda freia o Pipo.
+            let pos = app.state::<AppState>().pet_frame.lock().unwrap().map(|(p, _, _)| (p.x, p.y)).unwrap_or(prev);
+            let instant = ((pos.0 - prev.0) as f64 / dt / scale, (pos.1 - prev.1) as f64 / dt / scale);
+            prev = pos;
+            velocity = (velocity.0 * 0.7 + instant.0 * 0.3, velocity.1 * 0.7 + instant.1 * 0.3);
+            if last_emit.elapsed() >= Duration::from_millis(16) {
+                last_emit = std::time::Instant::now();
+                let _ = app.emit_to(MAIN, "pipo-drag", (velocity.0.round(), velocity.1.round(), true));
+            }
             std::thread::sleep(Duration::from_millis(8));
         }
         app.state::<AppState>().dragging.store(false, Ordering::SeqCst);
+        let _ = app.emit_to(MAIN, "pipo-drag", (velocity.0.round(), velocity.1.round(), false));
     });
 }
 
@@ -542,6 +560,12 @@ pub fn radial_open(app: AppHandle) -> Result<RadialLayout, String> {
         .collect();
 
     Ok(RadialLayout { pet_size, radius, angles, suggestion: suggestion(&app) })
+}
+
+/// Menu do botão direito (desenhado na própria janela do Pipo): a janela toda recebe o mouse.
+#[tauri::command]
+pub fn pet_menu_open(app: AppHandle) {
+    app.state::<AppState>().radial_open.store(true, Ordering::SeqCst);
 }
 
 #[tauri::command]

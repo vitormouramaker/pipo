@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 use rusqlite::params;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use crate::{windows, AppState};
 
@@ -65,8 +64,8 @@ pub struct FocusStatus {
     pub next_break_secs: Option<u64>,
 }
 
-fn notify(app: &AppHandle, title: &str, body: &str) {
-    let _ = app.notification().builder().title(title).body(body).show();
+fn notify(app: &AppHandle, kind: &str, title: &str, body: &str) {
+    crate::toast::notify(app, kind, title, body, Some("view:actions"));
 }
 
 pub fn pomodoro_focusing(app: &AppHandle) -> bool {
@@ -199,7 +198,7 @@ pub fn tick(app: &AppHandle, idle: u64, gaming: bool) {
             rows
         };
         for (_, text) in &due {
-            notify(app, "Pipo · lembrete", text);
+            notify(app, "reminder", "Lembrete", text);
             windows::set_pet_state(app, "alert");
             changed = true;
         }
@@ -232,7 +231,7 @@ pub fn tick(app: &AppHandle, idle: u64, gaming: bool) {
     };
     if let Some(message) = transition {
         if !gaming {
-            notify(app, "Pipo · pomodoro", &message);
+            notify(app, "pomodoro", "Pomodoro", &message);
         }
         windows::set_pet_state(app, "done");
         changed = true;
@@ -257,7 +256,7 @@ pub fn tick(app: &AppHandle, idle: u64, gaming: bool) {
         due
     };
     if remind_break && !gaming {
-        notify(app, "Pipo · pausa", "Você está há um tempo no computador. Beba água, ajuste a postura e descanse os olhos.");
+        notify(app, "break", "Hora de uma pausa", "Você está há um tempo no computador. Beba água, ajuste a postura e descanse os olhos.");
         windows::set_pet_state(app, "alert");
     }
 

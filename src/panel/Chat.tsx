@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, type ChatMessage, type Conversation, type VoiceState } from "../api";
 import { speak, stopSpeaking } from "./speech";
+import { ICONS } from "../ui/icons";
 import { sqliteDate } from "../format";
 
 type Props = {
@@ -38,6 +39,25 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
   const [history, setHistory] = useState<Conversation[] | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [voice, setVoice] = useState<VoiceState>({ phase: "idle", message: null });
+  const [download, setDownload] = useState<{ percent: number; error: string | null } | null>(null);
+
+  // Baixa o modelo de voz sem sair do chat.
+  const downloadModel = () => {
+    setDownload({ percent: 0, error: null });
+    const timer = window.setInterval(() => {
+      void api.voiceStatus().then((s) => {
+        if (s.total > 0) setDownload((d) => d && { ...d, percent: Math.floor((100 * s.downloaded) / s.total) });
+      });
+    }, 500);
+    void api
+      .voiceDownload()
+      .then(() => {
+        setDownload(null);
+        setVoice({ phase: "idle", message: "Modelo pronto! Clique no microfone e fale." });
+      })
+      .catch((e) => setDownload({ percent: 0, error: String(e) }))
+      .finally(() => window.clearInterval(timer));
+  };
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -290,18 +310,30 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
           <span className={voice.phase === "error" ? "voice-status error" : "voice-status"}>
             {voice.phase === "listening" && "Ouvindo… fale e faça uma pausa para enviar"}
             {voice.phase === "transcribing" && "Transcrevendo…"}
-            {voice.phase === "error" && voice.message}
+            {(voice.phase === "error" || voice.phase === "idle") && voice.message}
+            {voice.phase === "nomodel" &&
+              (download ? (
+                download.error ?? `Baixando o modelo de voz… ${download.percent}%`
+              ) : (
+                <>
+                  Para falar, baixe o modelo de voz (142 MB, uma vez só).{" "}
+                  <button className="link" onClick={downloadModel}>
+                    Baixar agora
+                  </button>
+                </>
+              ))}
           </span>
           <button
             className={voice.phase === "listening" ? "mic on" : "mic"}
-            title="Falar com o Pipo (o áudio é transcrito no computador)"
-            disabled={busy || voice.phase === "transcribing"}
+            title={voice.phase === "listening" ? "Parar e enviar" : "Falar com o Pipo (o áudio é transcrito no computador)"}
+            aria-label="Falar com o Pipo"
+            disabled={busy || voice.phase === "transcribing" || download !== null}
             onClick={() => {
               stopSpeaking();
               void api.voiceToggle();
             }}
           >
-            {voice.phase === "listening" ? "■ Parar" : "🎙"}
+            {voice.phase === "listening" ? ICONS.stop : ICONS.mic}
           </button>
           <button className="primary" onClick={() => void send()} disabled={busy || !input.trim()}>
             {busy ? "Respondendo…" : "Enviar"}

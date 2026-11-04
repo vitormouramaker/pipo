@@ -45,7 +45,8 @@ function squircle(cx: number, cy: number, a: number, b: number, n = 3.2, steps =
   return `M${pts.join(" L")}Z`;
 }
 const BODY = squircle(100, 100, 88, 74);
-const OUTLINE = squircle(100, 100, 96, 82);
+// Anel de atenção colado ao corpo: a borda interna do traço (3,5) encosta no corpo.
+const RING = squircle(100, 100, 89.75, 75.75);
 
 type PillProps = { x: number; y: number; w: number; h: number; color: string; rot?: number };
 function Pill({ x, y, w, h, color, rot = 0 }: PillProps) {
@@ -86,7 +87,7 @@ function arcs(up: boolean, color: string) {
   ));
 }
 
-type Look = { eyes: ReactNode; back?: ReactNode; badge?: ReactNode; blinks?: boolean; gaze?: boolean };
+type Look = { eyes: ReactNode; ring?: boolean; badge?: ReactNode; blinks?: boolean; gaze?: boolean };
 
 function look(state: PipoState): Look {
   switch (state) {
@@ -95,7 +96,7 @@ function look(state: PipoState): Look {
     case "attentive":
       return {
         eyes: pair(14, 34, C.eye),
-        back: <path d={OUTLINE} fill="none" stroke={C.eye} strokeWidth="3.5" />,
+        ring: true,
       };
     case "thinking":
       return {
@@ -306,7 +307,6 @@ export function Pipo({ state, gaze = [0, 0], stage = 0, accessories = [] }: Pipo
           <stop offset="1" stopColor={C.bottom} />
         </linearGradient>
       </defs>
-      {l.back}
       {accessories.map((a) => accessory(a, "behind"))}
       <g>
         <path d={BODY} fill={`url(#${id}g)`} stroke={rim.stroke} strokeWidth={rim.width} strokeOpacity={rim.opacity} />
@@ -314,6 +314,7 @@ export function Pipo({ state, gaze = [0, 0], stage = 0, accessories = [] }: Pipo
           <g className={blinking ? "eyes blinking" : "eyes"}>{l.eyes}</g>
         </g>
       </g>
+      {l.ring && <path d={RING} fill="none" stroke={C.eye} strokeWidth="3.5" />}
       {accessories.map((a) => accessory(a, "front"))}
       {l.badge}
     </svg>

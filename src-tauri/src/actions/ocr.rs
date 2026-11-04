@@ -5,7 +5,6 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use super::shell_open;
 use crate::{windows, AppState};
@@ -75,7 +74,7 @@ fn finish(app: &AppHandle, result: Result<String, String>) {
         Ok(text) if !text.trim().is_empty() => {
             let _ = arboard::Clipboard::new().and_then(|mut c| c.set_text(text.clone()));
             windows::set_pet_state(app, "done");
-            let _ = app.notification().builder().title("Pipo · texto copiado").body("O texto da imagem já está na área de transferência.").show();
+            crate::toast::notify(&app, "done", "Texto copiado", "O texto da imagem já está na área de transferência.", Some("view:clipboard"));
             let _ = app.emit("ocr-result", serde_json::json!({ "text": text }));
         }
         Ok(_) => {

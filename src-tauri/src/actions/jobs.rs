@@ -8,7 +8,6 @@ use std::time::Instant;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use super::{command, now_hm, projects};
 use crate::{windows, AppState};
@@ -136,7 +135,7 @@ pub fn start(app: &AppHandle, path: &str, script: &str) -> Result<u64, String> {
         } else {
             format!("{cmdline} falhou (código {}) em {project}.", code.map_or("?".into(), |c| c.to_string()))
         };
-        let _ = app.notification().builder().title(if ok { "Pipo · concluído" } else { "Pipo · falhou" }).body(body).show();
+        crate::toast::notify(&app, if ok { "done" } else { "error" }, if ok { "Script concluído" } else { "Script falhou" }, &body, Some("view:actions"));
     });
     Ok(id)
 }

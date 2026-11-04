@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use crate::context::{self, ActiveApp, Category};
 use crate::actions::focus;
@@ -54,7 +53,7 @@ pub fn sense_status(app: AppHandle) -> SenseStatus {
 }
 
 fn notify(app: &AppHandle, title: &str, body: &str) {
-    let _ = app.notification().builder().title(title).body(body).show();
+    crate::toast::notify(app, "alert", title, body, Some("view:system"));
 }
 
 /// Modo jogo: com um app em tela cheia o Pipo fica "jogando"; se a tela cheia estiver
@@ -178,7 +177,7 @@ pub fn start(app: AppHandle) {
                         high_cpu = 0;
                         high_memory = 0;
                         windows::set_pet_state(&app, "alert");
-                        notify(&app, "Pipo", &message);
+                        notify(&app, "Consumo alto", &message);
                     }
                 }
             }

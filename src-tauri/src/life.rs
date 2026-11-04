@@ -5,7 +5,6 @@
 use rusqlite::params;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use crate::{windows, AppState};
 
@@ -168,9 +167,6 @@ pub fn award(app: &AppHandle, kind: &str, times: i64) {
         (level_of(before).0, level_of(before + xp).0, check_achievements(conn))
     };
 
-    let notify = |title: &str, body: &str| {
-        let _ = app.notification().builder().title(title).body(body).show();
-    };
     if after > before {
         let (stage_before, _) = stage_of(before);
         let (stage_after, name) = stage_of(after);
@@ -182,11 +178,11 @@ pub fn award(app: &AppHandle, kind: &str, times: i64) {
         if !unlocked.is_empty() {
             body.push_str(&format!(" Novo acessório: {}.", unlocked.join(", ")));
         }
-        notify("Pipo · nível novo", &body);
+        crate::toast::notify(app, "level", &format!("Nível {after}!"), &body, Some("view:pipo"));
         windows::set_pet_state(app, "levelup");
     }
     for a in achievements {
-        notify("Pipo · conquista", &format!("{}: {}", a.title, a.detail));
+        crate::toast::notify(app, "achievement", &format!("Conquista: {}", a.title), a.detail, Some("view:pipo"));
     }
     let _ = app.emit("life-changed", ());
 }

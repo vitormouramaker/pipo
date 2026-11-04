@@ -8,7 +8,6 @@ use rusqlite::params;
 use serde::Serialize;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_notification::NotificationExt;
 
 use crate::chat::{self, Source};
 use crate::usage::Usage;
@@ -202,10 +201,10 @@ pub fn maybe_run(app: &AppHandle, idle: u64, gaming: bool) {
         match generate(&app).await {
             Ok(_) => {
                 windows::set_pet_state(&app, "done");
-                let _ = app.notification().builder().title("Pipo · bom dia").body("Seu briefing de hoje está pronto na aba Hoje.").show();
+                crate::toast::notify(&app, "info", "Bom dia!", "Seu briefing de hoje está pronto na aba Hoje.", Some("view:today"));
             }
             Err(e) => {
-                let _ = app.notification().builder().title("Pipo · briefing").body(format!("Não consegui montar o briefing: {e}")).show();
+                crate::toast::notify(&app, "error", "Briefing", &format!("Não consegui montar o briefing: {e}"), Some("view:today"));
             }
         }
     });

@@ -134,8 +134,9 @@ pub fn toggle(app: &AppHandle) {
     }
     let model = app.state::<AppState>().settings.lock().unwrap().voice_model.clone();
     let Some(path) = model_path(app, &model).filter(|p| p.exists()) else {
-        emit_state(app, "error", Some("Baixe o modelo de voz em Configurações > Voz."));
-        windows::show_panel(app, Some("settings"));
+        // O chat mostra o botão para baixar o modelo ali mesmo.
+        windows::show_panel(app, Some("chat"));
+        emit_state(app, "nomodel", None);
         return;
     };
     if LISTENING.swap(true, Ordering::SeqCst) {

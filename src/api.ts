@@ -55,7 +55,8 @@ export type VoiceStatus = {
   listening: boolean;
   hasMicrophone: boolean;
 };
-export type VoiceState = { phase: "idle" | "listening" | "transcribing" | "error"; message: string | null };
+export type Toast = { id: number; kind: string; title: string; body: string; url: string | null; view: string | null };
+export type VoiceState = { phase: "idle" | "listening" | "transcribing" | "error" | "nomodel"; message: string | null };
 
 /** Acessórios em uso: os liberados que o usuário não escondeu. */
 export const wornAccessories = (life: LifeStatus | null, settings: Settings | null) =>
@@ -255,6 +256,11 @@ export const api = {
   voiceStatus: (model?: string) => invoke<VoiceStatus>("voice_status", { model }),
   voiceDownload: (model?: string) => invoke<void>("voice_download", { model }),
   voiceToggle: () => invoke<void>("voice_toggle"),
+  petMenuOpen: () => invoke<void>("pet_menu_open"),
+  toastTake: () => invoke<Toast[]>("toast_take"),
+  toastLayout: (height: number) => invoke<void>("toast_layout", { height }),
+  toastOpen: (url: string | null, view: string | null) => invoke<void>("toast_open", { url, view }),
+  toastDone: () => invoke<void>("toast_done"),
   petDragStart: () => invoke<void>("pet_drag_start"),
   radialOpen: () => invoke<RadialLayout>("radial_open"),
   radialClose: () => invoke<void>("radial_close"),

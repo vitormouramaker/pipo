@@ -11,15 +11,16 @@ import Today from "./Today";
 import Life from "./Life";
 import Usage from "./Usage";
 import "./panel.css";
+import { ICONS } from "../ui/icons";
 
-const TABS: { view: PanelView; label: string; title?: string }[] = [
-  { view: "chat", label: "Chat" },
-  { view: "today", label: "Hoje" },
-  { view: "actions", label: "Ações" },
-  { view: "clipboard", label: "Clipboard", title: "Histórico da área de transferência" },
-  { view: "system", label: "Sistema" },
-  { view: "usage", label: "Gastos" },
-  { view: "settings", label: "⚙", title: "Configurações" },
+const TABS: { view: PanelView; icon: keyof typeof ICONS; title: string }[] = [
+  { view: "chat", icon: "chat", title: "Chat" },
+  { view: "today", icon: "today", title: "Hoje: briefing, lives e pesquisa" },
+  { view: "actions", icon: "actions", title: "Ações: dev, foco e atalhos" },
+  { view: "clipboard", icon: "clipboard", title: "Área de transferência" },
+  { view: "system", icon: "system", title: "Sistema" },
+  { view: "usage", icon: "usage", title: "Gastos" },
+  { view: "settings", icon: "settings", title: "Configurações" },
 ];
 
 export default function PanelApp() {
@@ -66,13 +67,20 @@ export default function PanelApp() {
         </button>
         <nav className="tabs">
           {TABS.map((t) => (
-            <button key={t.view} title={t.title} aria-pressed={view === t.view} onClick={() => setView(t.view)}>
-              {t.label}
+            <button
+              key={t.view}
+              className="tab-icon"
+              title={t.title}
+              aria-label={t.title}
+              aria-pressed={view === t.view}
+              onClick={() => setView(t.view)}
+            >
+              {ICONS[t.icon]}
             </button>
           ))}
         </nav>
-        <button className="icon-btn" title="Fechar" onClick={() => void api.panelHide()}>
-          ✕
+        <button className="icon-btn tab-icon" title="Fechar" aria-label="Fechar" onClick={() => void api.panelHide()}>
+          {ICONS.close}
         </button>
       </header>
 

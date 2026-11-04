@@ -118,3 +118,64 @@ body,
 @media (prefers-reduced-motion: reduce) {
   .radial-btn { animation: none; }
 }
+
+/* Física do arrasto (pet/physics.ts) mexe no transform do .pet a cada quadro. */
+.pet {
+  will-change: transform;
+}
+
+/* Menu do botão direito com a identidade do Pipo */
+.pet-menu {
+  position: absolute;
+  z-index: 10;
+  min-width: 176px;
+  padding: 5px;
+  display: grid;
+  gap: 1px;
+  background: #1f2227;
+  border: 1px solid #2f333a;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  animation: pop 140ms ease-out both;
+  transform-origin: top left;
+}
+.pet-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #e8eaed;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pet-menu button svg {
+  color: #2dd4e8;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+.pet-menu button:hover {
+  background: #262a30;
+}
+.pet-menu button.danger {
+  margin-top: 4px;
+  border-top: 1px solid #2f333a;
+  border-radius: 0 0 8px 8px;
+  color: #8a919c;
+}
+.pet-menu button.danger svg {
+  color: #8a919c;
+}
+.pet-menu button.danger:hover {
+  color: #f87171;
+}
+.pet-menu button.danger:hover svg {
+  color: #f87171;
+}
