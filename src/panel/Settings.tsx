@@ -274,6 +274,13 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           <input type="checkbox" checked={settings.followCursor} onChange={(e) => update({ followCursor: e.target.checked })} />
           Olhos do Pipo seguem o mouse
         </label>
+        <div className="row">
+          <button onClick={() => void api.islandToggle()}>Modo ilha (encolher na borda da tela)</button>
+        </div>
+        <p className="hint">
+          Na ilha, o Pipo vira uma pílula discreta grudada na borda. Arraste para outra borda; clique para o chat; o botão
+          dentro dela (ou o menu do botão direito) traz o Pipo de volta.
+        </p>
         <label className="check">
           <input type="checkbox" checked={settings.sounds} onChange={(e) => update({ sounds: e.target.checked })} />
           Efeitos sonoros

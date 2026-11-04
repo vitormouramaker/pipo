@@ -92,6 +92,14 @@ export function useDragPhysics(el: RefObject<HTMLElement | null>, callbacks: Cal
       p.lift.v -= 0.02;
       run();
     },
+    /** Pulinho (ex.: ao recolher o menu radial). */
+    bump() {
+      const p = state.current;
+      p.lift.target = 1;
+      p.lift.v += 0.045;
+      p.stretch.v -= 0.025;
+      run();
+    },
     /** Soltou sem arrastar (clique): quica de volta. */
     release() {
       const p = state.current;

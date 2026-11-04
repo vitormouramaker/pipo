@@ -3,7 +3,9 @@ mod chat;
 mod clipboard;
 mod context;
 mod db;
+mod island;
 mod life;
+mod menu;
 mod hardware;
 mod secrets;
 mod sensors;
@@ -125,6 +127,9 @@ pub fn run() {
             windows::clamp_pet(app.handle());
             windows::track_pet_frame(app.handle());
             windows::start_hit_test(app.handle().clone());
+            if settings.island {
+                island::enter(app.handle(), true);
+            }
             sensors::start(app.handle().clone());
             world::lives::start(app.handle().clone());
             Ok(())
@@ -176,7 +181,13 @@ pub fn run() {
             toast::toast_layout,
             toast::toast_open,
             toast::toast_done,
-            windows::pet_menu_open,
+            menu::pet_menu_open,
+            menu::menu_pending,
+            menu::menu_layout,
+            menu::menu_hide,
+            island::island_toggle,
+            island::island_status,
+            island::island_hit,
             windows::panel_expand,
             windows::panel_is_expanded,
             voice::voice_status,

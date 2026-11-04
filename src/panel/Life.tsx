@@ -69,11 +69,8 @@ export default function Life() {
   const unlockedCount = life.achievements.filter((a) => a.unlockedAt).length;
   const since = life.since ? life.since.split("-").reverse().join("/") : null;
   const heroAccessories = tryOn && !worn.includes(tryOn) ? [...worn, tryOn] : worn;
-  // Conquistas: as mais perto de sair primeiro; as feitas no fim.
-  const achievements = [...life.achievements].sort((a, b) => {
-    if (Boolean(a.unlockedAt) !== Boolean(b.unlockedAt)) return a.unlockedAt ? 1 : -1;
-    return b.progress / b.goal - a.progress / a.goal;
-  });
+  // Ordem fixa (a mesma sempre), para o usuário achar cada conquista no mesmo lugar.
+  const achievements = life.achievements;
 
   return (
     <section className="actions">

@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { ICONS } from "../ui/icons";
 import { useDragPhysics } from "./physics";
+import Island, { type Edge } from "./Island";
 import { sfx } from "../ui/sound";
 import { api, wornAccessories, type LifeStatus, type PanelView, type RadialLayout, type Settings } from "../api";
 import { Pipo, PIPO_STATES, type PipoState } from "../pipo/Pipo";
@@ -43,28 +44,35 @@ export default function PetApp() {
   const [gaze, setGaze] = useState<[number, number]>([0, 0]);
   const [life, setLife] = useState<LifeStatus | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
+  // Modo ilha: borda em que a pílula está (null = Pipo normal).
+  const [island, setIsland] = useState<Edge | null>(null);
   const press = useRef<{ x: number; y: number } | null>(null);
   const petRef = useRef<HTMLDivElement>(null);
   const physics = useDragPhysics(petRef, { onLift: sfx.pick, onDrop: sfx.drop });
-  // Menus abertos agora (lido pelos ouvintes de eventos, que não veem o estado novo).
+  // Menu radial aberto agora (lido pelos ouvintes de eventos, que não veem o estado novo).
   const openRef = useRef(false);
   const [closing, setClosing] = useState(false);
   const lastState = useRef<string>("idle");
-  // Menu do botão direito, desenhado aqui mesmo com a identidade do Pipo.
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const refreshLife = () => void api.lifeStatus().then(setLife);
     refreshLife();
     void api.getSettings().then(setSettings);
+    void api.islandStatus().then((s) => setIsland(s.active ? (s.edge as Edge) : null));
     const unlistenGaze = listen<[number, number]>("pipo-gaze", (e) => setGaze(e.payload));
     const unlistenLife = listen("life-changed", refreshLife);
     const unlistenSettings = listen<Settings>("settings-changed", (e) => setSettings(e.payload));
+    const unlistenIsland = listen<{ active: boolean; edge: string }>("island", (e) => {
+      setIsland((was) => {
+        if (Boolean(was) !== e.payload.active) (e.payload.active ? sfx.shrink : sfx.grow)();
+        return e.payload.active ? (e.payload.edge as Edge) : null;
+      });
+    });
     return () => {
       void unlistenGaze.then((fn) => fn());
       void unlistenLife.then((fn) => fn());
       void unlistenSettings.then((fn) => fn());
+      void unlistenIsland.then((fn) => fn());
     };
   }, []);
 
@@ -96,23 +104,23 @@ export default function PetApp() {
     return () => window.clearTimeout(timer);
   }, [override]);
 
-  // Fecha com animação: os botões voltam para dentro do Pipo antes de sumir.
+  // Fecha com animação: os botões voltam para dentro do Pipo e ele dá um pulinho.
   const closeRadial = () => {
     void api.radialClose();
     if (!openRef.current) return;
     openRef.current = false;
     sfx.close();
+    physics.bump();
     setClosing(true);
     window.setTimeout(() => {
       setRadial(null);
-      setMenu(null);
       setClosing(false);
     }, 150);
   };
 
-  // Os menus fecham com Esc ou ao clicar fora do Pipo (a janela perde o foco).
+  // O menu fecha com Esc ou ao clicar fora do Pipo (a janela perde o foco).
   useEffect(() => {
-    if (!radial && !menu) return;
+    if (!radial) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRadial();
     window.addEventListener("keydown", onKey);
     window.addEventListener("blur", closeRadial);
@@ -120,28 +128,7 @@ export default function PetApp() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("blur", closeRadial);
     };
-  }, [radial, menu]);
-
-  // O menu do botão direito não pode sair da janela.
-  useLayoutEffect(() => {
-    const node = menuRef.current;
-    if (!menu || !node) return;
-    // Tamanho de layout (sem a escala da animação de entrada).
-    const width = node.offsetWidth;
-    const height = node.offsetHeight;
-    const x = Math.max(4, Math.min(menu.x, window.innerWidth - width - 4));
-    const y = Math.max(4, Math.min(menu.y, window.innerHeight - height - 4));
-    if (x !== menu.x || y !== menu.y) setMenu({ x, y });
-  }, [menu]);
-
-  const menuItems: { id: string; label: string; icon: ReactNode; action: () => void; danger?: boolean }[] = [
-    { id: "chat", label: "Abrir chat", icon: ICONS.chat, action: () => void api.panelOpen("chat") },
-    { id: "mic", label: "Falar com o Pipo", icon: ICONS.mic, action: () => void api.voiceToggle() },
-    { id: "pipo", label: "Evolução do Pipo", icon: ICONS.star, action: () => void api.panelOpen("pipo") },
-    { id: "settings", label: "Configurações", icon: ICONS.settings, action: () => void api.panelOpen("settings") },
-    { id: "hide", label: "Ocultar Pipo", icon: ICONS.hide, action: () => void api.petToggle() },
-    { id: "quit", label: "Sair", icon: ICONS.power, action: () => void api.quit(), danger: true },
-  ];
+  }, [radial]);
 
   const open = (view: PanelView) => () => void api.panelOpen(view);
   const suggestion = radial?.suggestion;
@@ -156,38 +143,35 @@ export default function PetApp() {
         { id: "system", label: "Sistema", icon: ICONS.system, action: open("system") },
         { id: "usage", label: "Gastos", icon: ICONS.usage, action: open("usage") },
         { id: "settings", label: "Configurações", icon: ICONS.settings, action: open("settings") },
+        { id: "island", label: "Modo ilha (encolher na borda da tela)", icon: ICONS.island, action: () => void api.islandToggle() },
         { id: "hide", label: "Ocultar o Pipo", icon: ICONS.hide, action: () => void api.petToggle() },
       ]
     : [];
   const angles = radial ? placeItems(radial.angles, items.length) : [];
   const state: PipoState = override ?? base;
-  openRef.current = Boolean(radial || menu) && !closing;
+  openRef.current = Boolean(radial) && !closing;
+
+  if (island) return <Island edge={island} state={state} />;
 
   return (
     <main
       className={radial ? "stage radial-open" : "stage"}
       onContextMenu={(e) => {
         e.preventDefault();
-        if (radial || closing) return;
-        setMenu({ x: e.clientX, y: e.clientY });
-        sfx.open();
+        if (radial) closeRadial();
         void api.petMenuOpen();
       }}
       onPointerDown={(e) => {
         // Clique na margem transparente (fora do Pipo e dos botões) fecha o menu.
-        if ((radial || menu) && e.target === e.currentTarget) closeRadial();
+        if (radial && e.target === e.currentTarget) closeRadial();
       }}
     >
       <div
         ref={petRef}
         className="pet"
-        title={radial || menu ? undefined : "Clique para o menu · arraste para mover · botão direito para mais opções"}
+        title={radial ? undefined : "Clique para o menu · arraste para mover · botão direito para mais opções"}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
-          if (menu) {
-            closeRadial();
-            return;
-          }
           // Coordenadas de tela: a janela se move durante o arrasto.
           press.current = { x: e.screenX, y: e.screenY };
           if (!radial) {
@@ -243,25 +227,6 @@ export default function PetApp() {
             </button>
           );
         })}
-
-      {menu && (
-        <div className={closing ? "pet-menu closing" : "pet-menu"} ref={menuRef} style={{ left: menu.x, top: menu.y }} role="menu">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              role="menuitem"
-              className={item.danger ? "danger" : undefined}
-              onClick={() => {
-                closeRadial();
-                item.action();
-              }}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
     </main>
   );
 }

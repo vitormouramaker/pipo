@@ -92,6 +92,12 @@ export const ICONS = {
       <path d="M8 11V8a4 4 0 0 1 8 0v3" />
     </>,
   ),
+  island: icon(
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <rect x="8.5" y="4" width="7" height="3.5" rx="1.75" fill="currentColor" stroke="none" />
+    </>,
+  ),
   expand: icon(<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />, 16),
   collapse: icon(<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />, 16),
 };

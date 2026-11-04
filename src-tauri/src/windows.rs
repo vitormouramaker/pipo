@@ -11,7 +11,7 @@ use tauri::{
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 use crate::context::Category;
-use crate::{clipboard, sensors, AppState};
+use crate::{clipboard, island, sensors, AppState};
 
 pub const MAIN: &str = "main";
 pub const PANEL: &str = "panel";
@@ -109,29 +109,44 @@ fn follow_pet(app: &AppHandle) {
     }
 }
 
-/// Posiciona o painel ao lado do Pipo, dentro da área útil do monitor.
-fn place_panel(app: &AppHandle, panel: &WebviewWindow) {
-    let Some(pet) = app.get_webview_window(MAIN) else { return };
-    let (Ok(window_pos), Ok(window_size), Ok(size), Ok(Some(monitor))) =
-        (pet.outer_position(), pet.outer_size(), panel.outer_size(), pet.current_monitor())
-    else {
-        return;
-    };
-    let margin = (PET_MARGIN * monitor.scale_factor()) as i32;
-    let pet_pos = PhysicalPosition::new(window_pos.x + margin, window_pos.y + margin);
-    let pet_size = PhysicalSize::new(window_size.width - 2 * margin as u32, window_size.height - 2 * margin as u32);
+/// Onde colocar uma janela de `w`×`h` (px físicos) ao lado do Pipo, sem cobri-lo e dentro da
+/// área útil do monitor. Com o Pipo em modo ilha, vai para o lado de dentro da tela.
+/// `align_bottom`: alinha pela base do Pipo (painel); senão, pelo topo (menu).
+pub fn beside_pet(app: &AppHandle, w: i32, h: i32, align_bottom: bool) -> Option<(i32, i32)> {
+    let pet = app.get_webview_window(MAIN)?;
+    let (pos, size) = (pet.outer_position().ok()?, pet.outer_size().ok()?);
+    let monitor = pet.current_monitor().ok().flatten()?;
+    let scale = monitor.scale_factor();
     let area = monitor.work_area();
-    let gap = (PANEL_GAP * monitor.scale_factor()) as i32;
-    let (w, h) = (size.width as i32, size.height as i32);
+    let gap = (PANEL_GAP * scale) as i32;
     let (left, top) = (area.position.x, area.position.y);
     let (right, bottom) = (left + area.size.width as i32, top + area.size.height as i32);
+    let clamp = |x: i32, y: i32| (x.clamp(left, (right - w).max(left)), y.clamp(top, (bottom - h).max(top)));
 
-    let x = if pet_pos.x - w - gap >= left {
-        pet_pos.x - w - gap
-    } else {
-        (pet_pos.x + pet_size.width as i32 + gap).min(right - w)
-    };
-    let y = (pet_pos.y + pet_size.height as i32 - h).clamp(top, (bottom - h).max(top));
+    if let Some(edge) = island::edge(app) {
+        let (x0, y0, x1, y1) = (pos.x, pos.y, pos.x + size.width as i32, pos.y + size.height as i32);
+        let (cx, cy) = ((x0 + x1) / 2, (y0 + y1) / 2);
+        return Some(match edge.as_str() {
+            "left" => clamp(x1 + gap, cy - h / 2),
+            "right" => clamp(x0 - w - gap, cy - h / 2),
+            "bottom" => clamp(cx - w / 2, y0 - h - gap),
+            _ => clamp(cx - w / 2, y1 + gap),
+        });
+    }
+
+    // Corpo visível do Pipo (sem a margem transparente do menu radial).
+    let (ix, iy) = body_insets(size, scale);
+    let (bx0, by0) = (pos.x + ix as i32, pos.y + iy as i32);
+    let (bx1, by1) = (pos.x + size.width as i32 - ix as i32, pos.y + size.height as i32 - iy as i32);
+    let x = if bx0 - w - gap >= left { bx0 - w - gap } else { bx1 + gap };
+    let y = if align_bottom { by1 - h } else { by0 };
+    Some(clamp(x, y))
+}
+
+/// Posiciona o painel ao lado do Pipo, dentro da área útil do monitor.
+fn place_panel(app: &AppHandle, panel: &WebviewWindow) {
+    let Ok(size) = panel.outer_size() else { return };
+    let Some((x, y)) = beside_pet(app, size.width as i32, size.height as i32, true) else { return };
     set_panel_position(app, panel, x, y);
     remember_offset(app, (x, y));
 }
@@ -274,6 +289,13 @@ pub fn quit(app: &AppHandle) {
 fn handle_menu(app: &AppHandle, id: &str) {
     match id {
         "toggle_pet" => toggle_pet(app),
+        "island" => {
+            if island::active() {
+                island::exit(app);
+            } else {
+                island::enter(app, false);
+            }
+        }
         "chat" => show_panel(app, Some("chat")),
         "settings" => show_panel(app, Some("settings")),
         "quit" => quit(app),
@@ -288,6 +310,7 @@ pub fn create_tray(app: &AppHandle) -> tauri::Result<()> {
             &MenuItem::with_id(app, "chat", "Abrir chat", true, None::<&str>)?,
             &MenuItem::with_id(app, "settings", "Configurações", true, None::<&str>)?,
             &MenuItem::with_id(app, "toggle_pet", "Mostrar/ocultar Pipo", true, None::<&str>)?,
+            &MenuItem::with_id(app, "island", "Modo ilha (liga/desliga)", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?,
         ],
@@ -384,7 +407,11 @@ pub fn pet_drag_start(app: AppHandle) {
                 let x = window.x + (now.x - cursor.x).round() as i32;
                 let y = window.y + (now.y - cursor.y).round() as i32;
                 if (x, y) != (last.x, last.y) {
-                    move_pet_clamped(&app, x, y, Some(now));
+                    if island::active() {
+                        island::move_clamped(&app, x, y, now);
+                    } else {
+                        move_pet_clamped(&app, x, y, Some(now));
+                    }
                     follow_pet(&app);
                     last = PhysicalPosition::new(x, y);
                 }
@@ -404,6 +431,9 @@ pub fn pet_drag_start(app: AppHandle) {
         }
         app.state::<AppState>().dragging.store(false, Ordering::SeqCst);
         let _ = app.emit_to(MAIN, "pipo-drag", (velocity.0.round(), velocity.1.round(), false));
+        if island::active() && (last.x, last.y) != (window.x, window.y) {
+            island::snap(&app);
+        }
     });
 }
 
@@ -481,6 +511,21 @@ pub fn start_hit_test(app: AppHandle) {
             std::thread::sleep(Duration::from_millis(40));
             let state = app.state::<AppState>();
             let Some((pos, size, scale)) = *state.pet_frame.lock().unwrap() else { continue };
+            if island::active() {
+                let over = cursor_point().is_some_and(|c| island::hit(pos, scale, c));
+                if !state.dragging.load(Ordering::SeqCst) {
+                    island::set_hover(&app, over);
+                }
+                let want = over || state.dragging.load(Ordering::SeqCst);
+                if interactive != Some(want) {
+                    if let Some(pet) = app.get_webview_window(MAIN) {
+                        if pet.set_ignore_cursor_events(!want).is_ok() {
+                            interactive = Some(want);
+                        }
+                    }
+                }
+                continue;
+            }
             let follow = state.settings.lock().unwrap().follow_cursor;
             let looking = follow && !state.dragging.load(Ordering::SeqCst) && !state.radial_open.load(Ordering::SeqCst);
             let target = match (looking, cursor_point()) {
@@ -557,7 +602,7 @@ fn suggestion(app: &AppHandle) -> Option<Suggestion> {
     None
 }
 
-fn close_radial(app: &AppHandle) {
+pub fn close_radial(app: &AppHandle) {
     if app.state::<AppState>().radial_open.swap(false, Ordering::SeqCst) {
         let _ = app.emit_to(MAIN, "radial-close", ());
     }
@@ -595,12 +640,6 @@ pub fn radial_open(app: AppHandle) -> Result<RadialLayout, String> {
         .collect();
 
     Ok(RadialLayout { pet_size, radius, angles, suggestion: suggestion(&app) })
-}
-
-/// Menu do botão direito (desenhado na própria janela do Pipo): a janela toda recebe o mouse.
-#[tauri::command]
-pub fn pet_menu_open(app: AppHandle) {
-    app.state::<AppState>().radial_open.store(true, Ordering::SeqCst);
 }
 
 #[tauri::command]

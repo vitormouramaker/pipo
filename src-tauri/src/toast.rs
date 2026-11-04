@@ -103,6 +103,9 @@ fn position(app: &AppHandle, w: i32, h: i32, scale: f64) -> Option<(i32, i32)> {
     if !pet.is_visible().unwrap_or(false) {
         return Some((right - w - gap, bottom - h - gap));
     }
+    if crate::island::active() {
+        return windows::beside_pet(app, w, h, false);
+    }
     let (pos, size) = (pet.outer_position().ok()?, pet.outer_size().ok()?);
     let margin = (windows::PET_MARGIN * pet.scale_factor().unwrap_or(scale)) as i32;
     let body_top = pos.y + margin;

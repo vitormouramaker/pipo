@@ -182,63 +182,98 @@ body,
   will-change: transform;
 }
 
-/* Menu do botão direito com a identidade do Pipo */
-.pet-menu {
+/* Modo ilha: pílula grafite grudada na borda, com os olhos do Pipo */
+.island-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.island {
   position: absolute;
-  z-index: 10;
-  min-width: 150px;
-  max-width: calc(100vw - 8px);
-  padding: 4px;
-  display: grid;
-  gap: 1px;
-  background: #1f2227;
-  border: 1px solid #2f333a;
-  border-radius: 12px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-  font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
-  animation: menu-in 140ms ease-out both;
-  transform-origin: top left;
-}
-.pet-menu.closing {
-  animation: menu-out 120ms ease-in both;
-  pointer-events: none;
-}
-.pet-menu button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
+  justify-content: center;
+  gap: 10px;
+  background: #121417;
+  border: 1px solid #2a2e35;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  cursor: grab;
+  overflow: hidden;
+  transition: left 220ms cubic-bezier(0.2, 0.9, 0.3, 1.15), top 220ms cubic-bezier(0.2, 0.9, 0.3, 1.15),
+    width 220ms cubic-bezier(0.2, 0.9, 0.3, 1.15), height 220ms cubic-bezier(0.2, 0.9, 0.3, 1.15), border-color 200ms;
+  animation: island-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  font: 12.5px/1 "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  color: #e8eaed;
+}
+/* Colada na borda: os cantos do lado da borda ficam retos, como um entalhe. */
+.island.top { border-top: 0; border-radius: 0 0 16px 16px; }
+.island.bottom { border-bottom: 0; border-radius: 16px 16px 0 0; }
+.island.left { border-left: 0; border-radius: 0 16px 16px 0; flex-direction: column; }
+.island.right { border-right: 0; border-radius: 16px 0 0 16px; flex-direction: column; }
+.island.hover { border-color: #3a3f47; }
+.island-eyes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 12px;
+}
+.island-eyes i {
+  display: block;
+  width: 4px;
+  height: 11px;
+  border-radius: 2px;
+  background: #2dd4e8;
+  transition: height 160ms, background 160ms;
+}
+.island.hover .island-eyes i { height: 13px; }
+.island.s-thinking .island-eyes i { animation: island-pulse 1.2s ease-in-out infinite; }
+.island.s-thinking .island-eyes i + i { animation-delay: 0.3s; }
+.island.s-alert .island-eyes i { background: #f5b544; }
+.island.s-done .island-eyes i, .island.s-levelup .island-eyes i { background: #4ade80; height: 4px; border-radius: 4px 4px 0 0; }
+.island.s-sleep .island-eyes i { height: 2px; background: #9aa0a9; }
+.island.s-focused .island-eyes i { width: 9px; height: 3px; }
+.island.s-gaming .island-eyes i { height: 4px; opacity: 0.5; }
+.island.s-speaking .island-eyes i { animation: island-pulse 0.6s ease-in-out infinite; }
+.island-eyes i.bar { width: 3px; animation: island-bar 0.9s ease-in-out infinite; }
+.island-eyes i.bar:nth-child(2) { animation-delay: 0.15s; }
+.island-eyes i.bar:nth-child(3) { animation-delay: 0.3s; }
+.island-info {
+  color: #c9ced6;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: fade-in 180ms ease-out both;
+}
+.island-exit {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: #e8eaed;
-  font: inherit;
-  font-size: 12.5px;
-  text-align: left;
+  color: #8a919c;
   cursor: pointer;
-  white-space: nowrap;
+  animation: fade-in 180ms ease-out both;
 }
-.pet-menu button svg {
-  color: #2dd4e8;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+.island-exit:hover { background: #262a30; color: #2dd4e8; }
+.island-exit svg { width: 14px; height: 14px; }
+@keyframes island-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: none; }
 }
-.pet-menu button:hover {
-  background: #262a30;
+@keyframes island-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
-.pet-menu button.danger {
-  margin-top: 4px;
-  border-top: 1px solid #2f333a;
-  border-radius: 0 0 8px 8px;
-  color: #8a919c;
+@keyframes island-bar {
+  0%, 100% { transform: scaleY(0.45); }
+  50% { transform: scaleY(1); }
 }
-.pet-menu button.danger svg {
-  color: #8a919c;
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
-.pet-menu button.danger:hover {
-  color: #f87171;
-}
-.pet-menu button.danger:hover svg {
-  color: #f87171;
+@media (prefers-reduced-motion: reduce) {
+  .island, .island-eyes i, .island-info, .island-exit { animation: none; transition: none; }
 }

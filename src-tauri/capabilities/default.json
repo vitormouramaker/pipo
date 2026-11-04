@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Permissões das janelas do Pipo (personagem, painel e avisos)",
-  "windows": ["main", "panel", "toast"],
+  "windows": ["main", "panel", "toast", "menu"],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging"

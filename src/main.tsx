@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import PetApp from "./pet/PetApp";
 import PanelApp from "./panel/PanelApp";
 import ToastApp from "./toast/ToastApp";
+import MenuApp from "./menu/MenuApp";
 import "./styles.css";
 import { setupSound } from "./ui/sound";
 import { setupTooltips } from "./ui/tooltip";
@@ -12,7 +13,7 @@ import { setupTooltips } from "./ui/tooltip";
 const label = getCurrentWindow().label;
 setupSound();
 setupTooltips();
-const App = label === "panel" ? PanelApp : label === "toast" ? ToastApp : PetApp;
+const App = label === "panel" ? PanelApp : label === "toast" ? ToastApp : label === "menu" ? MenuApp : PetApp;
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

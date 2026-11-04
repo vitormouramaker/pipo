@@ -48,6 +48,12 @@ pub struct Settings {
     /// Efeitos sonoros (0 a 100).
     pub sounds: bool,
     pub sound_volume: u8,
+    /// Modo ilha: pílula discreta grudada numa borda da tela.
+    pub island: bool,
+    /// "top", "bottom", "left" ou "right"
+    pub island_edge: String,
+    /// Posição ao longo da borda (0 a 1).
+    pub island_pos: f64,
 }
 
 impl Default for Settings {
@@ -78,6 +84,9 @@ impl Default for Settings {
             hidden_accessories: Vec::new(),
             sounds: true,
             sound_volume: 60,
+            island: false,
+            island_edge: "top".into(),
+            island_pos: 0.5,
         }
     }
 }
@@ -117,7 +126,8 @@ pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<
         result.map_err(|e| format!("Não consegui alterar a inicialização com o Windows: {e}"))?;
     }
 
-    if let Some(pet) = app.get_webview_window(windows::MAIN) {
+    // Na ilha a janela tem outro tamanho; o do Pipo volta quando sair dela.
+    if let Some(pet) = app.get_webview_window(windows::MAIN).filter(|_| !crate::island::active()) {
         let size = windows::window_size(new.pet_size);
         let _ = pet.set_size(LogicalSize::new(size, size));
         windows::clamp_pet(app);

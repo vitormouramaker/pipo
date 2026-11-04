@@ -26,6 +26,9 @@ export type Settings = {
   hiddenAccessories: string[];
   sounds: boolean;
   soundVolume: number;
+  island: boolean;
+  islandEdge: string;
+  islandPos: number;
 };
 
 export type LifeStatus = {
@@ -261,6 +264,12 @@ export const api = {
   voiceDownload: (model?: string) => invoke<void>("voice_download", { model }),
   voiceToggle: () => invoke<void>("voice_toggle"),
   petMenuOpen: () => invoke<void>("pet_menu_open"),
+  menuPending: () => invoke<boolean | null>("menu_pending"),
+  menuLayout: (width: number, height: number) => invoke<void>("menu_layout", { width, height }),
+  menuHide: () => invoke<void>("menu_hide"),
+  islandToggle: () => invoke<void>("island_toggle"),
+  islandStatus: () => invoke<{ active: boolean; edge: string }>("island_status"),
+  islandHit: (small: number[], big: number[]) => invoke<void>("island_hit", { small, big }),
   toastTake: () => invoke<Toast[]>("toast_take"),
   toastLayout: (height: number) => invoke<void>("toast_layout", { height }),
   toastOpen: (url: string | null, view: string | null) => invoke<void>("toast_open", { url, view }),
