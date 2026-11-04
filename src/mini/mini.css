@@ -1,0 +1,75 @@
+/* Mini-player de lives: barra fina com a cara do Pipo e o player ocupando o resto. */
+/* (Fundo da página: definido pelo MiniApp, porque este CSS vale para todas as janelas.) */
+.mini {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0f1114;
+  border: 1px solid #2a2e35;
+  box-sizing: border-box;
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  color: #e6e8eb;
+}
+.mini-bar {
+  flex: none;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 10px;
+  background: #16181c;
+  border-bottom: 1px solid #2a2e35;
+  cursor: grab;
+  font-size: 12px;
+}
+.mini-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+  animation: mini-pulse 2s ease-in-out infinite;
+}
+@keyframes mini-pulse {
+  50% { opacity: 0.45; }
+}
+.mini-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #9aa3ad;
+}
+.mini-title strong { color: #e6e8eb; font-weight: 600; }
+.mini-sub { color: #6b7480; }
+.mini-bar button {
+  flex: none;
+  width: 26px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #9aa3ad;
+  cursor: pointer;
+}
+.mini-bar button:hover { background: #23262c; color: #2dd4e8; }
+.mini-player {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #000;
+}
+.mini-empty {
+  margin: auto;
+  color: #9aa3ad;
+  font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mini-dot { animation: none; }
+}

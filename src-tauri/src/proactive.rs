@@ -208,7 +208,7 @@ pub fn memory_remove(app: AppHandle, id: i64) -> Result<(), String> {
 
 /// Pode falar agora? Respeita o limite por hora, o intervalo, jogo, foco e ausência.
 fn can_speak(app: &AppHandle, idle: u64, gaming: bool) -> bool {
-    if gaming || idle >= AWAY || focus::pomodoro_focusing(app) {
+    if gaming || idle >= AWAY || focus::pomodoro_focusing(app) || crate::modes::quiet() {
         return false;
     }
     if !app.state::<AppState>().settings.lock().unwrap().proactive {
@@ -225,7 +225,7 @@ fn can_speak(app: &AppHandle, idle: u64, gaming: bool) -> bool {
 fn speak(app: &AppHandle, kind: &str, title: &str, body: &str, action: Option<&str>) {
     with(|s| s.spoken.push_back(Instant::now()));
     crate::windows::set_pet_state(app, "attentive");
-    toast::notify(app, kind, title, body, action);
+    toast::notify_from(app, "proactive", kind, title, body, action);
 }
 
 /// Texto novo na área de transferência: se for um erro, oferece explicar.

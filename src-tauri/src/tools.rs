@@ -71,6 +71,8 @@ pub fn definitions() -> Value {
             &["path"],
         ),
         tool("open_file", "Abre um arquivo no programa padrão do Windows.", json!({ "path": { "type": "string" }, "name": { "type": "string" } }), &["path", "name"]),
+        tool("check_email", "Lista os e-mails não lidos da caixa principal do Gmail (últimos 2 dias): remetente, assunto e começo do texto. Só leitura.", json!({}), &[]),
+        tool("watch_live", "Abre a live de um canal seguido no mini-player (janela pequena por cima de tudo). channel: nome do canal.", json!({ "channel": { "type": "string" } }), &["channel"]),
         tool("organize_downloads", "Separa os arquivos soltos da pasta Downloads em pastas por tipo (dá para desfazer em Ações > Atalhos).", json!({}), &[]),
         tool("open_recent_file", "Abre um arquivo recente (use o path retornado por recent_files).", json!({ "path": { "type": "string" }, "name": { "type": "string" } }), &["path", "name"]),
         tool("add_note", "Guarda uma nota rápida.", json!({ "text": { "type": "string" } }), &["text"]),
@@ -160,6 +162,8 @@ pub fn label(name: &str, input: &Value) -> String {
         "read_file" => format!("Lendo {}", std::path::Path::new(&s(input, "path")).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
         "open_file" => format!("Abrindo {}", s(input, "name")),
         "organize_downloads" => "Organizando Downloads".into(),
+        "check_email" => "Lendo os e-mails não lidos".into(),
+        "watch_live" => format!("Abrindo a live de {}", s(input, "channel")),
         "open_recent_file" => format!("Abrindo {}", s(input, "name")),
         "add_note" => "Guardando nota".into(),
         "search_notes" => "Buscando nas notas".into(),
@@ -223,6 +227,24 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
                 Ok(format!("Nenhum arquivo com \"{query}\" no nome."))
             } else {
                 to_json(found)
+            }
+        }
+        "check_email" => crate::world::email::summary_text(app),
+        "watch_live" => {
+            let wanted = s(input, "channel").trim_start_matches('@').to_lowercase();
+            let found = crate::world::lives::list(app).into_iter().find(|c| c.handle.trim_start_matches('@').to_lowercase().contains(&wanted));
+            match found {
+                Some(c) if c.status.live == Some(true) => {
+                    let (app, key) = (app.clone(), c.key.clone());
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = crate::miniplayer::open_key(&app, &key).await {
+                            crate::toast::notify(&app, "error", "Mini-player", &e, None);
+                        }
+                    });
+                    Ok(format!("Abrindo {} no mini-player.", c.handle))
+                }
+                Some(c) => Ok(format!("{} não está ao vivo agora.", c.handle)),
+                None => Err("Esse canal não está na lista de lives seguidas (aba Hoje).".into()),
             }
         }
         "organize_downloads" => crate::actions::downloads::organize(app).map(|n| format!("{n} arquivo(s) organizados em pastas por tipo.")),

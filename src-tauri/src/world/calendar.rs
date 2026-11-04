@@ -230,7 +230,7 @@ fn remind(app: &AppHandle) {
         let body = if e.location.is_empty() { format!("Às {}.", e.time) } else { format!("Às {} · {}", e.time, e.location) };
         let action = e.link.clone().unwrap_or_else(|| "view:today".into());
         crate::windows::set_pet_state(app, "alert");
-        toast::notify(app, "reminder", &format!("Em {minutes} min: {}", e.title), &body, Some(&action));
+        toast::notify_from(app, "reminder", "reminder", &format!("Em {minutes} min: {}", e.title), &body, Some(&action));
     }
 }
 

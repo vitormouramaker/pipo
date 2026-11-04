@@ -1,4 +1,5 @@
 mod actions;
+mod ai;
 mod chat;
 mod clipboard;
 mod context;
@@ -8,6 +9,8 @@ mod island;
 mod life;
 mod proactive;
 mod menu;
+mod miniplayer;
+mod modes;
 mod hardware;
 mod secrets;
 mod sensors;
@@ -183,6 +186,8 @@ pub fn run() {
             world::lives::start(app.handle().clone());
             world::github::start(app.handle().clone());
             world::calendar::start(app.handle().clone());
+            world::lol::start(app.handle().clone());
+            world::email::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -244,6 +249,7 @@ pub fn run() {
             actions::downloads::downloads_undo,
             actions::downloads::downloads_trash,
             documents::chat_take_attachments,
+            documents::attachment_preview,
             updater::update_status,
             updater::update_check,
             updater::update_install,
@@ -251,6 +257,20 @@ pub fn run() {
             toast::toast_layout,
             toast::toast_open,
             toast::toast_done,
+            miniplayer::mini_open,
+            miniplayer::mini_source,
+            miniplayer::mini_close,
+            modes::mode_status,
+            world::lol::lol_status,
+            world::telegram::telegram_status,
+            world::telegram::telegram_connect,
+            world::telegram::telegram_link,
+            world::telegram::telegram_test,
+            world::telegram::telegram_disconnect,
+            world::email::email_status,
+            world::email::email_refresh,
+            world::email::email_connect,
+            world::email::email_disconnect,
             menu::pet_menu_open,
             menu::menu_pending,
             menu::menu_layout,

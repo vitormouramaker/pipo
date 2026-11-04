@@ -25,17 +25,43 @@ pub struct Toast {
     url: Option<String>,
     /// …ou esta aba do painel…
     view: Option<String>,
-    /// …ou abre o chat já perguntando isto.
+    /// …ou abre o chat já perguntando isto…
     prompt: Option<String>,
+    /// …ou abre esta live no mini-player.
+    mini: Option<String>,
 }
 
-/// Mostra um aviso. `action`: link http(s) ou aba do painel ("view:today").
+/// De onde vem o aviso (decide o que os modos deixam passar e o que vai para o celular).
+fn source_of(kind: &str) -> &'static str {
+    match kind {
+        "live" => "live",
+        "reminder" | "pomodoro" | "break" => "reminder",
+        "alert" => "alert",
+        "level" | "achievement" => "pipo",
+        "error" => "error",
+        "done" => "done",
+        _ => "info",
+    }
+}
+
+/// Mostra um aviso. `action`: link http(s), aba do painel ("view:today"), pergunta para o
+/// chat ("prompt:…") ou live para o mini-player ("mini:twitch:canal").
 pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str, action: Option<&str>) {
-    let (url, view, prompt) = match action {
-        Some(a) if a.starts_with("view:") => (None, Some(a[5..].to_string()), None),
-        Some(a) if a.starts_with("prompt:") => (None, None, Some(a[7..].to_string())),
-        Some(a) if a.starts_with("http") => (Some(a.to_string()), None, None),
-        _ => (None, None, None),
+    notify_from(app, source_of(kind), kind, title, body, action);
+}
+
+/// Como `notify`, dizendo a origem (ex.: "github", "email", "lol", "proactive").
+pub fn notify_from(app: &AppHandle, source: &str, kind: &str, title: &str, body: &str, action: Option<&str>) {
+    if !crate::modes::allows(source) {
+        return;
+    }
+    crate::world::telegram::mirror(app, source, title, body);
+    let (url, view, prompt, mini) = match action {
+        Some(a) if a.starts_with("view:") => (None, Some(a[5..].to_string()), None, None),
+        Some(a) if a.starts_with("prompt:") => (None, None, Some(a[7..].to_string()), None),
+        Some(a) if a.starts_with("mini:") => (None, None, None, Some(a[5..].to_string())),
+        Some(a) if a.starts_with("http") => (Some(a.to_string()), None, None, None),
+        _ => (None, None, None, None),
     };
     let toast = Toast {
         id: SEQ.fetch_add(1, Ordering::SeqCst),
@@ -45,6 +71,7 @@ pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str, action: Opti
         url,
         view,
         prompt,
+        mini,
     };
     app.state::<AppState>().toasts.lock().unwrap().push(toast);
     if app.get_webview_window(TOAST).is_some() {
@@ -122,7 +149,10 @@ fn position(app: &AppHandle, w: i32, h: i32, scale: f64) -> Option<(i32, i32)> {
 
 /// Clique num aviso: abre o link ou a aba correspondente.
 #[tauri::command]
-pub async fn toast_open(app: AppHandle, url: Option<String>, view: Option<String>, prompt: Option<String>) -> Result<(), String> {
+pub async fn toast_open(app: AppHandle, url: Option<String>, view: Option<String>, prompt: Option<String>, mini: Option<String>) -> Result<(), String> {
+    if let Some(key) = mini {
+        return crate::miniplayer::open_key(&app, &key).await;
+    }
     if let Some(url) = url {
         return crate::world::open_url(url);
     }

@@ -2,9 +2,12 @@
 
 pub mod briefing;
 pub mod calendar;
+pub mod email;
 pub mod github;
 pub mod lives;
+pub mod lol;
 pub mod media;
+pub mod telegram;
 
 use std::time::Duration;
 

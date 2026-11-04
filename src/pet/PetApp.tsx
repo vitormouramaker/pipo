@@ -81,7 +81,7 @@ export default function PetApp() {
       };
       const [dx, dy] = d[edge] ?? [0, 0];
       physics.nudge(-dx, -dy);
-      window.setTimeout(() => setGoo((g) => (g && Date.now() - g.key >= 650 ? null : g)), 700);
+      window.setTimeout(() => setGoo((g) => (g && Date.now() - g.key >= 1100 ? null : g)), 1150);
     });
     const unlistenIsland = listen<{ active: boolean; edge: string; scale: number }>("island", (e) => {
       setIslandScale(e.payload.scale);

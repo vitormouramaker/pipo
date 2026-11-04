@@ -5,6 +5,7 @@ import PetApp from "./pet/PetApp";
 import PanelApp from "./panel/PanelApp";
 import ToastApp from "./toast/ToastApp";
 import MenuApp from "./menu/MenuApp";
+import MiniApp from "./mini/MiniApp";
 import "./styles.css";
 import { setupSound } from "./ui/sound";
 import { setupTooltips } from "./ui/tooltip";
@@ -13,7 +14,7 @@ import { setupTooltips } from "./ui/tooltip";
 const label = getCurrentWindow().label;
 setupSound();
 setupTooltips();
-const App = label === "panel" ? PanelApp : label === "toast" ? ToastApp : label === "menu" ? MenuApp : PetApp;
+const App = label === "panel" ? PanelApp : label === "toast" ? ToastApp : label === "menu" ? MenuApp : label === "mini" ? MiniApp : PetApp;
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

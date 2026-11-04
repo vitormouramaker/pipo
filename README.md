@@ -40,13 +40,15 @@ O jeito certo de usar no dia a dia é instalado, como qualquer app: rode `src-ta
 
 - **Clique no Pipo**: abre o menu radial (chat, área de transferência, sistema, gastos, configurações, ocultar). Quando você copia um erro ou um texto longo, aparece também um atalho para o Pipo explicar ou resumir.
 - **Ctrl + Alt + Shift + Espaço**: abre e fecha o chat.
-- **Ctrl + Alt + Shift + S**: recorte qualquer parte da tela e pergunte ao Pipo sobre ela (erro, gráfico, print de conversa); a imagem vai anexada ao chat.
+- **Ctrl + Alt + Shift + S**: recorte qualquer parte da tela e pergunte ao Pipo sobre ela (erro, gráfico, print de conversa); o print aparece em miniatura no chat (clique para ver inteiro).
 - **Ctrl + Alt + Shift + V**: fala com o Pipo (também pelo 🎙 do chat ou pelo menu dele). Ele ouve até você fazer uma pausa, transcreve no próprio computador e responde em voz alta, com uma **voz natural** (Piper, voz neural que roda no PC, baixada uma vez em ⚙ → Voz). Para ele parar de falar: "Parar de falar" no chat, Esc, clique no Pipo ou o atalho de voz.
 - **Ícone do Pipo no topo do painel**: nível, evolução, acessórios e conquistas.
 - **Arrastar**: move o Pipo, que para nas bordas da tela (e passa para outro monitor); a posição é lembrada. Com o painel aberto, Pipo e painel andam juntos (arrastando qualquer um dos dois). Ao ser arrastado, o Pipo se inclina, estica com a velocidade e balança como gelatina quando você solta.
 - **Modo ilha**: arraste o Pipo até encostar numa borda ou canto da tela; ele mostra que vai virar ilha e, ao soltar, vira (com um brilho rápido para ser notado). Puxe a ilha para longe da borda e ele volta a ser o Pipo. Também dá pelo menu do Pipo (ou pela bandeja): ele encolhe para uma pílula discreta grudada na borda da tela, como a ilha dinâmica do iPhone. Arraste para qualquer borda ou canto; ao passar o mouse ela expande e mostra a hora ou o pomodoro; clique para o chat; o botão dentro dela traz o Pipo de volta.
 - **Botão direito no Pipo**: menu com a cara do Pipo, sempre ao lado dele (chat, falar, modo ilha, evolução, configurações, ocultar e sair). O **ícone na bandeja** tem as mesmas opções no menu do Windows.
-- **Avisos**: lembretes, lives, pomodoro, níveis e alertas aparecem como balões do próprio Pipo ao lado dele, sem roubar o foco (nem de um jogo). Clique no balão para abrir a live ou a aba certa.
+- **Avisos**: lembretes, lives, pomodoro, níveis e alertas aparecem como balões do próprio Pipo ao lado dele, sem roubar o foco (nem de um jogo). Clique no balão para abrir a aba certa; no aviso de live, abre o **mini-player** (janela pequena por cima de tudo, que dá para arrastar e redimensionar).
+- **Modos** (⚙ → Modos): trabalho (tudo menos lives), estudo (só lembretes e agenda) e jogo (só lembretes, agenda e dicas do LoL). Ligam sozinhos com um app aberto ou num horário, ou na mão. Por padrão, abrir o LoL ou o Valorant liga o modo jogo.
+- **Atalhos de texto** (Ações → Atalhos): digite um gatilho como `;email` em qualquer app e ele vira o texto salvo (aceita `{data}` e `{hora}`). Só as últimas letras digitadas ficam na memória para reconhecer o gatilho; nada é gravado.
 - **X** no canto do painel: fecha o painel. O botão ao lado expande o painel para a tela toda (e volta).
 - **Sons**: efeitos curtos e suaves em cada interação (menus, arrasto, mensagens, avisos, nível novo). Volume e desligar em ⚙ → Aparência.
 - **Histórico** (no topo do chat): todas as conversas anteriores; clique para reabrir ou exclua as que não quiser. **+ Nova conversa** guarda a atual no histórico.
@@ -65,6 +67,9 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
   - **Atalhos**: perguntar sobre a tela, **organizar a pasta Downloads** (pastas por tipo, com desfazer, e o que dá para mandar para a Lixeira: instaladores antigos, downloads incompletos e cópias "(1)"); ler texto da tela (OCR do Windows, offline), jogos da Steam/Epic/Riot com favoritos, rotinas (abrir vários apps, links e projetos de uma vez) e arquivos recentes.
 - **Arquivos**: arraste um PDF, Word, PowerPoint, imagem ou arquivo de texto/código em cima do Pipo (ou do painel) e ele vira anexo do chat, com atalhos para resumir, traduzir, ver os pontos principais ou explicar. No chat, peça "acha o contrato que baixei semana passada": o Pipo procura nas pastas Documentos, Downloads, Desktop e Imagens, lê o arquivo e responde.
 - **Hoje** também mostra a **agenda** (Google Agenda pelo endereço secreto iCal, com aviso 10 min antes e botão "Entrar" em reuniões do Meet/Teams/Zoom), **o que está tocando** no Windows (com tocar/pausar e pular), **seu dia** (tempo em cada tipo de app, registrado só no computador) e o **GitHub** (seus PRs, revisões pedidas a você e a CI dos seus projetos, com aviso quando termina; vale para todas as contas logadas no `gh`, como trabalho e pessoal).
+- **League of Legends**: com o cliente aberto, ao travar o campeão chega uma dica curta da Claude (runas, plano de rota, cuidado principal); na partida, aviso 1 minuto antes de Dragão e Barão voltarem; no fim, resultado, KDA e farm por minuto, com atalho para pedir uma análise. Usa só as APIs locais que o próprio LoL abre no PC.
+- **Celular (Telegram)**: crie um bot no @BotFather, cole o token em ⚙ → Integrações e mande uma mensagem para ele: os avisos escolhidos (lembretes, lives, GitHub, e-mail…) chegam no Telegram, se quiser só quando você estiver longe do PC.
+- **Gmail** (só leitura): com uma senha de app, a aba Hoje mostra os não lidos da caixa principal e o botão "Resumir com o Pipo"; no chat, pergunte "tenho e-mail importante?". Nada é marcado como lido.
 - **Pipo proativo** (nível equilibrado): no máximo 3 dicas por hora e nunca em jogo, foco ou com você longe: erro copiado, muitas mudanças sem commit, horas seguidas no PC, madrugada e o resumo do fim do dia. Ele também **lembra** do que você contar ("lembra que eu prefiro TypeScript"); a lista fica em ⚙ → Memória do Pipo.
 - **Clipboard**: últimos textos copiados (só em memória; senhas e tokens são ignorados), com Resumir, Traduzir e Revisar.
 - **Sistema**: app em uso, humor do Pipo, CPU, memória, GPU NVIDIA e os processos que mais consomem.
@@ -95,7 +100,9 @@ src-tauri/        backend (Rust) e configuração do app
   src/clipboard.rs histórico da área de transferência
   src/tools.rs    ferramentas que a IA pode usar no chat
   src/actions/    projetos, tarefas, Git, portas, Docker, jogos, rotinas, arquivos, notas, foco e OCR
-  src/world/      lives (Twitch/YouTube/Kick) e briefing diário
+  src/world/      lives, briefing, GitHub, agenda, música, LoL, Telegram e Gmail
+  src/modes.rs    modos trabalho, estudo e jogo
+  src/miniplayer.rs mini-player de lives
   src/voice.rs    microfone e transcrição local (Whisper)
   src/life.rs     XP, níveis, evolução e conquistas
   src/secrets.rs  chave no Gerenciador de Credenciais
@@ -124,7 +131,8 @@ docs/             plano de implementação
 | 4 | Mundo externo: lives, notícias, briefing matinal |
 | 5 | Vida: voz, XP, evolução, acessórios (concluída) |
 | 6 | Assistente completo: atualização automática, documentos, Pipo proativo, GitHub, agenda e música (concluída) |
+| 7 | Mais completo: perguntar sobre a tela, Downloads, mini-player, modos, atalhos de texto, LoL, Telegram e Gmail (concluída) |
 
 ## Privacidade
 
-Os dados de contexto ficam no computador. O microfone só abre quando você pede, e o áudio é transcrito localmente; só o texto vai para o chat. A chave da API nunca entra no repositório: a pasta `api/` está no `.gitignore`, e o app guarda a chave no Gerenciador de Credenciais do Windows.
+Os dados de contexto ficam no computador. O microfone só abre quando você pede, e o áudio é transcrito localmente; só o texto vai para o chat. O token do bot do Telegram e a senha de app do Gmail ficam no Gerenciador de Credenciais; e-mails só vão para a Claude quando você pede um resumo. A chave da API nunca entra no repositório: a pasta `api/` está no `.gitignore`, e o app guarda a chave no Gerenciador de Credenciais do Windows.

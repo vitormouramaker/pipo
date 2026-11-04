@@ -44,6 +44,9 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
   useEffect(() => onSpeakingChange(setTalking), []);
   // Arquivos anexados (soltos no Pipo ou no painel) que vão com a próxima mensagem.
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  // Miniaturas das imagens anexadas (caminho -> data URL) e a imagem ampliada agora.
+  const [previews, setPreviews] = useState<Record<string, string>>({});
+  const [zoom, setZoom] = useState<string | null>(null);
   const [download, setDownload] = useState<{ percent: number; error: string | null } | null>(null);
 
   // Baixa o modelo de voz sem sair do chat.
@@ -101,6 +104,28 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
   }, []);
 
   useEffect(() => {
+    for (const a of attachments) {
+      if (a.kind !== "image" || previews[a.path]) continue;
+      void api
+        .attachmentPreview(a.path)
+        .then((url) => setPreviews((p) => ({ ...p, [a.path]: url })))
+        .catch(() => {});
+    }
+  }, [attachments]);
+
+  useEffect(() => {
+    if (!zoom) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopImmediatePropagation();
+        setZoom(null);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [zoom]);
+
+  useEffect(() => {
     if (!draft) return;
     setInput(draft);
     onDraftUsed();
@@ -122,7 +147,9 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     if (busyRef.current) return;
     const files = attachments;
     setAttachments([]);
-    const shown = [...files.map((f) => `📎 ${f.name}`), text].filter(Boolean).join("\n");
+    const isThumb = (f: Attachment) => f.kind === "image" && Boolean(previews[f.path]);
+    const images = files.filter(isThumb).map((f) => previews[f.path]);
+    const shown = [...files.filter((f) => !isThumb(f)).map((f) => `📎 ${f.name}`), text].filter(Boolean).join("\n");
     stopSpeaking();
     sfx.send();
     let reply = "";
@@ -131,7 +158,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     setHistory(null);
     setError(null);
     setBusy(true);
-    setMessages((m) => [...m, { role: "user", text: shown }, { role: "assistant", text: "" }]);
+    setMessages((m) => [...m, { role: "user", text: shown, images }, { role: "assistant", text: "" }]);
 
     // A resposta pode alternar texto e uso de ferramentas: cada trecho de texto vira um balão.
     const appendText = (piece: string) =>
@@ -299,7 +326,16 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
             }
             return (
               <div key={i} className={`msg ${m.role}`}>
-                {m.text ? renderText(m.text) : <span className="typing">pensando…</span>}
+                {m.images && m.images.length > 0 && (
+                  <div className="msg-images">
+                    {m.images.map((src, n) => (
+                      <button key={n} className="thumb" title="Ver imagem inteira" onClick={() => setZoom(src)}>
+                        <img src={src} alt="Imagem anexada" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {m.text ? renderText(m.text) : m.images?.length ? null : <span className="typing">pensando…</span>}
                 {m.sources && m.sources.length > 0 && (
                   <div className="sources">
                     <span>Fontes:</span>
@@ -317,6 +353,15 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
         </div>
       )}
 
+      {zoom && (
+        <div className="lightbox" role="dialog" aria-label="Imagem anexada" onClick={() => setZoom(null)}>
+          <img src={zoom} alt="Imagem anexada" />
+          <button className="lightbox-close" aria-label="Fechar" onClick={() => setZoom(null)}>
+            {ICONS.close}
+          </button>
+        </div>
+      )}
+
       <footer className="composer">
         {talking && (
           <button className="stop-speaking" onClick={stopSpeaking} title="Também para com Esc ou clicando no Pipo">
@@ -326,8 +371,14 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
         {attachments.length > 0 && (
           <div className="attachments">
             {attachments.map((a) => (
-              <span key={a.path} className="attachment-chip" title={a.path}>
-                📎 {a.name}
+              <span key={a.path} className={`attachment-chip${previews[a.path] ? " has-thumb" : ""}`} title={a.path}>
+                {previews[a.path] ? (
+                  <button className="thumb small" title="Ver imagem inteira" onClick={() => setZoom(previews[a.path])}>
+                    <img src={previews[a.path]} alt={a.name} />
+                  </button>
+                ) : (
+                  <>📎 {a.name}</>
+                )}
                 <button aria-label={`Tirar ${a.name}`} onClick={() => setAttachments((all) => all.filter((x) => x.path !== a.path))}>
                   {ICONS.close}
                 </button>

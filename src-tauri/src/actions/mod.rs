@@ -3,6 +3,7 @@
 
 pub mod docker;
 pub mod downloads;
+pub mod expander;
 pub mod files;
 pub mod focus;
 pub mod games;

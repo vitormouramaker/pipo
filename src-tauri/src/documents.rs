@@ -68,6 +68,19 @@ fn image_type(ext: &str) -> Option<&'static str> {
     }
 }
 
+/// Prévia de uma imagem anexada (para a miniatura no chat), como data URL.
+#[tauri::command]
+pub fn attachment_preview(path: String) -> Result<String, String> {
+    let p = Path::new(&path);
+    let media = image_type(&extension(p)).ok_or("Não é imagem.")?;
+    let meta = std::fs::metadata(p).map_err(|e| e.to_string())?;
+    if meta.len() > MAX_IMAGE {
+        return Err("Imagem grande demais.".into());
+    }
+    let bytes = std::fs::read(p).map_err(|e| e.to_string())?;
+    Ok(format!("data:{media};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+}
+
 /// Confere se o arquivo pode ser anexado e de que tipo é.
 pub fn inspect(path: &Path) -> Result<Attachment, String> {
     let meta = std::fs::metadata(path).map_err(|_| "Arquivo não encontrado.".to_string())?;

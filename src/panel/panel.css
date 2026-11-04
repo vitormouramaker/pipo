@@ -412,3 +412,94 @@
 
 .trow.check-row { cursor: pointer; }
 .trow.check-row input { margin: 0; }
+
+/* Miniaturas de imagens anexadas (prints) e a imagem ampliada. */
+.msg-images { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.thumb {
+  padding: 0;
+  border: 1px solid #2a2e35;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0f1114;
+  cursor: zoom-in;
+  line-height: 0;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+.thumb:hover { border-color: #2dd4e8; transform: translateY(-1px); }
+.thumb img { display: block; max-width: 220px; max-height: 150px; object-fit: cover; }
+.thumb.small img { max-width: 96px; max-height: 64px; }
+.attachment-chip.has-thumb { padding: 3px 3px 3px 3px; gap: 4px; }
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 9, 11, 0.86);
+  backdrop-filter: blur(3px);
+  cursor: zoom-out;
+  animation: lightbox-in 160ms ease-out both;
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  animation: lightbox-pop 200ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+.lightbox-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #1b1d21;
+  border: 1px solid #2a2e35;
+}
+@keyframes lightbox-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lightbox-pop { from { transform: scale(0.92); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .lightbox, .lightbox img { animation: none; } }
+
+/* Hoje: e-mail e LoL */
+.mail-row { gap: 8px; }
+.mail-from { flex: none; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.mail-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c9ced4; }
+.lol-tip {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-left: 2px solid #2dd4e8;
+  background: #14171b;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  font-size: 12.5px;
+  line-height: 1.45;
+  user-select: text;
+}
+
+/* Configurações da Fase 7: modos, Telegram, Gmail, LoL */
+.panel .segmented.wrap, fieldset > .segmented { flex-wrap: wrap; align-self: flex-start; }
+.mode-legend { margin: 4px 0 2px; padding-left: 18px; color: var(--muted); font-size: 12.5px; display: grid; gap: 2px; }
+.mode-legend strong { color: var(--ink); font-weight: 600; }
+.rules { display: grid; gap: 6px; }
+.rules.disabled { opacity: 0.5; pointer-events: none; }
+.rule { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.rule select { width: auto; }
+.rule .grow { min-width: 140px; }
+.rule-time { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; }
+.days { display: inline-flex; gap: 3px; }
+.panel .days button { width: 22px; height: 22px; padding: 0; border-radius: 6px; font-size: 11px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.panel .days button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--surface-2); }
+.subsection { display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.hint.error { color: #f59e8b; }
+
+/* Atalhos de texto */
+.snippet-trigger { flex: none; color: var(--accent); font-size: 12.5px; }
+.snippet-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.snippet-form { display: grid; grid-template-columns: 110px 1fr auto; gap: 6px; align-items: start; margin-top: 6px; }
+.snippet-form textarea { resize: vertical; min-height: 34px; }
+.check.inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }

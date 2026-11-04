@@ -15,6 +15,25 @@ fn entry() -> Result<Entry, String> {
     Entry::new(SERVICE, ACCOUNT).map_err(|e| format!("Gerenciador de Credenciais indisponível: {e}"))
 }
 
+/// Outros segredos (token do bot do Telegram, senha de app do Gmail), cada um na sua entrada.
+fn named(account: &str) -> Result<Entry, String> {
+    Entry::new(SERVICE, account).map_err(|e| format!("Gerenciador de Credenciais indisponível: {e}"))
+}
+
+pub fn get_named(account: &str) -> Option<String> {
+    named(account).ok()?.get_password().ok().filter(|s| !s.is_empty())
+}
+
+pub fn set_named(account: &str, value: &str) -> Result<(), String> {
+    named(account)?.set_password(value).map_err(|e| format!("Não consegui guardar no Gerenciador de Credenciais: {e}"))
+}
+
+pub fn delete_named(account: &str) {
+    if let Ok(entry) = named(account) {
+        let _ = entry.delete_credential();
+    }
+}
+
 pub fn get() -> Option<String> {
     entry().ok()?.get_password().ok()
 }

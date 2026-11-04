@@ -36,6 +36,21 @@ export type Settings = {
   island: boolean;
   islandEdge: string;
   islandPos: number;
+  autoModes: boolean;
+  manualMode: string;
+  modeRules: ModeRule[];
+  textExpander: boolean;
+  snippets: Snippet[];
+  lolEnabled: boolean;
+  lolTips: boolean;
+  telegramEnabled: boolean;
+  telegramBot: string;
+  telegramChatId: string;
+  telegramAwayOnly: boolean;
+  telegramSources: string[];
+  emailEnabled: boolean;
+  emailAddress: string;
+  emailNotify: boolean;
 };
 
 export type LifeStatus = {
@@ -67,7 +82,7 @@ export type VoiceStatus = {
   listening: boolean;
   hasMicrophone: boolean;
 };
-export type Toast = { id: number; kind: string; title: string; body: string; url: string | null; view: string | null; prompt: string | null };
+export type Toast = { id: number; kind: string; title: string; body: string; url: string | null; view: string | null; prompt: string | null; mini: string | null };
 export type DaySummary = {
   day: string;
   activeSecs: number;
@@ -94,6 +109,21 @@ export type UpdateStatus = {
 };
 export type Attachment = { path: string; name: string; kind: "pdf" | "image" | "docx" | "pptx" | "text"; size: number };
 export type AttachResult = { path: string; name: string; attachment: Attachment | null; error: string | null };
+export type MiniSource = { platform: string; handle: string; title: string | null; video: string | null; url: string };
+export type ModeStatus = { mode: string; reason: string };
+export type ModeRule = { mode: string; kind: "app" | "horario"; apps: string; days: number[]; from: string; to: string };
+export type Snippet = { trigger: string; text: string };
+export type LolStatus = {
+  running: boolean;
+  phase: string;
+  champion: string | null;
+  position: string | null;
+  tip: string | null;
+  lastGame: string | null;
+};
+export type TelegramStatus = { hasToken: boolean; linked: boolean; bot: string };
+export type Mail = { uid: number; from: string; subject: string; date: string; snippet: string };
+export type MailStatus = { configured: boolean; address: string; unread: Mail[]; checkedAt: string | null; error: string | null };
 export type DownloadsPlan = {
   loose: number;
   groups: { folder: string; count: number; bytes: number }[];
@@ -157,6 +187,7 @@ export type ChatMessage = {
   confirmId?: string;
   decision?: "approved" | "denied";
   sources?: { title: string; url: string }[];
+  images?: string[];
 };
 
 export type Conversation = { id: number; title: string; updatedAt: string; current: boolean };
@@ -279,6 +310,7 @@ export const api = {
   },
   chatAttach: (paths: string[], openChat = true) => invoke<AttachResult[]>("chat_attach", { paths, openChat }),
   chatTakeAttachments: () => invoke<Attachment[]>("chat_take_attachments"),
+  attachmentPreview: (path: string) => invoke<string>("attachment_preview", { path }),
   usageSummary: () => invoke<UsageSummary>("usage_summary"),
   clipboardList: () => invoke<ClipItem[]>("clipboard_list"),
   clipboardCopy: (id: number) => invoke<void>("clipboard_copy", { id }),
@@ -326,7 +358,22 @@ export const api = {
   islandStatus: () => invoke<{ active: boolean; edge: string; scale: number }>("island_status"),
   toastTake: () => invoke<Toast[]>("toast_take"),
   toastLayout: (height: number) => invoke<void>("toast_layout", { height }),
-  toastOpen: (url: string | null, view: string | null, prompt: string | null) => invoke<void>("toast_open", { url, view, prompt }),
+  toastOpen: (url: string | null, view: string | null, prompt: string | null, mini: string | null) =>
+    invoke<void>("toast_open", { url, view, prompt, mini }),
+  miniOpen: (key: string) => invoke<void>("mini_open", { key }),
+  miniSource: () => invoke<MiniSource | null>("mini_source"),
+  miniClose: () => invoke<void>("mini_close"),
+  modeStatus: () => invoke<ModeStatus>("mode_status"),
+  lolStatus: () => invoke<LolStatus>("lol_status"),
+  telegramStatus: () => invoke<TelegramStatus>("telegram_status"),
+  telegramConnect: (token: string) => invoke<string>("telegram_connect", { token }),
+  telegramLink: () => invoke<string>("telegram_link"),
+  telegramTest: () => invoke<void>("telegram_test"),
+  telegramDisconnect: () => invoke<void>("telegram_disconnect"),
+  emailStatus: () => invoke<MailStatus>("email_status"),
+  emailRefresh: () => invoke<MailStatus>("email_refresh"),
+  emailConnect: (address: string, password: string) => invoke<number>("email_connect", { address, password }),
+  emailDisconnect: () => invoke<void>("email_disconnect"),
   daySummary: () => invoke<DaySummary>("day_summary"),
   calendarStatus: () => invoke<CalendarStatus>("calendar_status"),
   calendarRefresh: () => invoke<number>("calendar_refresh"),

@@ -66,6 +66,14 @@ export const ICONS = {
       <path d="M6.3 7.5a8 8 0 1 0 11.4 0" />
     </>,
   ),
+  external: icon(
+    <>
+      <path d="M14 4h6v6" />
+      <path d="M20 4 11 13" />
+      <path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" />
+    </>,
+    15,
+  ),
   close: icon(<path d="M6 6l12 12M18 6 6 18" />, 14),
   clock: icon(
     <>

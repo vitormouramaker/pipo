@@ -243,7 +243,7 @@ fn check(app: &AppHandle) {
     }
     if notify_on {
         for (kind, title, body, url) in alerts {
-            toast::notify(app, kind, &title, &body, Some(&url));
+            toast::notify_from(app, "github", kind, &title, &body, Some(&url));
         }
     }
     let _ = app.emit("github-changed", ());

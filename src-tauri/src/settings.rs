@@ -66,6 +66,27 @@ pub struct Settings {
     pub island_edge: String,
     /// Posição ao longo da borda (0 a 1).
     pub island_pos: f64,
+    /// Fase 7.4: modos automáticos. manual_mode: "auto", "normal", "trabalho", "estudo" ou "jogo".
+    pub auto_modes: bool,
+    pub manual_mode: String,
+    pub mode_rules: Vec<crate::modes::ModeRule>,
+    /// Fase 7.5: atalhos de texto.
+    pub text_expander: bool,
+    pub snippets: Vec<crate::actions::expander::Snippet>,
+    /// Fase 7.6: League of Legends (dica na seleção de campeões usa a Claude).
+    pub lol_enabled: bool,
+    pub lol_tips: bool,
+    /// Fase 7.7: avisos no Telegram (o token do bot fica no Gerenciador de Credenciais).
+    pub telegram_enabled: bool,
+    pub telegram_bot: String,
+    pub telegram_chat_id: String,
+    pub telegram_away_only: bool,
+    /// Origens repetidas no celular: reminder, live, github, alert, email, lol, proactive.
+    pub telegram_sources: Vec<String>,
+    /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
+    pub email_enabled: bool,
+    pub email_address: String,
+    pub email_notify: bool,
 }
 
 impl Default for Settings {
@@ -106,6 +127,21 @@ impl Default for Settings {
             island: false,
             island_edge: "top".into(),
             island_pos: 0.5,
+            auto_modes: true,
+            manual_mode: "auto".into(),
+            mode_rules: crate::modes::default_rules(),
+            text_expander: true,
+            snippets: Vec::new(),
+            lol_enabled: true,
+            lol_tips: true,
+            telegram_enabled: false,
+            telegram_bot: String::new(),
+            telegram_chat_id: String::new(),
+            telegram_away_only: true,
+            telegram_sources: ["reminder", "live", "github", "alert", "email"].iter().map(|s| s.to_string()).collect(),
+            email_enabled: false,
+            email_address: String::new(),
+            email_notify: false,
         }
     }
 }
@@ -142,6 +178,8 @@ pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<
             return Err(e);
         }
     }
+
+    crate::actions::expander::configure(new.text_expander, &new.snippets);
 
     let autolaunch = app.autolaunch();
     if autolaunch.is_enabled().unwrap_or(false) != new.autostart {

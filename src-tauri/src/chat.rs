@@ -50,6 +50,9 @@ pub struct ChatMessage {
     text: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     sources: Vec<Source>,
+    /// Imagens anexadas pelo usuário (data URLs), para mostrar a miniatura.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    images: Vec<String>,
 }
 
 /// Fontes citadas nos blocos de texto, sem repetir o mesmo link.
@@ -167,14 +170,38 @@ pub struct ConversationInfo {
     current: bool,
 }
 
+/// Tira as marcas "[Imagem anexada: …]" do texto (a imagem já aparece como miniatura).
+fn strip_image_notes(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while let Some(i) = rest.find("[Imagem anexada: ") {
+        out.push_str(&rest[..i]);
+        rest = match rest[i..].find(']') {
+            Some(j) => &rest[i + j + 1..],
+            None => "",
+        };
+    }
+    out.push_str(rest);
+    out.trim().to_string()
+}
+
 /// Histórico para a tela: texto de cada mensagem e uma linha para cada ferramenta usada.
 fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
     let messages = db.messages(conversation).map_err(|e| e.to_string())?;
     let mut out = Vec::new();
     for (role, content) in messages {
         let mut text = visible_text(&content);
-        // Anexos de documento aparecem como "📎 nome" acima do texto.
+        let mut images = Vec::new();
+        // Anexos de documento aparecem como "📎 nome" acima do texto; imagens viram miniatura.
         if role == "user" {
+            for b in content.as_array().into_iter().flatten().filter(|b| b["type"] == "image") {
+                if let (Some(media), Some(data)) = (b["source"]["media_type"].as_str(), b["source"]["data"].as_str()) {
+                    images.push(format!("data:{media};base64,{data}"));
+                }
+            }
+            if !images.is_empty() {
+                text = strip_image_notes(&text);
+            }
             let names: Vec<String> = content
                 .as_array()
                 .into_iter()
@@ -186,9 +213,9 @@ fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
                 text = format!("{}\n{}", names.join("\n"), text).trim().to_string();
             }
         }
-        if !text.is_empty() {
+        if !text.is_empty() || !images.is_empty() {
             let sources = if role == "assistant" { sources_of(&content) } else { Vec::new() };
-            out.push(ChatMessage { role: role.clone(), text, sources });
+            out.push(ChatMessage { role: role.clone(), text, sources, images });
         }
         if role == "assistant" {
             for block in content.as_array().into_iter().flatten() {
@@ -197,7 +224,7 @@ fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
                     Some("server_tool_use") => web_label(block),
                     _ => continue,
                 };
-                out.push(ChatMessage { role: "tool".into(), text: label, sources: Vec::new() });
+                out.push(ChatMessage { role: "tool".into(), text: label, sources: Vec::new(), images: Vec::new() });
             }
         }
     }
@@ -622,4 +649,14 @@ fn handle_event(
         _ => {}
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod image_notes {
+    #[test]
+    fn tira_marcas_de_imagem() {
+        assert_eq!(super::strip_image_notes("[Imagem anexada: tela.png]o que é isso?"), "o que é isso?");
+        assert_eq!(super::strip_image_notes("[Imagem anexada: a.png][Imagem anexada: b.png]"), "");
+        assert_eq!(super::strip_image_notes("sem nada"), "sem nada");
+    }
 }

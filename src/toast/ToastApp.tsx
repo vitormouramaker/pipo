@@ -21,12 +21,15 @@ const FACE: Record<string, PipoState> = {
   achievement: "done",
   done: "done",
   info: "idle",
+  lol: "attentive",
 };
 const TONE: Record<string, string> = { alert: "warn", error: "warn", level: "gold", achievement: "gold", live: "live" };
 
 function Bubble({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const [paused, setPaused] = useState(false);
-  const left = useRef(DURATION);
+  // Dicas do LoL são mais longas: ficam mais tempo.
+  const duration = toast.kind === "lol" ? 16000 : DURATION;
+  const left = useRef(duration);
   const started = useRef(Date.now());
 
   useEffect(() => {
@@ -39,7 +42,7 @@ function Bubble({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     };
   }, [paused]);
 
-  const clickable = Boolean(toast.url || toast.view || toast.prompt);
+  const clickable = Boolean(toast.url || toast.view || toast.prompt || toast.mini);
   return (
     <div
       className={`bubble ${TONE[toast.kind] ?? ""}${clickable ? " clickable" : ""}`}
@@ -47,7 +50,7 @@ function Bubble({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       onMouseLeave={() => setPaused(false)}
       onClick={() => {
         if (!clickable) return;
-        void api.toastOpen(toast.url, toast.view, toast.prompt);
+        void api.toastOpen(toast.url, toast.view, toast.prompt, toast.mini);
         onClose();
       }}
     >
@@ -68,7 +71,7 @@ function Bubble({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       >
         {ICONS.close}
       </button>
-      <div className="timer" style={{ animationDuration: `${DURATION}ms`, animationPlayState: paused ? "paused" : "running" }} />
+      <div className="timer" style={{ animationDuration: `${duration}ms`, animationPlayState: paused ? "paused" : "running" }} />
     </div>
   );
 }

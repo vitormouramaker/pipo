@@ -44,6 +44,8 @@ pub struct LiveStatus {
     /// `None` enquanto ainda não foi verificado.
     pub live: Option<bool>,
     pub title: Option<String>,
+    /// YouTube: id do vídeo da live (para o mini-player).
+    pub video: Option<String>,
     pub checked_at: Option<String>,
     pub error: Option<String>,
 }
@@ -172,9 +174,15 @@ fn youtube_status(html: &str) -> (bool, Option<String>) {
     (live, title.filter(|_| live))
 }
 
-async fn check(client: &reqwest::Client, channel: &Channel) -> Result<(bool, Option<String>), String> {
+/// YouTube: id do vídeo da live, no link canônico da página /live.
+fn youtube_video(html: &str) -> Option<String> {
+    let id = html.split("<link rel=\"canonical\" href=\"https://www.youtube.com/watch?v=").nth(1)?.split(['"', '&']).next()?;
+    (id.len() == 11 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')).then(|| id.to_string())
+}
+
+async fn check(client: &reqwest::Client, channel: &Channel) -> Result<(bool, Option<String>, Option<String>), String> {
     if channel.platform == "kick" {
-        return kick_status(client, &channel.handle).await;
+        return kick_status(client, &channel.handle).await.map(|(live, title)| (live, title, None));
     }
     let html = client
         .get(channel.url())
@@ -185,7 +193,13 @@ async fn check(client: &reqwest::Client, channel: &Channel) -> Result<(bool, Opt
         .text()
         .await
         .map_err(|e| e.to_string())?;
-    Ok(if channel.platform == "twitch" { twitch_status(&html) } else { youtube_status(&html) })
+    Ok(if channel.platform == "twitch" {
+        let (live, title) = twitch_status(&html);
+        (live, title, None)
+    } else {
+        let (live, title) = youtube_status(&html);
+        (live, title, youtube_video(&html).filter(|_| live))
+    })
 }
 
 /// Verifica todos os canais e avisa os que acabaram de entrar ao vivo.
@@ -201,9 +215,10 @@ pub async fn check_all(app: &AppHandle) {
             let was_live = entry.live == Some(true);
             entry.checked_at = Some(crate::actions::now_hm());
             match result {
-                Ok((live, title)) => {
+                Ok((live, title, video)) => {
                     entry.live = Some(live);
                     entry.title = title;
+                    entry.video = video;
                     entry.error = None;
                     live && !was_live
                 }
@@ -218,11 +233,16 @@ pub async fn check_all(app: &AppHandle) {
             let name = channel.handle.trim_start_matches('@');
             let platform = platform_name(&channel.platform);
             let body = title.unwrap_or_else(|| "Clique para assistir.".into());
-            crate::toast::notify(app, "live", &format!("{name} está ao vivo na {platform}"), &body, Some(&channel.url()));
+            let action = if channel.platform == "youtube" && !has_video(app, &channel.key()) { channel.url() } else { format!("mini:{}", channel.key()) };
+            crate::toast::notify(app, "live", &format!("{name} está ao vivo na {platform}"), &body, Some(&action));
             windows::set_pet_state(app, "done");
         }
     }
     let _ = app.emit("lives-changed", ());
+}
+
+fn has_video(app: &AppHandle, key: &str) -> bool {
+    app.state::<AppState>().lives.lock().unwrap().get(key).is_some_and(|s| s.video.is_some())
 }
 
 pub fn start(app: AppHandle) {

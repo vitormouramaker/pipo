@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings } from "../api";
+import { ICONS } from "../ui/icons";
+import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus } from "../api";
 import { sqliteDate } from "../format";
 import { sfx } from "../ui/sound";
 
@@ -196,9 +197,18 @@ function Lives() {
             </span>
             <span className="row-meta">{PLATFORMS[c.platform]}</span>
             {c.live && (
-              <button className="link" onClick={() => void api.openUrl(c.url)}>
-                ▶ Assistir
-              </button>
+              <>
+                <button
+                  className="link"
+                  title="Abre num mini-player por cima de tudo"
+                  onClick={() => void api.miniOpen(c.key).catch(() => api.openUrl(c.url))}
+                >
+                  ▶ Assistir
+                </button>
+                <button className="link muted" title="Abrir no navegador" onClick={() => void api.openUrl(c.url)}>
+                  {ICONS.external}
+                </button>
+              </>
             )}
             <button className="link muted" onClick={() => void api.liveRemove(c.key).then(refresh)}>
               ✕
@@ -432,6 +442,105 @@ function Music() {
   );
 }
 
+function Email({ onAsk }: Props) {
+  const [mail, setMail] = useState<MailStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    const refresh = () => void api.emailStatus().then(setMail);
+    refresh();
+    const unlisten = listen("email-changed", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  if (!mail?.configured) return null;
+  const summarize = () =>
+    onAsk(
+      "Resuma meus e-mails não lidos em tópicos curtos: o que é importante, o que pede resposta ou ação (e até quando) e o que dá para ignorar. " +
+        "Não invente nada além do que está aqui.\n\n" +
+        mail.unread.map((m) => `- [${m.date}] De: ${m.from} — Assunto: ${m.subject}\n  ${m.snippet}`).join("\n"),
+    );
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>E-mail {mail.unread.length > 0 ? `· ${mail.unread.length} não lido(s)` : ""}</h4>
+        <button
+          className="link muted"
+          onClick={() => {
+            setChecking(true);
+            void api.emailRefresh().then(setMail).finally(() => setChecking(false));
+          }}
+        >
+          {checking ? "Verificando…" : "Atualizar"}
+        </button>
+      </div>
+      {mail.error && <p className="hint">{mail.error}</p>}
+      {!mail.error && mail.unread.length === 0 && <p className="hint">Nada novo na caixa principal nos últimos 2 dias.</p>}
+      <div className="table">
+        {mail.unread.slice(0, 6).map((m) => (
+          <div key={m.uid} className="trow mail-row" title={m.snippet}>
+            <span className="mail-from">{m.from}</span>
+            <span className="grow mail-subject">{m.subject}</span>
+            <span className="row-meta">{m.date}</span>
+          </div>
+        ))}
+      </div>
+      {mail.unread.length > 0 && (
+        <div className="btns">
+          <button className="primary" onClick={summarize}>
+            Resumir com o Pipo
+          </button>
+          <button onClick={() => void api.openUrl("https://mail.google.com/mail/u/0/#inbox")}>Abrir o Gmail</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PHASE: Record<string, string> = {
+  None: "cliente aberto",
+  Lobby: "no saguão",
+  Matchmaking: "procurando partida",
+  ReadyCheck: "partida encontrada",
+  ChampSelect: "seleção de campeões",
+  GameStart: "carregando a partida",
+  InProgress: "em partida",
+  WaitingForStats: "esperando estatísticas",
+  PreEndOfGame: "fim de partida",
+  EndOfGame: "fim de partida",
+};
+
+function League({ onAsk }: Props) {
+  const [lol, setLol] = useState<LolStatus | null>(null);
+  useEffect(() => {
+    const refresh = () => void api.lolStatus().then(setLol);
+    refresh();
+    const unlisten = listen("lol-changed", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  if (!lol?.running && !lol?.lastGame) return null;
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>League of Legends {lol.running ? `· ${PHASE[lol.phase] ?? lol.phase}` : ""}</h4>
+      </div>
+      {lol.champion && (
+        <p className="hint">
+          <strong>{lol.champion}</strong>
+          {lol.position ? ` · ${lol.position}` : ""}
+        </p>
+      )}
+      {lol.tip && <p className="lol-tip">{lol.tip}</p>}
+      {lol.lastGame && <p className="hint">Última partida: {lol.lastGame}</p>}
+      {lol.champion && (
+        <div className="btns">
+          <button onClick={() => onAsk(`Me explica melhor como jogar de ${lol.champion}${lol.position ? ` no ${lol.position}` : ""}: runas, build e plano de jogo.`)}>
+            Mais dicas de {lol.champion}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Today({ onAsk }: Props) {
   return (
     <section className="actions">
@@ -439,6 +548,8 @@ export default function Today({ onAsk }: Props) {
         <Agenda />
         <Music />
         <MyDay onAsk={onAsk} />
+        <League onAsk={onAsk} />
+        <Email onAsk={onAsk} />
         <Github />
         <BriefingCard />
         <Lives />

@@ -104,6 +104,7 @@ pub fn usage_summary(app: AppHandle) -> Result<UsageSummary, String> {
             id,
             title: match id {
                 crate::world::briefing::USAGE_ID => "Briefing diário".to_string(),
+                crate::ai::USAGE_ID => "Extras (dicas do LoL)".to_string(),
                 _ => crate::chat::title_of(&first),
             },
             updated_at,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { type DownloadsPlan, api, type Game, type RecentFile, type Routine, type RoutineStep } from "../../api";
+import { type DownloadsPlan, type Snippet, api, type Game, type RecentFile, type Routine, type RoutineStep } from "../../api";
 
 const STEP_LABEL: Record<RoutineStep["kind"], string> = {
   app: "Programa",
@@ -283,6 +283,76 @@ function Downloads() {
   );
 }
 
+/** Fase 7.5: atalhos de texto (gatilho -> texto) que funcionam em qualquer app. */
+function TextSnippets() {
+  const [enabled, setEnabled] = useState(true);
+  const [list, setList] = useState<Snippet[] | null>(null);
+  const [trigger, setTrigger] = useState("");
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void api.getSettings().then((s) => {
+      setEnabled(s.textExpander);
+      setList(s.snippets);
+    });
+  }, []);
+  if (!list) return null;
+  const save = (patch: { textExpander?: boolean; snippets?: Snippet[] }) => {
+    if (patch.snippets) setList(patch.snippets);
+    if (patch.textExpander !== undefined) setEnabled(patch.textExpander);
+    void api.settingsUpdate(patch).catch((e) => setError(String(e)));
+  };
+  const add = () => {
+    const t = trigger.trim();
+    if (t.length < 2 || !text) return;
+    if (list.some((s) => s.trigger === t)) {
+      setError("Esse gatilho já existe.");
+      return;
+    }
+    setError(null);
+    save({ snippets: [...list, { trigger: t, text }] });
+    setTrigger("");
+    setText("");
+  };
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>Atalhos de texto</h4>
+        <label className="check inline">
+          <input type="checkbox" checked={enabled} onChange={(e) => save({ textExpander: e.target.checked })} />
+          Ligado
+        </label>
+      </div>
+      <p className="hint">
+        Digite o gatilho em qualquer app e ele vira o texto. Comece com um símbolo para não disparar sem querer (ex.: <code>;email</code>,{" "}
+        <code>;pix</code>). Use <code>{"{data}"}</code> e <code>{"{hora}"}</code> para a data e a hora de agora. O Pipo só guarda na memória
+        as últimas letras digitadas para reconhecer o gatilho; nada é gravado.
+      </p>
+      <div className="table">
+        {list.map((s) => (
+          <div key={s.trigger} className="trow">
+            <code className="snippet-trigger">{s.trigger}</code>
+            <span className="grow snippet-text" title={s.text}>
+              {s.text}
+            </span>
+            <button className="link muted" aria-label={`Remover ${s.trigger}`} onClick={() => save({ snippets: list.filter((x) => x.trigger !== s.trigger) })}>
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="snippet-form">
+        <input className="short" placeholder=";email" value={trigger} onChange={(e) => setTrigger(e.target.value.replace(/\s/g, ""))} aria-label="Gatilho" />
+        <textarea rows={2} placeholder="Texto que entra no lugar" value={text} onChange={(e) => setText(e.target.value)} aria-label="Texto" />
+        <button className="primary" disabled={trigger.trim().length < 2 || !text} onClick={add}>
+          Adicionar
+        </button>
+      </div>
+      {error && <p className="hint error">{error}</p>}
+    </div>
+  );
+}
+
 function AskScreen() {
   return (
     <div className="block">
@@ -301,6 +371,7 @@ export default function Shortcuts() {
   return (
     <>
       <AskScreen />
+      <TextSnippets />
       <Downloads />
       <ReadScreen />
       <Games />

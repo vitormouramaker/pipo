@@ -1,3 +1,4 @@
+import { EmailSettings, LolSettings, ModesSettings, TelegramSettings } from "./settings7";
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
@@ -499,6 +500,8 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
         </label>
       </fieldset>
 
+      <ModesSettings settings={settings} update={update} />
+
       <MemorySettings />
 
       <fieldset>
@@ -516,6 +519,9 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           Usa o GitHub CLI (gh) deste computador, com todas as contas logadas nele (ex.: trabalho e pessoal). Para incluir
           outra conta, rode <code>gh auth login</code> no terminal. A música é controlada pelo próprio Windows.
         </p>
+        <TelegramSettings settings={settings} update={update} />
+        <EmailSettings settings={settings} update={update} />
+        <LolSettings settings={settings} update={update} />
       </fieldset>
 
       <VoiceSettings settings={settings} update={update} />
