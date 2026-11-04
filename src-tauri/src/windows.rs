@@ -571,9 +571,20 @@ pub fn start_hit_test(app: AppHandle) {
         let mut interactive: Option<bool> = None;
         let mut last_gaze = (0i8, 0i8);
         let mut last_emit = std::time::Instant::now();
+        let mut last_sync = std::time::Instant::now();
         loop {
             std::thread::sleep(Duration::from_millis(40));
             let state = app.state::<AppState>();
+            // A cada 2 s confere a janela de verdade (se algum aviso de movimento se perdeu,
+            // o teste do mouse se corrige sozinho).
+            if last_sync.elapsed() >= Duration::from_secs(2) {
+                last_sync = std::time::Instant::now();
+                if let Some(pet) = app.get_webview_window(MAIN) {
+                    if let (Ok(p), Ok(s), Ok(k)) = (pet.outer_position(), pet.outer_size(), pet.scale_factor()) {
+                        *state.pet_frame.lock().unwrap() = Some((p, s, k));
+                    }
+                }
+            }
             let Some((pos, size, scale)) = *state.pet_frame.lock().unwrap() else { continue };
             if island::active() {
                 let over = cursor_point().is_some_and(|c| island::hit(&app, pos, size, scale, c));

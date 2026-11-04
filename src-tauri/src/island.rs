@@ -147,6 +147,14 @@ fn place(app: &AppHandle, edge: &str, pos: f64) {
         _ => (left + ((width - w) as f64 * pos) as i32, top),
     };
     let _ = pet.set_position(PhysicalPosition::new(x, y));
+    // Registra já a posição e o tamanho novos: ao abrir o Pipo direto em ilha (por exemplo,
+    // depois de uma atualização) os avisos de "janela mudou" podem não chegar, e o teste do
+    // mouse ficaria usando o tamanho do Pipo normal.
+    *app.state::<AppState>().pet_frame.lock().unwrap() = Some((
+        PhysicalPosition::new(x, y),
+        tauri::PhysicalSize::new(w.max(1) as u32, h.max(1) as u32),
+        scale,
+    ));
 }
 
 fn save(app: &AppHandle, edit: impl FnOnce(&mut settings::Settings)) {
@@ -172,7 +180,11 @@ pub fn enter(app: &AppHandle, restore: bool) {
     };
     place(app, &edge, pos);
     emit(app);
-    if !restore {
+    if restore {
+        if let (Ok(dir), Some((p, s, _))) = (app.path().app_data_dir(), *app.state::<AppState>().pet_frame.lock().unwrap()) {
+            crate::log(&dir, &format!("ilha restaurada: borda={edge} janela={},{} {}x{}", p.x, p.y, s.width, s.height));
+        }
+    } else {
         save(app, |s| s.island = true);
     }
 }
