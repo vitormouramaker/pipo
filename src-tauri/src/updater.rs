@@ -56,6 +56,9 @@ async fn check(app: &AppHandle) -> Option<String> {
     CHECKING.store(false, Ordering::SeqCst);
     match result {
         Ok(Some(update)) => {
+            if let Ok(dir) = app.path().app_data_dir() {
+                crate::log(&dir, &format!("atualização encontrada: {} -> {}", update.current_version, update.version));
+            }
             *ERROR.lock().unwrap() = None;
             *FOUND.lock().unwrap() = Some((update.version.clone(), update.body.clone()));
             let _ = app.emit("update-changed", ());
@@ -68,6 +71,9 @@ async fn check(app: &AppHandle) -> Option<String> {
             None
         }
         Err(e) => {
+            if let Ok(dir) = app.path().app_data_dir() {
+                crate::log(&dir, &format!("procura de atualização falhou: {e}"));
+            }
             *ERROR.lock().unwrap() = Some(format!("Não consegui procurar atualização: {e}"));
             let _ = app.emit("update-changed", ());
             None

@@ -58,6 +58,19 @@ pub fn definitions() -> Value {
         tool("list_routines", "Rotinas criadas pelo usuário (conjuntos de apps, links e projetos).", json!({}), &[]),
         tool("run_routine", "Roda uma rotina pelo id.", json!({ "id": { "type": "string" }, "name": { "type": "string" } }), &["id", "name"]),
         tool("recent_files", "Arquivos e pastas abertos recentemente no Windows, com busca por nome.", json!({ "query": { "type": "string" } }), &[]),
+        tool(
+            "search_files",
+            "Procura arquivos pelo nome nas pastas Documentos, Downloads, Desktop e Imagens do usuário (todas as palavras precisam aparecer no nome). Devolve os mais recentes primeiro.",
+            json!({ "query": { "type": "string", "description": "palavras do nome do arquivo" } }),
+            &["query"],
+        ),
+        tool(
+            "read_file",
+            "Lê um arquivo do usuário (PDF, imagem, Word .docx, PowerPoint .pptx, texto ou código) para você responder sobre ele. Use o path de search_files ou recent_files.",
+            json!({ "path": { "type": "string" } }),
+            &["path"],
+        ),
+        tool("open_file", "Abre um arquivo no programa padrão do Windows.", json!({ "path": { "type": "string" }, "name": { "type": "string" } }), &["path", "name"]),
         tool("open_recent_file", "Abre um arquivo recente (use o path retornado por recent_files).", json!({ "path": { "type": "string" }, "name": { "type": "string" } }), &["path", "name"]),
         tool("add_note", "Guarda uma nota rápida.", json!({ "text": { "type": "string" } }), &["text"]),
         tool("search_notes", "Busca nas notas do usuário (sem query, lista as mais recentes).", json!({ "query": { "type": "string" } }), &[]),
@@ -86,6 +99,7 @@ const CONFIRM: &[&str] = &[
     "launch_game",
     "run_routine",
     "open_recent_file",
+    "open_file",
 ];
 
 pub fn needs_confirmation(name: &str) -> bool {
@@ -120,6 +134,9 @@ pub fn label(name: &str, input: &Value) -> String {
         "list_routines" => "Listando rotinas".into(),
         "run_routine" => format!("Rodando a rotina {}", s(input, "name")),
         "recent_files" => "Buscando arquivos recentes".into(),
+        "search_files" => format!("Procurando arquivos: {}", s(input, "query")),
+        "read_file" => format!("Lendo {}", std::path::Path::new(&s(input, "path")).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()),
+        "open_file" => format!("Abrindo {}", s(input, "name")),
         "open_recent_file" => format!("Abrindo {}", s(input, "name")),
         "add_note" => "Guardando nota".into(),
         "search_notes" => "Buscando nas notas".into(),
@@ -144,6 +161,7 @@ pub fn confirmation(name: &str, input: &Value) -> String {
         "launch_game" => format!("Abrir {}?", s(input, "name")),
         "run_routine" => format!("Rodar a rotina {}?", s(input, "name")),
         "open_recent_file" => format!("Abrir {}?", s(input, "name")),
+        "open_file" => format!("Abrir {}?", s(input, "name")),
         other => format!("Executar {other}?"),
     }
 }
@@ -164,6 +182,23 @@ struct PathIn {
 /// Executa a ferramenta (fora da thread principal) e devolve o resultado em texto.
 pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, String> {
     match name {
+        "search_files" => {
+            let query = input["query"].as_str().unwrap_or("");
+            let found = crate::documents::search(query, 20);
+            if found.is_empty() {
+                Ok(format!("Nenhum arquivo com \"{query}\" no nome."))
+            } else {
+                to_json(found)
+            }
+        }
+        "open_file" => {
+            let path = std::path::Path::new(input["path"].as_str().unwrap_or(""));
+            if !crate::documents::allowed(path) {
+                return Err("Só abro arquivos dentro da pasta do usuário.".into());
+            }
+            crate::actions::shell_open(&path.to_string_lossy()).map(|_| "Aberto.".into())
+        }
+
         "system_status" => {
             let state = app.state::<AppState>();
             let (cpu, memory) = state.hardware.lock().unwrap().sample();

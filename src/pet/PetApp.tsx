@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { ICONS } from "../ui/icons";
 import { useDragPhysics } from "./physics";
 import Island, { type Edge } from "./Island";
@@ -101,6 +102,19 @@ export default function PetApp() {
       void unlistenState.then((fn) => fn());
       void unlistenRadial.then((fn) => fn());
     };
+  }, []);
+
+  // Arquivo arrastado por cima: o Pipo fica atento; soltou, vira anexo do chat.
+  useEffect(() => {
+    const unlisten = getCurrentWebview().onDragDropEvent((e) => {
+      if (e.payload.type === "enter") setOverride("attentive");
+      else if (e.payload.type === "leave") setOverride(null);
+      else if (e.payload.type === "drop") {
+        setOverride("done");
+        void api.chatAttach(e.payload.paths, true);
+      }
+    });
+    return () => void unlisten.then((fn) => fn());
   }, []);
 
   useEffect(() => {

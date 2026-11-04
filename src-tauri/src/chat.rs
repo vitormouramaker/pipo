@@ -11,7 +11,7 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::usage::Usage;
-use crate::{db::Db, secrets, settings, tools, windows, AppState, life};
+use crate::{db::Db, documents, life, secrets, settings, tools, windows, AppState};
 
 pub const API_URL: &str = "https://api.anthropic.com/v1/messages";
 pub const API_VERSION: &str = "2026-10-21";
@@ -114,7 +114,8 @@ fn system_prompt(sarcasm: u8, city: &str) -> String {
          acompanha atualidades. Responda em português do Brasil, de forma curta e direta; use listas e \
          blocos de código só quando ajudarem.\n\n\
          Você tem ferramentas para agir no computador: projetos e scripts, Git, portas, Docker, jogos, \
-         rotinas, arquivos recentes, notas, lembretes e pomodoro. Quando o pedido depender delas, use-as \
+         rotinas, arquivos recentes, notas, lembretes e pomodoro. Também procura e lê arquivos do usuário \
+         (PDF, Word, PowerPoint, imagens, texto e código) quando ele pede. Quando o pedido depender delas, use-as \
          em vez de explicar como o usuário faria. Ações que mudam algo pedem a confirmação do usuário \
          automaticamente; não peça permissão antes, só chame a ferramenta.\n\n\
          Quando a busca na web estiver disponível, use-a para notícias, fatos recentes, preços, placares e \
@@ -168,7 +169,20 @@ fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
     let messages = db.messages(conversation).map_err(|e| e.to_string())?;
     let mut out = Vec::new();
     for (role, content) in messages {
-        let text = visible_text(&content);
+        let mut text = visible_text(&content);
+        // Anexos de documento aparecem como "📎 nome" acima do texto.
+        if role == "user" {
+            let names: Vec<String> = content
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|b| b["type"] == "document")
+                .filter_map(|b| b["title"].as_str().map(|t| format!("📎 {t}")))
+                .collect();
+            if !names.is_empty() {
+                text = format!("{}\n{}", names.join("\n"), text).trim().to_string();
+            }
+        }
         if !text.is_empty() {
             let sources = if role == "assistant" { sources_of(&content) } else { Vec::new() };
             out.push(ChatMessage { role: role.clone(), text, sources });
@@ -274,12 +288,17 @@ pub fn chat_confirm(app: AppHandle, id: String, approved: bool) {
 }
 
 #[tauri::command]
-pub async fn chat_send(app: AppHandle, text: String, on_event: Channel<ChatEvent>) -> Result<(), String> {
+pub async fn chat_send(
+    app: AppHandle,
+    text: String,
+    attachments: Option<Vec<String>>,
+    on_event: Channel<ChatEvent>,
+) -> Result<(), String> {
     let state = app.state::<AppState>();
     state.busy.store(true, Ordering::SeqCst);
     windows::set_pet_state(&app, "thinking");
 
-    let result = run(&app, &text, &on_event).await;
+    let result = run(&app, &text, &attachments.unwrap_or_default(), &on_event).await;
     state.busy.store(false, Ordering::SeqCst);
 
     match result {
@@ -297,15 +316,24 @@ pub async fn chat_send(app: AppHandle, text: String, on_event: Channel<ChatEvent
     Ok(())
 }
 
-async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Result<Option<String>, String> {
+async fn run(app: &AppHandle, text: &str, attachments: &[String], on_event: &Channel<ChatEvent>) -> Result<Option<String>, String> {
     let key = secrets::get().ok_or("Configure a chave da Claude API nas Configurações.")?;
     let state = app.state::<AppState>();
+
+    // Anexos primeiro (a Claude lê melhor o documento antes da pergunta), depois o texto.
+    let mut content: Vec<Value> = Vec::new();
+    for path in attachments.iter().take(documents::MAX_ATTACHMENTS) {
+        let attachment = documents::inspect(std::path::Path::new(path))?;
+        content.extend(documents::blocks(&attachment)?);
+    }
+    let text = if text.trim().is_empty() && !attachments.is_empty() { "Veja o anexo." } else { text };
+    content.push(json!({ "type": "text", "text": text }));
 
     let (settings, conversation) = {
         let db = state.db.lock().unwrap();
         let settings = settings::load(&db);
         let conversation = db.current_conversation().map_err(|e| e.to_string())?;
-        db.add_message(conversation, "user", &json!([{ "type": "text", "text": text }]))
+        db.add_message(conversation, "user", &Value::Array(content))
             .map_err(|e| e.to_string())?;
         (settings, conversation)
     };
@@ -421,13 +449,20 @@ async fn run(app: &AppHandle, text: &str, on_event: &Channel<ChatEvent>) -> Resu
             let id = block["id"].as_str().unwrap_or("").to_string();
             let name = block["name"].as_str().unwrap_or("").to_string();
             let input = block["input"].clone();
-            let (content, is_error) = if invalid.contains(&id) {
-                ("INVALID_JSON: a entrada da ferramenta veio incompleta. Tente de novo.".to_string(), true)
+            let (content, is_error): (Value, bool) = if invalid.contains(&id) {
+                (json!("INVALID_JSON: a entrada da ferramenta veio incompleta. Tente de novo."), true)
+            } else if name == "read_file" {
+                // Ler arquivo devolve o próprio documento (PDF, imagem ou texto) para a Claude.
+                let _ = on_event.send(ChatEvent::Tool { label: tools::label(&name, &input) });
+                match documents::read_for_chat(input["path"].as_str().unwrap_or("")) {
+                    Ok(blocks) => (Value::Array(blocks), false),
+                    Err(e) => (json!(e), true),
+                }
             } else {
                 let _ = on_event.send(ChatEvent::Tool { label: tools::label(&name, &input) });
                 match run_tool(app, &name, &input, on_event).await {
-                    Ok(out) => (out, false),
-                    Err(e) => (e, true),
+                    Ok(out) => (json!(out), false),
+                    Err(e) => (json!(e), true),
                 }
             };
             results.push(json!({ "type": "tool_result", "tool_use_id": id, "content": content, "is_error": is_error }));

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type ChatMessage, type Conversation, type VoiceState } from "../api";
+import { api, type Attachment, type ChatMessage, type Conversation, type VoiceState } from "../api";
 import { speak, stopSpeaking } from "./speech";
 import { ICONS } from "../ui/icons";
 import { sfx } from "../ui/sound";
@@ -40,6 +40,8 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
   const [history, setHistory] = useState<Conversation[] | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [voice, setVoice] = useState<VoiceState>({ phase: "idle", message: null });
+  // Arquivos anexados (soltos no Pipo ou no painel) que vão com a próxima mensagem.
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [download, setDownload] = useState<{ percent: number; error: string | null } | null>(null);
 
   // Baixa o modelo de voz sem sair do chat.
@@ -78,10 +80,20 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     const unlistenView = listen("panel-view", () => inputRef.current?.focus());
     const unlistenPrefill = listen("chat-prefill", takePrefill);
     const unlistenVoice = listen<VoiceState>("voice-state", (e) => setVoice(e.payload));
+    const takeAttachments = () =>
+      void api.chatTakeAttachments().then((fresh) => {
+        if (!fresh.length) return;
+        sfx.done();
+        setAttachments((a) => [...a, ...fresh.filter((f) => !a.some((x) => x.path === f.path))].slice(0, 5));
+        inputRef.current?.focus();
+      });
+    takeAttachments();
+    const unlistenAttach = listen("chat-attach", takeAttachments);
     return () => {
       void unlistenView.then((fn) => fn());
       void unlistenPrefill.then((fn) => fn());
       void unlistenVoice.then((fn) => fn());
+      void unlistenAttach.then((fn) => fn());
       stopSpeaking();
     };
   }, []);
@@ -97,15 +109,18 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, history]);
 
-  const send = () => {
-    const text = input.trim();
-    if (!text || busy) return;
+  const send = (preset?: string) => {
+    const text = (preset ?? input).trim();
+    if ((!text && attachments.length === 0) || busy) return;
     setInput("");
     void sendText(text);
   };
 
   const sendText = async (text: string, spoken = false) => {
     if (busyRef.current) return;
+    const files = attachments;
+    setAttachments([]);
+    const shown = [...files.map((f) => `📎 ${f.name}`), text].filter(Boolean).join("\n");
     stopSpeaking();
     sfx.send();
     let reply = "";
@@ -114,7 +129,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     setHistory(null);
     setError(null);
     setBusy(true);
-    setMessages((m) => [...m, { role: "user", text }, { role: "assistant", text: "" }]);
+    setMessages((m) => [...m, { role: "user", text: shown }, { role: "assistant", text: "" }]);
 
     // A resposta pode alternar texto e uso de ferramentas: cada trecho de texto vira um balão.
     const appendText = (piece: string) =>
@@ -153,7 +168,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
       }
       else if (event.stopReason === "refusal") setError("O Pipo não pode responder a esse pedido.");
       else if (event.stopReason === "max_tokens") setError("A resposta foi cortada por ser longa demais.");
-    });
+    }, files.map((f) => f.path));
 
     setMessages((m) => m.filter((msg, i) => msg.role !== "assistant" || msg.text || i < m.length - 1));
     busyRef.current = false;
@@ -301,11 +316,35 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
       )}
 
       <footer className="composer">
+        {attachments.length > 0 && (
+          <div className="attachments">
+            {attachments.map((a) => (
+              <span key={a.path} className="attachment-chip" title={a.path}>
+                📎 {a.name}
+                <button aria-label={`Tirar ${a.name}`} onClick={() => setAttachments((all) => all.filter((x) => x.path !== a.path))}>
+                  {ICONS.close}
+                </button>
+              </span>
+            ))}
+            <div className="attachment-actions">
+              {[
+                ["Resumir", "Resuma em tópicos curtos."],
+                ["Pontos principais", "Quais são os pontos principais e o que eu preciso fazer?"],
+                ["Traduzir", "Traduza para o português do Brasil (se já estiver em português, para o inglês)."],
+                ["Explicar", "Explique de forma simples, como se eu nunca tivesse visto isso."],
+              ].map(([label, prompt]) => (
+                <button key={label} className="link" disabled={busy} onClick={() => send(prompt)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <textarea
           ref={inputRef}
           rows={2}
           value={input}
-          placeholder="Mensagem para o Pipo  (Enter envia, Shift+Enter quebra linha)"
+          placeholder={attachments.length ? "Pergunte sobre o anexo ou use um atalho acima" : "Mensagem para o Pipo  (Enter envia, Shift+Enter quebra linha)"}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -343,7 +382,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
           >
             {voice.phase === "listening" ? ICONS.stop : ICONS.mic}
           </button>
-          <button className="primary" onClick={() => void send()} disabled={busy || !input.trim()}>
+          <button className="primary" onClick={() => void send()} disabled={busy || (!input.trim() && attachments.length === 0)}>
             {busy ? "Respondendo…" : "Enviar"}
           </button>
         </div>

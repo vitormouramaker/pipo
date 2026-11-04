@@ -3,6 +3,7 @@ mod chat;
 mod clipboard;
 mod context;
 mod db;
+mod documents;
 mod island;
 mod life;
 mod menu;
@@ -57,6 +58,8 @@ pub struct AppState {
     pub busy: AtomicBool,
     /// Avisos esperando a janela de balões pegar.
     pub toasts: Mutex<Vec<toast::Toast>>,
+    /// Arquivos soltos no Pipo esperando o chat pegar.
+    pub attachments: Mutex<Vec<documents::Attachment>>,
 }
 
 /// Registro simples de diagnóstico em `pipo.log` (fica só no computador).
@@ -136,6 +139,7 @@ pub fn run() {
                 dragging: AtomicBool::new(false),
                 busy: AtomicBool::new(false),
                 toasts: Mutex::new(Vec::new()),
+                attachments: Mutex::new(Vec::new()),
             });
 
             secrets::import_from_file_if_missing();
@@ -203,6 +207,8 @@ pub fn run() {
             actions::ocr::ocr_start,
             world::open_url,
             life::life_status,
+            documents::chat_attach,
+            documents::chat_take_attachments,
             updater::update_status,
             updater::update_check,
             updater::update_install,

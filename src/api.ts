@@ -69,6 +69,8 @@ export type UpdateStatus = {
   installing: boolean;
   error: string | null;
 };
+export type Attachment = { path: string; name: string; kind: "pdf" | "image" | "docx" | "pptx" | "text"; size: number };
+export type AttachResult = { path: string; name: string; attachment: Attachment | null; error: string | null };
 export type VoiceState = { phase: "idle" | "listening" | "transcribing" | "error" | "nomodel"; message: string | null };
 
 /** Acessórios em uso: os liberados que o usuário não escondeu. */
@@ -241,11 +243,13 @@ export const api = {
   briefingLatest: () => invoke<Briefing | null>("briefing_latest"),
   briefingGenerate: () => invoke<Briefing>("briefing_generate"),
   briefingRunning: () => invoke<boolean>("briefing_running"),
-  chatSend: (text: string, onEvent: (e: ChatEvent) => void) => {
+  chatSend: (text: string, onEvent: (e: ChatEvent) => void, attachments: string[] = []) => {
     const channel = new Channel<ChatEvent>();
     channel.onmessage = onEvent;
-    return invoke<void>("chat_send", { text, onEvent: channel });
+    return invoke<void>("chat_send", { text, attachments, onEvent: channel });
   },
+  chatAttach: (paths: string[], openChat = true) => invoke<AttachResult[]>("chat_attach", { paths, openChat }),
+  chatTakeAttachments: () => invoke<Attachment[]>("chat_take_attachments"),
   usageSummary: () => invoke<UsageSummary>("usage_summary"),
   clipboardList: () => invoke<ClipItem[]>("clipboard_list"),
   clipboardCopy: (id: number) => invoke<void>("clipboard_copy", { id }),

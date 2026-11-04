@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { api, wornAccessories, type LifeStatus, type PanelView, type Settings } from "../api";
 import { Pipo } from "../pipo/Pipo";
 import Actions from "./actions/Actions";
@@ -32,6 +33,20 @@ export default function PanelApp() {
   const [draft, setDraft] = useState<string | null>(null);
   const [life, setLife] = useState<LifeStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [dropping, setDropping] = useState(false);
+
+  useEffect(() => {
+    const unlisten = getCurrentWebview().onDragDropEvent((e) => {
+      if (e.payload.type === "enter" || e.payload.type === "over") setDropping(true);
+      else if (e.payload.type === "leave") setDropping(false);
+      else if (e.payload.type === "drop") {
+        setDropping(false);
+        setView("chat");
+        void api.chatAttach(e.payload.paths, true);
+      }
+    });
+    return () => void unlisten.then((fn) => fn());
+  }, []);
 
   const refreshKey = () => void api.keyStatus().then(setHasKey);
 
@@ -58,6 +73,12 @@ export default function PanelApp() {
 
   return (
     <div className="panel">
+      {dropping && (
+        <div className="drop-overlay">
+          <span>Solte para anexar ao chat</span>
+          <small>PDF, Word, PowerPoint, imagem, texto ou código</small>
+        </div>
+      )}
       <header className="panel-header" data-tauri-drag-region>
         <button
           className="brand"
