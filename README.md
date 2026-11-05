@@ -88,6 +88,8 @@ Sensores e alertas são lidos só no computador; nada disso é enviado para a in
 
 **Instalação limpa:** ao abrir, o Pipo garante que o "iniciar com o Windows" e os atalhos apontam para ele mesmo e avisa se achar uma cópia antiga (que pode ser mandada para a Lixeira em ⚙ → Atualizações). As configurações têm uma cópia completa: se uma versão antiga abrir por engano e apagar campos novos, eles voltam.
 
+**Backup na nuvem e vários PCs** (⚙ → Backup na nuvem): escolha a pasta do Google Drive para computador ou do OneDrive e o Pipo guarda uma cópia por dia (ou na hora). Em outro PC, aponte para a mesma pasta e restaure. Chaves e senhas não vão para a nuvem.
+
 **Seus dados:** as configurações são salvas sozinhas assim que você muda algo. A cada início o Pipo guarda uma cópia de segurança do banco (as 15 mais recentes ficam em `%APPDATA%\com.vitormouramaker.pipo\backups`) e anota um resumo em `pipo.log` na mesma pasta.
 
 **Chave da API:** na primeira execução, o Pipo procura `api/api-pipo.txt` (ou o arquivo indicado em `PIPO_API_KEY_FILE`) e guarda a chave no Gerenciador de Credenciais do Windows. Também dá para colar a chave ou importar o arquivo em **Configurações**. Depois de importada, o arquivo pode ser apagado.
@@ -142,7 +144,7 @@ docs/             plano de implementação
 | 5 | Vida: voz, XP, evolução, acessórios (concluída) |
 | 6 | Assistente completo: atualização automática, documentos, Pipo proativo, GitHub, agenda e música (concluída) |
 | 7 | Mais completo: perguntar sobre a tela, Downloads, mini-player, modos, atalhos de texto, LoL, Telegram e Gmail (concluída) |
-| 8 | Ainda mais: Pipo pelo celular, relatório semanal, automações, busca inteligente, LoL avançado, legenda ao vivo, visual e backup (em andamento) |
+| 8 | Ainda mais: Pipo pelo celular, relatório semanal, automações, busca inteligente, LoL avançado, legenda ao vivo, visual e backup na nuvem (concluída) |
 
 ## Privacidade
 

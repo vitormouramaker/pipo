@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type ModeRule, type ModeStatus, type Settings, type TelegramStatus } from "../api";
+import { api, type CloudStatus, type ModeRule, type ModeStatus, type Settings, type TelegramStatus } from "../api";
 import { sfx } from "../ui/sound";
 
 type Update = (patch: Partial<Settings>) => void;
@@ -520,6 +520,104 @@ export function CaptionsSettings({ settings, update }: { settings: Settings; upd
         Usa o mesmo modelo da voz (⚙ → Voz) para transcrever o som do PC no próprio computador. Enquanto estiver ligada, usa um pouco
         mais de processador. A tradução custa poucos centavos por hora de vídeo (aparece em Gastos, como "Extras").
       </p>
+    </fieldset>
+  );
+}
+
+/** Fase 8.7: backup na nuvem e vários PCs. */
+export function CloudSettings({ settings, update }: { settings: Settings; update: Update }) {
+  const [status, setStatus] = useState<CloudStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const refresh = () => void api.cloudStatus().then(setStatus);
+  useEffect(refresh, [settings.cloudFolder]);
+  useEffect(() => {
+    const unlisten = listen("cloud-changed", refresh);
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  const backup = () => {
+    setBusy(true);
+    setMessage(null);
+    void api
+      .cloudBackup()
+      .then((when) => {
+        setMessage({ ok: true, text: `Backup feito (${when}).` });
+        sfx.done();
+        refresh();
+      })
+      .catch((e) => {
+        setMessage({ ok: false, text: String(e) });
+        sfx.error();
+      })
+      .finally(() => setBusy(false));
+  };
+  const options = Array.from(new Set([...(status?.detected ?? []), ...(settings.cloudFolder ? [settings.cloudFolder] : [])]));
+  return (
+    <fieldset>
+      <legend>Backup na nuvem</legend>
+      <p className="hint">
+        O Pipo copia configurações, memória, notas, lembretes, conversas, rotinas e automações para uma pasta que a nuvem já
+        sincroniza (Google Drive para computador ou OneDrive). Em outro PC, escolha a mesma pasta e restaure. Chaves e senhas
+        (Claude, Telegram, Gmail) não vão junto: ficam só no Windows de cada PC.
+      </p>
+      <label>
+        Pasta da nuvem
+        <select value={settings.cloudFolder} onChange={(e) => update({ cloudFolder: e.target.value })}>
+          <option value="">{options.length ? "Escolha…" : "Nenhuma pasta da nuvem encontrada"}</option>
+          {options.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      </label>
+      {settings.cloudFolder && (
+        <>
+          <label className="check">
+            <input type="checkbox" checked={settings.cloudAuto} onChange={(e) => update({ cloudAuto: e.target.checked })} />
+            Backup automático todo dia (guarda os 10 mais recentes de cada PC)
+          </label>
+          <div className="btns">
+            <button className="primary" disabled={busy} onClick={backup}>
+              {busy ? "Copiando…" : "Fazer backup agora"}
+            </button>
+            {status?.lastBackup && <span className="hint">Último: {status.lastBackup}</span>}
+          </div>
+          {status && status.backups.length > 0 && (
+            <div className="table">
+              {status.backups.slice(0, 8).map((b) => (
+                <div key={b.path} className="trow">
+                  <span className="grow">
+                    {b.when} <span className="row-meta">· {b.thisPc ? "este PC" : b.pc} · {b.sizeKb} KB</span>
+                  </span>
+                  {confirm === b.path ? (
+                    <>
+                      <button className="danger" onClick={() => void api.cloudRestore(b.path).catch((e) => setMessage({ ok: false, text: String(e) }))}>
+                        Restaurar e reiniciar
+                      </button>
+                      <button className="link muted" onClick={() => setConfirm(null)}>
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <button className="link" onClick={() => setConfirm(b.path)}>
+                      Restaurar
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {confirm && (
+            <p className="hint">
+              Restaurar troca tudo o que está no Pipo agora por esse backup e reinicia o Pipo. O estado atual fica guardado numa
+              pasta "antes-da-restauracao" (dá para voltar).
+            </p>
+          )}
+        </>
+      )}
+      {message && <p className={`hint${message.ok ? " ok" : " error"}`}>{message.text}</p>}
     </fieldset>
   );
 }

@@ -16,7 +16,7 @@ const resting = (s: Spring, eps: number) => Math.abs(s.x - s.target) < eps && Ma
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
-type Callbacks = { onLift?: () => void; onDrop?: () => void };
+type Callbacks = { onLift?: () => void; onDrop?: () => void; /** 1 = Pipo; menos = mais de leve (ilha). */ strength?: number };
 
 export function useDragPhysics(el: RefObject<HTMLElement | null>, callbacks: Callbacks = {}) {
   const cb = useRef(callbacks);
@@ -63,8 +63,9 @@ export function useDragPhysics(el: RefObject<HTMLElement | null>, callbacks: Cal
           cb.current.onLift?.();
         }
         if (speed > 60) p.dir = Math.round((Math.atan2(vy, vx) * 180) / Math.PI);
-        p.tilt.target = clamp(vx / 110, -14, 14);
-        p.stretch.target = clamp(speed / 4000, 0, 0.16);
+        const k = cb.current.strength ?? 1;
+        p.tilt.target = clamp(vx / 110, -14, 14) * k;
+        p.stretch.target = clamp(speed / 4000, 0, 0.16) * (0.5 + k / 2);
       } else {
         // Soltou: tudo volta ao lugar com um balanço; quanto mais rápido, mais ele chacoalha.
         if (p.moving) cb.current.onDrop?.();

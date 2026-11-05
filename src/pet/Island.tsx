@@ -4,6 +4,7 @@ import { api, type FocusStatus } from "../api";
 import type { PipoState } from "../pipo/Pipo";
 import { ICONS } from "../ui/icons";
 import { skinColors } from "../pipo/Pipo";
+import { useDragPhysics } from "./physics";
 import { sfx } from "../ui/sound";
 
 export type Edge = "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -37,7 +38,44 @@ function islandColors(skin?: string, style?: string): Record<string, string> {
   return { "--island-bg": c.bottom, "--island-border": c.edge, "--island-eye": c.eye };
 }
 
-export default function Island({ edge, state, scale = 1, skin, islandStyle }: { edge: Edge; state: PipoState; scale?: number; skin?: string; islandStyle?: string }) {
+export default function Island({
+  edge,
+  state,
+  scale = 1,
+  skin,
+  islandStyle,
+  gaze = [0, 0],
+}: {
+  edge: Edge;
+  state: PipoState;
+  scale?: number;
+  skin?: string;
+  islandStyle?: string;
+  gaze?: [number, number];
+}) {
+  // Movimento "gostosinho" ao arrastar pela borda (mesma física do Pipo, mais de leve).
+  const motionRef = useRef<HTMLDivElement>(null);
+  const beatRef = useRef<HTMLDivElement>(null);
+  useDragPhysics(motionRef, { strength: 0.45 });
+  // Batida da música (e comemoração): a pílula pulsa.
+  const pulse = (strength: number) => {
+    const el = beatRef.current;
+    if (!el) return;
+    el.style.setProperty("--beat", String(strength));
+    el.classList.remove("beat");
+    void el.offsetWidth;
+    el.classList.add("beat");
+  };
+  useEffect(() => {
+    const unlisten = listen<number>("pipo-beat", (e) => pulse(e.payload));
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  // Vitória (levelup): três pulinhos.
+  useEffect(() => {
+    if (state !== "levelup") return;
+    const timers = [0, 260, 520].map((ms) => window.setTimeout(() => pulse(1), ms));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [state]);
   const vertical = edge === "left" || edge === "right";
   const [hover, setHover] = useState(false);
   // Redesenha quando a janela muda de tamanho (troca de borda, escala).
@@ -87,8 +125,11 @@ export default function Island({ edge, state, scale = 1, skin, islandStyle }: { 
   const dims = times((vertical ? PILL.v : PILL.h)[hover ? "big" : "small"], scale);
   const [x, y, w, h] = rect(edge, dims, scale);
 
+  const [gx, gy] = state === "sleep" || state === "gaming" ? [0, 0] : gaze;
   return (
     <main className="island-stage">
+      <div className="island-motion" ref={motionRef} style={{ transformOrigin: `${x + w / 2}px ${y + h / 2}px` }}>
+      <div className="island-beat" ref={beatRef} style={{ transformOrigin: `${x + w / 2}px ${y + h / 2}px` }}>
       <div
         className={`island ${edge}${vertical ? " splat-v" : ""} s-${state}${hover ? " hover" : ""}${glow ? " glow" : ""}`}
         style={{ left: x, top: y, width: w, height: h, "--k": scale, ...islandColors(skin, islandStyle) } as CSSProperties}
@@ -116,7 +157,7 @@ export default function Island({ edge, state, scale = 1, skin, islandStyle }: { 
           void api.petMenuOpen();
         }}
       >
-        <span className="island-eyes">
+        <span className="island-eyes" style={{ transform: `translate(${(gx * 0.7 * scale).toFixed(1)}px, ${(gy * 0.45 * scale).toFixed(1)}px)` }}>
           {state === "listening" ? (
             <>
               <i className="bar" />
@@ -136,6 +177,8 @@ export default function Island({ edge, state, scale = 1, skin, islandStyle }: { 
             {ICONS.expand}
           </button>
         )}
+      </div>
+      </div>
       </div>
     </main>
   );

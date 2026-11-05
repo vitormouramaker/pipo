@@ -608,6 +608,18 @@ pub fn start_hit_test(app: AppHandle) {
                 }
             }
             let Some((pos, size, scale)) = *state.pet_frame.lock().unwrap() else { continue };
+            // Os olhos seguem o mouse no Pipo e também na ilha.
+            let follow = state.settings.lock().unwrap().follow_cursor;
+            let looking = follow && !state.dragging.load(Ordering::SeqCst) && !state.radial_open.load(Ordering::SeqCst);
+            let target = match (looking, cursor_point()) {
+                (true, Some(c)) => gaze(pos, size, c),
+                _ => (0, 0),
+            };
+            if target != last_gaze && last_emit.elapsed() >= Duration::from_millis(120) {
+                last_gaze = target;
+                last_emit = std::time::Instant::now();
+                let _ = app.emit_to(MAIN, "pipo-gaze", [target.0, target.1]);
+            }
             if island::active() {
                 let over = cursor_point().is_some_and(|c| island::hit(&app, pos, size, scale, c));
                 if !state.dragging.load(Ordering::SeqCst) {
@@ -622,17 +634,6 @@ pub fn start_hit_test(app: AppHandle) {
                     }
                 }
                 continue;
-            }
-            let follow = state.settings.lock().unwrap().follow_cursor;
-            let looking = follow && !state.dragging.load(Ordering::SeqCst) && !state.radial_open.load(Ordering::SeqCst);
-            let target = match (looking, cursor_point()) {
-                (true, Some(c)) => gaze(pos, size, c),
-                _ => (0, 0),
-            };
-            if target != last_gaze && last_emit.elapsed() >= Duration::from_millis(120) {
-                last_gaze = target;
-                last_emit = std::time::Instant::now();
-                let _ = app.emit_to(MAIN, "pipo-gaze", [target.0, target.1]);
             }
             let want = state.radial_open.load(Ordering::SeqCst)
                 || state.dragging.load(Ordering::SeqCst)

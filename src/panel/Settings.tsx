@@ -1,5 +1,5 @@
 import SettingsNav from "./SettingsNav";
-import { CaptionsSettings, EmailSettings, LolSettings, ModesSettings, ReportSettings, TelegramSettings } from "./settings7";
+import { CaptionsSettings, CloudSettings, EmailSettings, LolSettings, ModesSettings, ReportSettings, TelegramSettings } from "./settings7";
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { type OldCopy, api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
@@ -582,6 +582,8 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
       <ReportSettings settings={settings} update={update} />
 
       <CaptionsSettings settings={settings} update={update} />
+
+      <CloudSettings settings={settings} update={update} />
 
       <MemorySettings />
 

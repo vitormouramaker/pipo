@@ -121,6 +121,9 @@ pub struct Settings {
     pub automations: Vec<crate::automations::Automation>,
     /// Fase 8.2: índice de busca pelo conteúdo dos documentos (só neste PC).
     pub file_index: bool,
+    /// Fase 8.7: pasta da nuvem (Google Drive para computador / OneDrive) e backup diário.
+    pub cloud_folder: String,
+    pub cloud_auto: bool,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -200,6 +203,8 @@ impl Default for Settings {
             weekly_report_ai: true,
             automations: Vec::new(),
             file_index: true,
+            cloud_folder: String::new(),
+            cloud_auto: true,
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,

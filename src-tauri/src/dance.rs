@@ -92,7 +92,7 @@ pub fn start(app: AppHandle) {
             let enabled = state.settings.lock().unwrap().dance;
             let gaming = state.sense.lock().unwrap().gaming;
             let visible = app.get_webview_window(windows::MAIN).is_some_and(|w| w.is_visible().unwrap_or(false));
-            let should = enabled && !gaming && visible && !crate::island::active() && crate::world::media::is_playing();
+            let should = enabled && !gaming && visible && crate::world::media::is_playing();
             if should && stream.is_none() {
                 stream = open_stream(&app);
                 ACTIVE.store(stream.is_some(), Ordering::SeqCst);

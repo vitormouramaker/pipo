@@ -211,7 +211,7 @@ export default function PetApp() {
   const state: PipoState = override ?? base;
   openRef.current = Boolean(radial) && !closing;
 
-  if (island) return <Island edge={island} state={state} scale={islandScale} skin={settings?.skin} islandStyle={settings?.islandStyle} />;
+  if (island) return <Island edge={island} state={state} scale={islandScale} skin={settings?.skin} islandStyle={settings?.islandStyle} gaze={settings?.followCursor === false ? [0, 0] : gaze} />;
 
   return (
     <main

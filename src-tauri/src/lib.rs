@@ -4,6 +4,7 @@ mod ai;
 mod automations;
 mod chat;
 mod clipboard;
+mod cloud;
 mod context;
 mod dance;
 mod db;
@@ -144,6 +145,10 @@ pub fn run() {
                 std::process::exit(0);
             }
             std::mem::forget(lock);
+            // Restauração da nuvem pedida antes de reiniciar: troca o banco antes de abrir.
+            if let Some(what) = cloud::apply_pending(&dir) {
+                log(&dir, &format!("nuvem: {what}"));
+            }
             let (db, repaired) = db::Db::open_or_repair(&dir).map_err(|e| format!("banco: {e}"))?;
             if let Some(what) = &repaired {
                 log(&dir, &format!("conserto: {what}"));
@@ -210,6 +215,7 @@ pub fn run() {
             files_index::start(app.handle().clone());
             install::start(app.handle().clone());
             dance::start(app.handle().clone());
+            cloud::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -292,6 +298,9 @@ pub fn run() {
             world::telegram::telegram_test,
             world::telegram::telegram_disconnect,
             report::report_latest,
+            cloud::cloud_status,
+            cloud::cloud_backup,
+            cloud::cloud_restore,
             captions::captions_toggle,
             captions::captions_status,
             files_index::files_search,
