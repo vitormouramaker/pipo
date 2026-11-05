@@ -465,6 +465,32 @@ function FileSearch() {
   );
 }
 
+/** Fase 8.5: legenda ao vivo do som do PC. */
+function LiveCaptions() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    void api.captionsStatus().then(setOn);
+    const unlisten = listen<boolean>("captions-state", (e) => setOn(e.payload));
+    return () => void unlisten.then((fn) => fn());
+  }, []);
+  return (
+    <div className="block">
+      <div className="block-head">
+        <h4>Legenda ao vivo {on ? "· ligada" : ""}</h4>
+      </div>
+      <p className="hint">
+        Uma faixa por cima de tudo com o que está tocando no PC (live, vídeo, call), traduzido para o português. O áudio é
+        transcrito no próprio computador; só o texto vai para a tradução. Atalho: Ctrl+Alt+Shift+L, ou o botão CC do mini-player.
+      </p>
+      <div className="btns">
+        <button className={on ? undefined : "primary"} onClick={() => void api.captionsToggle()}>
+          {on ? "Desligar a legenda" : "Ligar a legenda"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AskScreen() {
   return (
     <div className="block">
@@ -483,6 +509,7 @@ export default function Shortcuts() {
   return (
     <>
       <FileSearch />
+      <LiveCaptions />
       <AskScreen />
       <TextSnippets />
       <Downloads />

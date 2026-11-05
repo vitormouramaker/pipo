@@ -776,3 +776,22 @@
 .lol-game.win .lol-result { color: #34d399; }
 .lol-game.loss .lol-result { color: #f87171; }
 .lol-kda { font-variant-numeric: tabular-nums; }
+
+/* LoL visual (imagens oficiais do Data Dragon) */
+.lol-img { display: block; flex: none; border-radius: 6px; border: 1px solid #2a2e35; background: #0f1114; object-fit: cover; }
+.lol-img.champ { border-radius: 10px; border-color: rgba(45, 212, 232, 0.5); box-shadow: 0 0 10px rgba(45, 212, 232, 0.18); }
+.lol-img.rune, .lol-img.keystone { border-radius: 50%; border-color: #3b3220; background: #14110a; }
+.lol-img.keystone { border-color: #c8aa6e; box-shadow: 0 0 8px rgba(200, 170, 110, 0.35); }
+.lol-img.enemy { border-color: rgba(248, 113, 113, 0.5); }
+.lol-pick { display: flex; align-items: center; gap: 10px; }
+.lol-pick-text { display: grid; gap: 2px; }
+.lol-pick-text strong { font-size: 15px; }
+.lol-vs { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.lol-build { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.lol-row { display: flex; align-items: center; gap: 10px; }
+.lol-row-label { width: 64px; flex: none; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; }
+.lol-row-icons { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.lol-arrow { color: var(--muted); font-size: 14px; margin: 0 -1px; }
+.lol-sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+.lol-tips { margin: 2px 0 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; line-height: 1.45; }
+.lol-game .lol-img { border-radius: 50%; }

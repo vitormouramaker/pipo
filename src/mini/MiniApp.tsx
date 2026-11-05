@@ -46,6 +46,9 @@ export default function MiniApp() {
           <span data-tauri-drag-region> · {PLATFORM[src.platform] ?? src.platform}</span>
           {src.title && <span className="mini-sub" data-tauri-drag-region> — {src.title}</span>}
         </span>
+        <button title="Legenda ao vivo (traduzida)" aria-label="Legenda ao vivo" onClick={() => void api.captionsToggle()}>
+          CC
+        </button>
         <button title="Abrir no navegador" aria-label="Abrir no navegador" onClick={() => void api.openUrl(src.url)}>
           {ICONS.external}
         </button>

@@ -35,6 +35,11 @@ fn model_file(model: &str) -> &'static str {
     }
 }
 
+/// Caminho do modelo do Whisper (também usado pela legenda ao vivo).
+pub fn model_file_path(app: &AppHandle, model: &str) -> Option<PathBuf> {
+    model_path(app, model)
+}
+
 fn model_path(app: &AppHandle, model: &str) -> Option<PathBuf> {
     Some(app.path().app_data_dir().ok()?.join("models").join(model_file(model)))
 }

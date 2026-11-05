@@ -16,6 +16,7 @@ use serde::Serialize;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::world::ddragon::{Dd, Icon};
 use crate::AppState;
 
 #[derive(Clone, Default, Serialize)]
@@ -28,6 +29,49 @@ pub struct LolStatus {
     position: Option<String>,
     tip: Option<String>,
     last_game: Option<String>,
+    /// Fase 8.4+: imagens (Data Dragon) e a build montada com ícones.
+    champion_icon: Option<Icon>,
+    enemies: Vec<Icon>,
+    build: Option<Build>,
+}
+
+/// Build da seleção de campeões, com os ícones oficiais.
+#[derive(Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Build {
+    patch: String,
+    keystone: Option<Icon>,
+    primary: Vec<Icon>,
+    secondary: Vec<Icon>,
+    summoners: Vec<Icon>,
+    starting: Vec<Icon>,
+    core: Vec<Icon>,
+    boots: Option<Icon>,
+    situational: Vec<Icon>,
+    tips: Vec<String>,
+}
+
+/// Lê o JSON que a Claude devolve (pode vir dentro de ```json … ```).
+fn parse_build(text: &str, patch: &str, dd: &Dd) -> Option<Build> {
+    let start = text.find('{')?;
+    let end = text.rfind('}')?;
+    let v: Value = serde_json::from_str(&text[start..=end]).ok()?;
+    let list = |key: &str, f: &dyn Fn(&str) -> Option<Icon>| -> Vec<Icon> {
+        v[key].as_array().into_iter().flatten().filter_map(|x| x.as_str()).filter_map(f).collect()
+    };
+    let build = Build {
+        patch: patch.to_string(),
+        keystone: v["keystone"].as_str().and_then(|n| dd.rune(n)),
+        primary: list("primary", &|n| dd.rune(n)),
+        secondary: list("secondary", &|n| dd.rune(n)),
+        summoners: list("summoners", &|n| dd.spell(n)),
+        starting: list("starting", &|n| dd.item(n)),
+        core: list("core", &|n| dd.item(n)),
+        boots: v["boots"].as_str().and_then(|n| dd.item(n)),
+        situational: list("situational", &|n| dd.item(n)),
+        tips: v["tips"].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(String::from)).take(3).collect(),
+    };
+    (build.keystone.is_some() || !build.core.is_empty()).then_some(build)
 }
 
 static STATUS: Mutex<Option<LolStatus>> = Mutex::new(None);
@@ -148,19 +192,25 @@ async fn champ_select(app: &AppHandle, client: &reqwest::Client, port: u16, pass
     }
     let name = names.get(&champion).cloned().unwrap_or_else(|| format!("campeão {champion}"));
     let position = position_name(mine["assignedPosition"].as_str().unwrap_or("")).to_string();
-    let enemies: Vec<String> = session["theirTeam"]
+    let enemy_ids: Vec<i64> = session["theirTeam"]
         .as_array()
         .into_iter()
         .flatten()
         .filter_map(|p| p["championId"].as_i64().filter(|&c| c > 0))
-        .filter_map(|id| names.get(&id).cloned())
         .collect();
+    let enemies: Vec<String> = enemy_ids.iter().filter_map(|id| names.get(id).cloned()).collect();
     game.champion = Some(name.clone());
     game.position = position.clone();
+    let dd = crate::world::ddragon::data().await;
+    let champion_icon = dd.as_ref().and_then(|d| d.champion_by_id(champion));
+    let enemy_icons: Vec<Icon> = dd.as_ref().map(|d| enemy_ids.iter().filter_map(|id| d.champion_by_id(*id)).collect()).unwrap_or_default();
     update(app, |s| {
         s.champion = Some(name.clone());
         s.position = (!position.is_empty()).then(|| position.clone());
         s.tip = None;
+        s.build = None;
+        s.champion_icon = champion_icon;
+        s.enemies = enemy_icons;
     });
     if !app.state::<AppState>().settings.lock().unwrap().lol_tips {
         return;
@@ -177,20 +227,46 @@ async fn champ_select(app: &AppHandle, client: &reqwest::Client, port: u16, pass
         let prompt = match &patch {
             Some(patch) => format!(
                 "Vou jogar League of Legends de {name}{role}{against}, no patch {patch}. Pesquise a build e as runas mais usadas e com \
-                 melhor taxa de vitória neste patch para essa rota (sites como u.gg, op.gg ou lolalytics) e me dê em no máximo 5 linhas \
-                 curtas: runas principais, itens iniciais e núcleo da build, plano para a fase de rotas e o maior cuidado contra esses \
-                 adversários. Sem introdução e sem links."
+                 melhor taxa de vitória neste patch para essa rota (sites como u.gg, op.gg ou lolalytics). Responda SÓ com um JSON, \
+                 com os nomes oficiais em inglês, assim: {{\"keystone\": \"Conqueror\", \"primary\": [\"Triumph\", \"Legend: Alacrity\", \
+                 \"Last Stand\"], \"secondary\": [\"Second Wind\", \"Overgrowth\"], \"summoners\": [\"Flash\", \"Ignite\"], \"starting\": \
+                 [\"Doran's Blade\", \"Health Potion\"], \"core\": [\"Trinity Force\", \"Sterak's Gage\", \"Death's Dance\"], \"boots\": \
+                 \"Plated Steelcaps\", \"situational\": [\"Guardian Angel\"], \"tips\": [\"plano para a fase de rotas\", \"maior cuidado \
+                 contra esses adversários\"]}}. As dicas (tips) em português do Brasil, curtas."
             ),
             None => format!(
                 "Vou jogar League of Legends de {name}{role}{against}. Me dê uma dica rápida para esta partida em no máximo 4 linhas curtas: \
                  runas/itens iniciais, plano para a fase de rotas e o maior cuidado. Sem introdução."
             ),
         };
-        let answer = if patch.is_some() { crate::ai::ask_web(&app, system, &prompt, 700, 2).await } else { crate::ai::ask(&app, system, &prompt, 350).await };
+        let answer = if patch.is_some() { crate::ai::ask_web(&app, system, &prompt, 900, 2).await } else { crate::ai::ask(&app, system, &prompt, 350).await };
         match answer {
             Ok(tip) => {
-                update(&app, |s| s.tip = Some(tip.clone()));
-                crate::toast::notify_from(&app, "lol", "lol", &format!("Dica: {name}{role}"), &tip, Some(&more));
+                // Build com ícones (quando a resposta veio no formato combinado).
+                let build = match (&patch, crate::world::ddragon::data().await) {
+                    (Some(patch), Some(dd)) => parse_build(&tip, patch, &dd),
+                    _ => None,
+                };
+                let text = match &build {
+                    Some(b) => {
+                        let mut parts = Vec::new();
+                        if let Some(k) = &b.keystone {
+                            parts.push(format!("Runa: {}", k.name));
+                        }
+                        if !b.core.is_empty() {
+                            parts.push(format!("Itens: {}", b.core.iter().map(|i| i.name.clone()).collect::<Vec<_>>().join(", ")));
+                        }
+                        parts.extend(b.tips.iter().cloned());
+                        parts.join("\n")
+                    }
+                    None => tip.clone(),
+                };
+                update(&app, |s| {
+                    s.tip = Some(text.clone());
+                    s.build = build.clone();
+                });
+                let body = if build.is_some() { format!("{text}\nA build com as imagens está na aba Hoje.") } else { text };
+                crate::toast::notify_from(&app, "lol", "lol", &format!("Dica: {name}{role}"), &body, Some(&more));
             }
             Err(e) => update(&app, |s| s.tip = Some(format!("Não consegui a dica: {e}"))),
         }
@@ -387,6 +463,7 @@ fn tilted(recent: &[bool]) -> bool {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameRow {
+    icon: Option<String>,
     day: String,
     champion: String,
     position: String,
@@ -410,7 +487,18 @@ pub struct History {
 }
 
 #[tauri::command]
-pub fn lol_history(app: AppHandle) -> History {
+pub async fn lol_history(app: AppHandle) -> History {
+    let dd = crate::world::ddragon::data().await;
+    let mut history = history_rows(&app);
+    if let Some(dd) = dd {
+        for g in history.games.iter_mut() {
+            g.icon = dd.champion_by_name(&g.champion).map(|i| i.url);
+        }
+    }
+    history
+}
+
+fn history_rows(app: &AppHandle) -> History {
     let state = app.state::<AppState>();
     let db = state.db.lock().unwrap();
     let games: Vec<GameRow> = db
@@ -422,6 +510,7 @@ pub fn lol_history(app: AppHandle) -> History {
         .and_then(|mut st| {
             st.query_map([], |r| {
                 Ok(GameRow {
+                    icon: None,
                     day: r.get(0)?,
                     champion: r.get(1)?,
                     position: r.get(2)?,

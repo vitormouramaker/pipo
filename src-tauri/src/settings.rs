@@ -44,6 +44,11 @@ pub struct Settings {
     pub find_shortcut: String,
     /// Fase 8.2: colar o que está copiado como texto puro (sem formatação).
     pub plain_paste_shortcut: String,
+    /// Fase 8.5: legenda ao vivo do som do PC.
+    pub captions_shortcut: String,
+    pub captions_translate: bool,
+    pub captions_original: bool,
+    pub captions_size: u8,
     /// Ler em voz alta as respostas de comandos de voz.
     pub speak_replies: bool,
     /// Nome da voz do Windows ("" = primeira voz em português).
@@ -135,6 +140,10 @@ impl Default for Settings {
             screen_shortcut: "Ctrl+Alt+Shift+S".into(),
             find_shortcut: "Ctrl+Alt+Shift+P".into(),
             plain_paste_shortcut: "Ctrl+Alt+Shift+T".into(),
+            captions_shortcut: "Ctrl+Alt+Shift+L".into(),
+            captions_translate: true,
+            captions_original: true,
+            captions_size: 22,
             speak_replies: true,
             voice_name: String::new(),
             voice_engine: "natural".into(),
@@ -215,6 +224,10 @@ fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
         gs.register(s.screen_shortcut.as_str())
             .map_err(|e| format!("Atalho da tela inválido ou em uso por outro app ({}): {e}", s.screen_shortcut))?;
     }
+    if !s.captions_shortcut.trim().is_empty() {
+        gs.register(s.captions_shortcut.as_str())
+            .map_err(|e| format!("Atalho da legenda inválido ou em uso por outro app ({}): {e}", s.captions_shortcut))?;
+    }
     if !s.plain_paste_shortcut.trim().is_empty() {
         gs.register(s.plain_paste_shortcut.as_str())
             .map_err(|e| format!("Atalho de colar texto puro inválido ou em uso por outro app ({}): {e}", s.plain_paste_shortcut))?;
@@ -228,7 +241,7 @@ fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
 
 /// Aplica as configurações no sistema. Na inicialização `old` é `None`.
 pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<(), String> {
-    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut || o.find_shortcut != new.find_shortcut || o.plain_paste_shortcut != new.plain_paste_shortcut) {
+    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut || o.find_shortcut != new.find_shortcut || o.plain_paste_shortcut != new.plain_paste_shortcut || o.captions_shortcut != new.captions_shortcut) {
         if let Err(e) = register_shortcuts(app, new) {
             if let Some(o) = old {
                 let _ = register_shortcuts(app, o);

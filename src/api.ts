@@ -23,6 +23,10 @@ export type Settings = {
   screenShortcut: string;
   findShortcut: string;
   plainPasteShortcut: string;
+  captionsShortcut: string;
+  captionsTranslate: boolean;
+  captionsOriginal: boolean;
+  captionsSize: number;
   speakReplies: boolean;
   voiceName: string;
   voiceEngine: "natural" | "windows";
@@ -148,8 +152,25 @@ export type LolStatus = {
   position: string | null;
   tip: string | null;
   lastGame: string | null;
+  championIcon: LolIcon | null;
+  enemies: LolIcon[];
+  build: LolBuild | null;
+};
+export type LolIcon = { name: string; url: string };
+export type LolBuild = {
+  patch: string;
+  keystone: LolIcon | null;
+  primary: LolIcon[];
+  secondary: LolIcon[];
+  summoners: LolIcon[];
+  starting: LolIcon[];
+  core: LolIcon[];
+  boots: LolIcon | null;
+  situational: LolIcon[];
+  tips: string[];
 };
 export type LolGame = {
+  icon: string | null;
   day: string;
   champion: string;
   position: string;
@@ -391,6 +412,8 @@ export const api = {
   voiceToggle: () => invoke<void>("voice_toggle"),
   screenAsk: () => invoke<void>("screen_ask"),
   petFind: () => invoke<void>("pet_find"),
+  captionsToggle: () => invoke<void>("captions_toggle"),
+  captionsStatus: () => invoke<boolean>("captions_status"),
   downloadsPlan: () => invoke<DownloadsPlan>("downloads_plan"),
   downloadsOrganize: () => invoke<number>("downloads_organize"),
   downloadsUndo: () => invoke<number>("downloads_undo"),

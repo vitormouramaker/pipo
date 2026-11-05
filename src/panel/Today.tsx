@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { ICONS } from "../ui/icons";
-import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus, type WeeklyReport, type FullMail, type LolHistory } from "../api";
+import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus, type WeeklyReport, type FullMail, type LolHistory, type LolIcon, type LolBuild } from "../api";
 import { sqliteDate } from "../format";
 import { sfx } from "../ui/sound";
 
@@ -697,7 +697,63 @@ const PHASE: Record<string, string> = {
   EndOfGame: "fim de partida",
 };
 
-function League({ onAsk }: Props) {
+/** Ícone oficial do LoL (Data Dragon), com o nome ao passar o mouse. */
+function LolImg({ icon, size = 28, className }: { icon: LolIcon; size?: number; className?: string }) {
+  return <img className={`lol-img${className ? ` ${className}` : ""}`} src={icon.url} alt={icon.name} title={icon.name} width={size} height={size} />;
+}
+
+function IconRow({ label, icons, arrows }: { label: string; icons: (LolIcon | null)[]; arrows?: boolean }) {
+  const list = icons.filter((i): i is LolIcon => Boolean(i));
+  if (list.length === 0) return null;
+  return (
+    <div className="lol-row">
+      <span className="lol-row-label">{label}</span>
+      <div className="lol-row-icons">
+        {list.map((i, n) => (
+          <Fragment key={`${i.url}${n}`}>
+            {arrows && n > 0 && <span className="lol-arrow">›</span>}
+            <LolImg icon={i} />
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Build da seleção de campeões com as imagens de runas, feitiços e itens. */
+function BuildView({ build }: { build: LolBuild }) {
+  return (
+    <div className="lol-build">
+      <div className="lol-row">
+        <span className="lol-row-label">Runas</span>
+        <div className="lol-row-icons">
+          {build.keystone && <LolImg icon={build.keystone} size={40} className="keystone" />}
+          {build.primary.map((r) => (
+            <LolImg key={r.url} icon={r} size={26} className="rune" />
+          ))}
+          {build.secondary.length > 0 && <span className="lol-sep" />}
+          {build.secondary.map((r) => (
+            <LolImg key={r.url} icon={r} size={22} className="rune" />
+          ))}
+        </div>
+      </div>
+      <IconRow label="Feitiços" icons={build.summoners} />
+      <IconRow label="Início" icons={build.starting} />
+      <IconRow label="Núcleo" icons={[...build.core, build.boots]} arrows />
+      <IconRow label="Situação" icons={build.situational} />
+      {build.tips.length > 0 && (
+        <ul className="lol-tips">
+          {build.tips.map((t, i) => (
+            <li key={i}>{t}</li>
+          ))}
+        </ul>
+      )}
+      <span className="row-meta">Patch {build.patch} · passe o mouse nas imagens para ver os nomes</span>
+    </div>
+  );
+}
+
+export function League({ onAsk }: Props) {
   const [lol, setLol] = useState<LolStatus | null>(null);
   const [history, setHistory] = useState<LolHistory | null>(null);
   const [all, setAll] = useState(false);
@@ -726,12 +782,23 @@ function League({ onAsk }: Props) {
         <h4>League of Legends {lol?.running ? `· ${PHASE[lol.phase] ?? lol.phase}` : ""}</h4>
       </div>
       {lol?.champion && (
-        <p className="hint">
-          <strong>{lol.champion}</strong>
-          {lol.position ? ` · ${lol.position}` : ""}
-        </p>
+        <div className="lol-pick">
+          {lol.championIcon && <LolImg icon={lol.championIcon} size={48} className="champ" />}
+          <div className="lol-pick-text">
+            <strong>{lol.champion}</strong>
+            {lol.position && <span className="row-meta">{lol.position}</span>}
+          </div>
+          {lol.enemies.length > 0 && (
+            <div className="lol-vs">
+              <span className="row-meta">contra</span>
+              {lol.enemies.map((e) => (
+                <LolImg key={e.url} icon={e} size={26} className="enemy" />
+              ))}
+            </div>
+          )}
+        </div>
       )}
-      {lol?.tip && <p className="lol-tip">{lol.tip}</p>}
+      {lol?.build ? <BuildView build={lol.build} /> : lol?.tip && <p className="lol-tip">{lol.tip}</p>}
       {lol?.lastGame && games.length === 0 && <p className="hint">Última partida: {lol.lastGame}</p>}
       {games.length > 0 && history && (
         <>
@@ -755,6 +822,7 @@ function League({ onAsk }: Props) {
             {(all ? games : games.slice(0, 5)).map((g, i) => (
               <div key={i} className={`lol-game ${g.won ? "win" : "loss"}`}>
                 <span className="lol-result">{g.won ? "V" : "D"}</span>
+                {g.icon && <img className="lol-img" src={g.icon} alt={g.champion} width={26} height={26} />}
                 <span className="grow">
                   <strong>{g.champion}</strong>
                   {g.position && <span className="row-meta"> · {g.position}</span>}

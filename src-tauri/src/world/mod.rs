@@ -2,6 +2,7 @@
 
 pub mod briefing;
 pub mod calendar;
+pub mod ddragon;
 pub mod email;
 pub mod github;
 pub mod lives;

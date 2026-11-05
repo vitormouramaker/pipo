@@ -498,3 +498,28 @@ export function ReportSettings({ settings, update }: { settings: Settings; updat
     </fieldset>
   );
 }
+
+/** Fase 8.5: legenda ao vivo. */
+export function CaptionsSettings({ settings, update }: { settings: Settings; update: Update }) {
+  return (
+    <fieldset>
+      <legend>Legenda ao vivo</legend>
+      <label>
+        Atalho para ligar e desligar
+        <input value={settings.captionsShortcut} onChange={(e) => update({ captionsShortcut: e.target.value })} />
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={settings.captionsTranslate} onChange={(e) => update({ captionsTranslate: e.target.checked })} />
+        Traduzir para o português o que não estiver em português (cada trecho é uma resposta curta da Claude)
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={settings.captionsOriginal} onChange={(e) => update({ captionsOriginal: e.target.checked })} />
+        Mostrar também o texto original, menor
+      </label>
+      <p className="hint">
+        Usa o mesmo modelo da voz (⚙ → Voz) para transcrever o som do PC no próprio computador. Enquanto estiver ligada, usa um pouco
+        mais de processador. A tradução custa poucos centavos por hora de vídeo (aparece em Gastos, como "Extras").
+      </p>
+    </fieldset>
+  );
+}

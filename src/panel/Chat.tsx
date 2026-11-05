@@ -69,6 +69,7 @@ const COMMANDS: { name: string; arg?: string; hint: string }[] = [
   { name: "pomodoro", arg: "min", hint: "Começa um pomodoro (25 min se não disser)" },
   { name: "ilha", hint: "Liga ou desliga o modo ilha" },
   { name: "encontrar", hint: "Faz o Pipo pulsar na tela" },
+  { name: "legenda", hint: "Liga ou desliga a legenda ao vivo do som do PC" },
   { name: "ajuda", hint: "Lista os comandos" },
 ];
 
@@ -212,6 +213,8 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
           return void (await api.islandToggle());
         case "encontrar":
           return void (await api.petFind());
+        case "legenda":
+          return void (await api.captionsToggle());
         case "lembrete":
           if (!arg) {
             setInput("/lembrete ");

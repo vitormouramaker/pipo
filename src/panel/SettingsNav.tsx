@@ -27,9 +27,13 @@ export default function SettingsNav({ root }: { root: RefObject<HTMLElement | nu
     const bar = nav.current;
     const chip = bar?.querySelector<HTMLElement>("button.on");
     if (!bar || !chip) return;
-    const left = chip.offsetLeft - bar.offsetLeft;
-    if (left < bar.scrollLeft) bar.scrollTo({ left: left - 8, behavior: "smooth" });
-    else if (left + chip.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollTo({ left: left + chip.offsetWidth - bar.clientWidth + 8, behavior: "smooth" });
+    // Mostra também a vizinha de cada lado: assim dá para continuar clicando sem arrastar a barra.
+    const prev = chip.previousElementSibling as HTMLElement | null;
+    const next = chip.nextElementSibling as HTMLElement | null;
+    const start = (prev ?? chip).offsetLeft - bar.offsetLeft;
+    const end = (next ?? chip).offsetLeft - bar.offsetLeft + (next ?? chip).offsetWidth;
+    if (start < bar.scrollLeft) bar.scrollTo({ left: start - 8, behavior: "smooth" });
+    else if (end > bar.scrollLeft + bar.clientWidth) bar.scrollTo({ left: end - bar.clientWidth + 8, behavior: "smooth" });
   }, [active]);
 
   // Lê as seções (e relê quando alguma aparece depois, ex.: as que carregam dados).

@@ -1,4 +1,5 @@
 mod actions;
+mod captions;
 mod ai;
 mod automations;
 mod chat;
@@ -110,9 +111,9 @@ pub fn run() {
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
-                    let (voice, screen, find, plain) = {
+                    let (voice, screen, find, plain, captions) = {
                         let s = app.state::<AppState>().settings.lock().unwrap().clone();
-                        (s.voice_shortcut, s.screen_shortcut, s.find_shortcut, s.plain_paste_shortcut)
+                        (s.voice_shortcut, s.screen_shortcut, s.find_shortcut, s.plain_paste_shortcut, s.captions_shortcut)
                     };
                     let is = |text: &str| text.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|v| v == *shortcut);
                     if is(&voice) {
@@ -123,6 +124,8 @@ pub fn run() {
                         windows::find_pet(app);
                     } else if is(&plain) {
                         clipboard::paste_plain(app);
+                    } else if is(&captions) {
+                        captions::toggle(app);
                     } else {
                         windows::toggle_panel(app);
                     }
@@ -287,6 +290,8 @@ pub fn run() {
             world::telegram::telegram_test,
             world::telegram::telegram_disconnect,
             report::report_latest,
+            captions::captions_toggle,
+            captions::captions_status,
             files_index::files_search,
             install::old_copies,
             install::old_copy_remove,
