@@ -20,3 +20,6 @@ dist-ssr/
 *.local
 *.log
 .idea/
+
+# Credenciais do Google Cloud (cliente OAuth do backup no Drive) - nunca versionar
+client_secret*.json
