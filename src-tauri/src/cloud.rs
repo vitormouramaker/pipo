@@ -19,7 +19,7 @@ const EVERY: Duration = Duration::from_secs(24 * 3600);
 /// Arquivo que, se existir ao abrir, substitui o banco (restauração pedida pelo usuário).
 pub const PENDING: &str = "restaurar.db";
 
-fn pc_name() -> String {
+pub fn pc_name() -> String {
     let raw = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC".into());
     raw.chars().filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_').collect()
 }
@@ -54,8 +54,37 @@ fn base(folder: &str) -> PathBuf {
     Path::new(folder).join("Pipo")
 }
 
-/// Faz o backup agora: copia local primeiro (rápido e consistente) e depois para a nuvem.
+/// Faz o backup agora no destino escolhido (Google Drive pela internet ou pasta sincronizada).
 pub fn backup_now(app: &AppHandle) -> Result<String, String> {
+    let mode = app.state::<AppState>().settings.lock().unwrap().cloud_mode.clone();
+    if mode == "gdrive" {
+        return backup_drive(app);
+    }
+    backup_folder(app)
+}
+
+/// Google Drive pela internet: cópia local e envio pela API.
+fn backup_drive(app: &AppHandle) -> Result<String, String> {
+    if !crate::gdrive::connected(app) {
+        return Err("Conecte o Google Drive primeiro.".into());
+    }
+    let temp = std::env::temp_dir().join(format!("pipo-drive-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&temp);
+    let local = app.state::<AppState>().db.lock().unwrap().backup(&temp, 1)?;
+    let result = crate::gdrive::upload(app, &local);
+    let _ = std::fs::remove_dir_all(&temp);
+    result?;
+    let when = chrono::Local::now().format("%d/%m %H:%M").to_string();
+    let _ = app.state::<AppState>().db.lock().unwrap().set_setting("cloud_last_backup", &when);
+    if let Ok(dir) = app.path().app_data_dir() {
+        crate::log(&dir, "nuvem: backup enviado ao Google Drive");
+    }
+    let _ = app.emit("cloud-changed", ());
+    Ok(when)
+}
+
+/// Pasta sincronizada (Google Drive para computador ou OneDrive).
+fn backup_folder(app: &AppHandle) -> Result<String, String> {
     let folder = app.state::<AppState>().settings.lock().unwrap().cloud_folder.clone();
     if folder.trim().is_empty() {
         return Err("Escolha a pasta da nuvem primeiro.".into());
@@ -175,7 +204,8 @@ pub fn start(app: AppHandle) {
         }
         loop {
             let s = app.state::<AppState>().settings.lock().unwrap().clone();
-            if s.cloud_auto && !s.cloud_folder.is_empty() {
+            let ready = if s.cloud_mode == "gdrive" { crate::gdrive::connected(&app) } else { !s.cloud_folder.is_empty() };
+            if s.cloud_auto && ready {
                 if let Err(e) = backup_now(&app) {
                     if let Ok(dir) = app.path().app_data_dir() {
                         crate::log(&dir, &format!("nuvem: backup automático falhou: {e}"));
@@ -190,6 +220,10 @@ pub fn start(app: AppHandle) {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CloudStatus {
+    /// Google Drive pela internet: conectado e os backups que estão lá (ou o erro ao listar).
+    drive_connected: bool,
+    drive_backups: Vec<crate::gdrive::DriveBackup>,
+    drive_error: Option<String>,
     detected: Vec<String>,
     folder: String,
     last_backup: Option<String>,
@@ -201,12 +235,42 @@ pub struct CloudStatus {
 pub async fn cloud_status(app: AppHandle) -> CloudStatus {
     let handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let folder = handle.state::<AppState>().settings.lock().unwrap().cloud_folder.clone();
+        let (folder, mode) = {
+            let s = handle.state::<AppState>().settings.lock().unwrap().clone();
+            (s.cloud_folder, s.cloud_mode)
+        };
         let last_backup = handle.state::<AppState>().db.lock().unwrap().get_setting("cloud_last_backup");
-        CloudStatus { detected: detect(), backups: if folder.is_empty() { Vec::new() } else { list(&folder) }, folder, last_backup, pc: pc_name() }
+        let drive_connected = crate::gdrive::connected(&handle);
+        let (drive_backups, drive_error) = if mode == "gdrive" && drive_connected {
+            match crate::gdrive::list(&handle) {
+                Ok(list) => (list, None),
+                Err(e) => (Vec::new(), Some(e)),
+            }
+        } else {
+            (Vec::new(), None)
+        };
+        CloudStatus {
+            drive_connected,
+            drive_backups,
+            drive_error,
+            detected: detect(),
+            backups: if folder.is_empty() { Vec::new() } else { list(&folder) },
+            folder,
+            last_backup,
+            pc: pc_name(),
+        }
     })
     .await
-    .unwrap_or(CloudStatus { detected: Vec::new(), folder: String::new(), last_backup: None, backups: Vec::new(), pc: pc_name() })
+    .unwrap_or(CloudStatus {
+        drive_connected: false,
+        drive_backups: Vec::new(),
+        drive_error: None,
+        detected: Vec::new(),
+        folder: String::new(),
+        last_backup: None,
+        backups: Vec::new(),
+        pc: pc_name(),
+    })
 }
 
 #[tauri::command]
@@ -226,6 +290,35 @@ pub fn cloud_restore(app: AppHandle, path: String) -> Result<(), String> {
     // Guarda a cópia do banco atual antes de reiniciar.
     app.state::<AppState>().db.lock().unwrap().checkpoint();
     crate::log(&dir, &format!("nuvem: restauração pedida de {path}"));
+    app.restart();
+}
+
+/// Conecta o Google Drive (abre o login no navegador e espera voltar).
+#[tauri::command]
+pub async fn gdrive_connect(app: AppHandle, client_id: String, client_secret: String) -> Result<(), String> {
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::gdrive::connect(&handle, &client_id, &client_secret)).await.map_err(|e| e.to_string())??;
+    crate::settings::settings_update(app.clone(), serde_json::json!({ "cloudMode": "gdrive" }))?;
+    let _ = app.emit("cloud-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn gdrive_disconnect(app: AppHandle) -> Result<(), String> {
+    crate::gdrive::disconnect(&app)?;
+    let _ = app.emit("cloud-changed", ());
+    Ok(())
+}
+
+/// Baixa o backup escolhido do Google Drive e reinicia para restaurar.
+#[tauri::command]
+pub async fn gdrive_restore(app: AppHandle, id: String) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let handle = app.clone();
+    let target = dir.join(PENDING);
+    tauri::async_runtime::spawn_blocking(move || crate::gdrive::download(&handle, &id, &target)).await.map_err(|e| e.to_string())??;
+    app.state::<AppState>().db.lock().unwrap().checkpoint();
+    crate::log(&dir, "nuvem: restauração pedida do Google Drive");
     app.restart();
 }
 

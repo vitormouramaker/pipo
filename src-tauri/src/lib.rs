@@ -10,6 +10,7 @@ mod dance;
 mod db;
 mod documents;
 mod files_index;
+mod gdrive;
 mod install;
 mod island;
 mod life;
@@ -301,6 +302,9 @@ pub fn run() {
             cloud::cloud_status,
             cloud::cloud_backup,
             cloud::cloud_restore,
+            cloud::gdrive_connect,
+            cloud::gdrive_disconnect,
+            cloud::gdrive_restore,
             captions::captions_toggle,
             captions::captions_status,
             files_index::files_search,

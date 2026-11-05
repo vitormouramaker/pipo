@@ -524,6 +524,81 @@ export function CaptionsSettings({ settings, update }: { settings: Settings; upd
   );
 }
 
+/** Passo a passo do registro único no Google Cloud (para conectar o Drive pela internet). */
+function DriveSetup({ settings, onConnected }: { settings: Settings; onConnected: () => void }) {
+  const [id, setId] = useState(settings.gdriveClientId);
+  const [secret, setSecret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const open = (url: string) => () => void api.openUrl(url);
+  const connect = () => {
+    setBusy(true);
+    setError(null);
+    void api
+      .gdriveConnect(id, secret)
+      .then(() => {
+        setSecret("");
+        sfx.done();
+        onConnected();
+      })
+      .catch((e) => {
+        setError(String(e));
+        sfx.error();
+      })
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div className="drive-setup">
+      <p className="hint">
+        Uma vez só, uns 5 minutos: registrar o Pipo no Google Cloud (grátis). Assim o Google deixa o Pipo guardar os backups no seu
+        Drive, sem instalar nada. O Pipo só enxerga a pasta que ele mesmo criar.
+      </p>
+      <ol className="steps">
+        <li>
+          <button className="link" onClick={open("https://console.cloud.google.com/projectcreate")}>
+            Crie um projeto
+          </button>{" "}
+          com o nome <code>Pipo</code> (entre com a sua conta Google).
+        </li>
+        <li>
+          <button className="link" onClick={open("https://console.cloud.google.com/apis/library/drive.googleapis.com")}>
+            Ative a Google Drive API
+          </button>{" "}
+          nesse projeto (botão "Ativar").
+        </li>
+        <li>
+          <button className="link" onClick={open("https://console.cloud.google.com/auth/overview")}>
+            Configure a tela de consentimento
+          </button>
+          : nome do app <code>Pipo</code>, seu e-mail, público <strong>Externo</strong>. Depois, em <strong>Público-alvo</strong>, clique em{" "}
+          <strong>Publicar app</strong> (se ficar em teste, o acesso expira a cada 7 dias).
+        </li>
+        <li>
+          <button className="link" onClick={open("https://console.cloud.google.com/auth/clients")}>
+            Crie um cliente
+          </button>{" "}
+          do tipo <strong>App para computador</strong>, com o nome <code>Pipo</code>.
+        </li>
+        <li>Copie o <strong>ID do cliente</strong> e a <strong>chave secreta do cliente</strong> e cole aqui:</li>
+      </ol>
+      <input placeholder="ID do cliente (…apps.googleusercontent.com)" value={id} onChange={(e) => setId(e.target.value.trim())} />
+      <div className="inline-form">
+        <input className="grow" type="password" autoComplete="off" placeholder="Chave secreta do cliente" value={secret} onChange={(e) => setSecret(e.target.value)} />
+        <button className="primary" disabled={busy || !id || !secret} onClick={connect}>
+          {busy ? "Esperando o navegador…" : "Conectar ao Google Drive"}
+        </button>
+      </div>
+      {busy && (
+        <p className="hint">
+          Abri o login do Google no navegador. Escolha sua conta e permita o acesso. Se aparecer "o Google não verificou este app", é
+          normal (o app é seu): clique em <strong>Avançado → Acessar Pipo</strong>.
+        </p>
+      )}
+      {error && <p className="hint error">{error}</p>}
+    </div>
+  );
+}
+
 /** Fase 8.7: backup na nuvem e vários PCs. */
 export function CloudSettings({ settings, update }: { settings: Settings; update: Update }) {
   const [status, setStatus] = useState<CloudStatus | null>(null);
@@ -531,7 +606,7 @@ export function CloudSettings({ settings, update }: { settings: Settings; update
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const refresh = () => void api.cloudStatus().then(setStatus);
-  useEffect(refresh, [settings.cloudFolder]);
+  useEffect(refresh, [settings.cloudFolder, settings.cloudMode]);
   useEffect(() => {
     const unlisten = listen("cloud-changed", refresh);
     return () => void unlisten.then((fn) => fn());
@@ -552,27 +627,55 @@ export function CloudSettings({ settings, update }: { settings: Settings; update
       })
       .finally(() => setBusy(false));
   };
+  const drive = settings.cloudMode !== "pasta";
+  const ready = drive ? Boolean(status?.driveConnected) : Boolean(settings.cloudFolder);
   const options = Array.from(new Set([...(status?.detected ?? []), ...(settings.cloudFolder ? [settings.cloudFolder] : [])]));
+  type Row = { key: string; when: string; label: string; size: number; restore: () => Promise<void> };
+  const rows: Row[] = drive
+    ? (status?.driveBackups ?? []).map((b) => ({ key: b.id, when: b.when, label: b.thisPc ? "este PC" : b.pc, size: b.sizeKb, restore: () => api.gdriveRestore(b.id) }))
+    : (status?.backups ?? []).map((b) => ({ key: b.path, when: b.when, label: b.thisPc ? "este PC" : b.pc, size: b.sizeKb, restore: () => api.cloudRestore(b.path) }));
   return (
     <fieldset>
       <legend>Backup na nuvem</legend>
       <p className="hint">
-        O Pipo copia configurações, memória, notas, lembretes, conversas, rotinas e automações para uma pasta que a nuvem já
-        sincroniza (Google Drive para computador ou OneDrive). Em outro PC, escolha a mesma pasta e restaure. Chaves e senhas
-        (Claude, Telegram, Gmail) não vão junto: ficam só no Windows de cada PC.
+        O Pipo guarda configurações, memória, notas, lembretes, conversas, rotinas e automações na nuvem e restaura em outro PC.
+        Chaves e senhas (Claude, Telegram, Gmail) não vão junto: ficam só no Windows de cada PC.
       </p>
-      <label>
-        Pasta da nuvem
-        <select value={settings.cloudFolder} onChange={(e) => update({ cloudFolder: e.target.value })}>
-          <option value="">{options.length ? "Escolha…" : "Nenhuma pasta da nuvem encontrada"}</option>
-          {options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      </label>
-      {settings.cloudFolder && (
+      <div className="segmented" aria-label="Onde guardar">
+        <button aria-pressed={drive} onClick={() => update({ cloudMode: "gdrive" })}>
+          Google Drive pela internet
+        </button>
+        <button aria-pressed={!drive} onClick={() => update({ cloudMode: "pasta" })}>
+          Pasta sincronizada no PC
+        </button>
+      </div>
+
+      {drive && !status?.driveConnected && <DriveSetup settings={settings} onConnected={refresh} />}
+
+      {drive && status?.driveConnected && (
+        <p className="hint ok">
+          Conectado ao Google Drive ✓ · backups na pasta "Pipo (backups)" do seu Drive.{" "}
+          <button className="link muted" onClick={() => void api.gdriveDisconnect().then(refresh)}>
+            Desconectar
+          </button>
+        </p>
+      )}
+
+      {!drive && (
+        <label>
+          Pasta da nuvem
+          <select value={settings.cloudFolder} onChange={(e) => update({ cloudFolder: e.target.value })}>
+            <option value="">{options.length ? "Escolha…" : "Nenhuma pasta da nuvem encontrada"}</option>
+            {options.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {ready && (
         <>
           <label className="check">
             <input type="checkbox" checked={settings.cloudAuto} onChange={(e) => update({ cloudAuto: e.target.checked })} />
@@ -580,20 +683,21 @@ export function CloudSettings({ settings, update }: { settings: Settings; update
           </label>
           <div className="btns">
             <button className="primary" disabled={busy} onClick={backup}>
-              {busy ? "Copiando…" : "Fazer backup agora"}
+              {busy ? "Enviando…" : "Fazer backup agora"}
             </button>
             {status?.lastBackup && <span className="hint">Último: {status.lastBackup}</span>}
           </div>
-          {status && status.backups.length > 0 && (
+          {drive && status?.driveError && <p className="hint error">{status.driveError}</p>}
+          {rows.length > 0 && (
             <div className="table">
-              {status.backups.slice(0, 8).map((b) => (
-                <div key={b.path} className="trow">
+              {rows.slice(0, 8).map((b) => (
+                <div key={b.key} className="trow">
                   <span className="grow">
-                    {b.when} <span className="row-meta">· {b.thisPc ? "este PC" : b.pc} · {b.sizeKb} KB</span>
+                    {b.when} <span className="row-meta">· {b.label} · {b.size} KB</span>
                   </span>
-                  {confirm === b.path ? (
+                  {confirm === b.key ? (
                     <>
-                      <button className="danger" onClick={() => void api.cloudRestore(b.path).catch((e) => setMessage({ ok: false, text: String(e) }))}>
+                      <button className="danger" onClick={() => void b.restore().catch((e) => setMessage({ ok: false, text: String(e) }))}>
                         Restaurar e reiniciar
                       </button>
                       <button className="link muted" onClick={() => setConfirm(null)}>
@@ -601,7 +705,7 @@ export function CloudSettings({ settings, update }: { settings: Settings; update
                       </button>
                     </>
                   ) : (
-                    <button className="link" onClick={() => setConfirm(b.path)}>
+                    <button className="link" onClick={() => setConfirm(b.key)}>
                       Restaurar
                     </button>
                   )}

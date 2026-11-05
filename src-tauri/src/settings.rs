@@ -124,6 +124,11 @@ pub struct Settings {
     /// Fase 8.7: pasta da nuvem (Google Drive para computador / OneDrive) e backup diário.
     pub cloud_folder: String,
     pub cloud_auto: bool,
+    /// "pasta" (Google Drive para computador / OneDrive) ou "gdrive" (Google Drive pela internet).
+    pub cloud_mode: String,
+    /// ID do cliente OAuth do Google Cloud (a chave secreta fica no Gerenciador de Credenciais).
+    pub gdrive_client_id: String,
+    pub gdrive_folder_id: String,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -205,6 +210,9 @@ impl Default for Settings {
             file_index: true,
             cloud_folder: String::new(),
             cloud_auto: true,
+            cloud_mode: "gdrive".into(),
+            gdrive_client_id: String::new(),
+            gdrive_folder_id: String::new(),
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,

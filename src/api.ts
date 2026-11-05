@@ -73,6 +73,8 @@ export type Settings = {
   fileIndex: boolean;
   cloudFolder: string;
   cloudAuto: boolean;
+  cloudMode: string;
+  gdriveClientId: string;
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -149,7 +151,17 @@ export type OldCopy = { path: string; version: string };
 export type FileHit = { path: string; name: string; folder: string; snippet: string; modified: string };
 export type FileIndexStatus = { files: number; withContent: number; running: boolean; progress: number; updatedAt: string | null; error: string | null };
 export type CloudBackup = { path: string; pc: string; when: string; sizeKb: number; thisPc: boolean };
-export type CloudStatus = { detected: string[]; folder: string; lastBackup: string | null; backups: CloudBackup[]; pc: string };
+export type DriveBackup = { id: string; pc: string; when: string; sizeKb: number; thisPc: boolean };
+export type CloudStatus = {
+  driveConnected: boolean;
+  driveBackups: DriveBackup[];
+  driveError: string | null;
+  detected: string[];
+  folder: string;
+  lastBackup: string | null;
+  backups: CloudBackup[];
+  pc: string;
+};
 export type WeeklyReport = { week: string; text: string; createdAt: string };
 export type MiniSource = { platform: string; handle: string; title: string | null; video: string | null; url: string };
 export type ModeStatus = { mode: string; reason: string };
@@ -461,6 +473,9 @@ export const api = {
   cloudStatus: () => invoke<CloudStatus>("cloud_status"),
   cloudBackup: () => invoke<string>("cloud_backup"),
   cloudRestore: (path: string) => invoke<void>("cloud_restore", { path }),
+  gdriveConnect: (clientId: string, clientSecret: string) => invoke<void>("gdrive_connect", { clientId, clientSecret }),
+  gdriveDisconnect: () => invoke<void>("gdrive_disconnect"),
+  gdriveRestore: (id: string) => invoke<void>("gdrive_restore", { id }),
   filesSearch: (query: string) => invoke<FileHit[]>("files_search", { query }),
   openPath: (path: string) => invoke<void>("open_path", { path }),
   revealPath: (path: string) => invoke<void>("reveal_path", { path }),

@@ -88,7 +88,7 @@ Sensores e alertas são lidos só no computador; nada disso é enviado para a in
 
 **Instalação limpa:** ao abrir, o Pipo garante que o "iniciar com o Windows" e os atalhos apontam para ele mesmo e avisa se achar uma cópia antiga (que pode ser mandada para a Lixeira em ⚙ → Atualizações). As configurações têm uma cópia completa: se uma versão antiga abrir por engano e apagar campos novos, eles voltam.
 
-**Backup na nuvem e vários PCs** (⚙ → Backup na nuvem): escolha a pasta do Google Drive para computador ou do OneDrive e o Pipo guarda uma cópia por dia (ou na hora). Em outro PC, aponte para a mesma pasta e restaure. Chaves e senhas não vão para a nuvem.
+**Backup na nuvem e vários PCs** (⚙ → Backup na nuvem): no **Google Drive pela internet** (sem instalar nada; um registro único de ~5 min no Google Cloud, com passo a passo na tela, e login pelo navegador) ou numa pasta sincronizada (Google Drive para computador ou OneDrive). O Pipo guarda uma cópia por dia (ou na hora); em outro PC, conecte a mesma conta (ou pasta) e restaure. Chaves e senhas não vão para a nuvem.
 
 **Seus dados:** as configurações são salvas sozinhas assim que você muda algo. A cada início o Pipo guarda uma cópia de segurança do banco (as 15 mais recentes ficam em `%APPDATA%\com.vitormouramaker.pipo\backups`) e anota um resumo em `pipo.log` na mesma pasta.
 
