@@ -1,6 +1,7 @@
 //! Fase 7.7: avisos no celular pelo Telegram, com um bot do próprio usuário (criado no
 //! @BotFather). O token fica no Gerenciador de Credenciais e nunca aparece em log nem em
 //! mensagens de erro. O Pipo só manda mensagens para a conversa que o usuário ligou.
+//! Fase 9.3: controle remoto do PC (/print, /arquivo, /bloquear, /status com downloads).
 
 use std::time::{Duration, Instant};
 
@@ -30,6 +31,32 @@ async fn call(token: &str, method: &str, body: Value) -> Result<Value, String> {
         .send()
         .await
         .map_err(|e| format!("Sem conexão com o Telegram: {}", e.without_url()))?;
+    answer(response).await
+}
+
+/// Limite do Telegram para arquivos mandados por bot.
+const MAX_UPLOAD: u64 = 50 * 1024 * 1024;
+/// Acima disso, o print vai como arquivo (sendPhoto aceita até 10 MB).
+const MAX_PHOTO: usize = 9 * 1024 * 1024;
+
+/// Manda uma foto ou um arquivo (multipart). Erros nunca levam a URL.
+async fn upload(token: &str, chat: &str, method: &str, field: &str, name: String, bytes: Vec<u8>, caption: &str) -> Result<(), String> {
+    let part = reqwest::multipart::Part::bytes(bytes).file_name(name);
+    let form = reqwest::multipart::Form::new().text("chat_id", chat.to_string()).text("caption", caption.to_string()).part(field.to_string(), part);
+    let response = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(300))
+        .build()
+        .unwrap_or_default()
+        .post(format!("https://api.telegram.org/bot{token}/{method}"))
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("Sem conexão com o Telegram: {}", e.without_url()))?;
+    answer(response).await.map(|_| ())
+}
+
+async fn answer(response: reqwest::Response) -> Result<Value, String> {
     let value: Value = response.json().await.map_err(|e| format!("Resposta inesperada do Telegram: {}", e.without_url()))?;
     if value["ok"] != true {
         let code = value["error_code"].as_i64().unwrap_or(0);
@@ -129,6 +156,9 @@ fn set_listening(app: &AppHandle, ok: Result<(), String>) {
 /// Menu que aparece no Telegram ao digitar "/".
 const COMMANDS: &[(&str, &str)] = &[
     ("status", "O que está rolando no PC agora"),
+    ("print", "Print da tela do PC"),
+    ("arquivo", "Manda um arquivo do PC (ex.: /arquivo contrato)"),
+    ("bloquear", "Bloqueia o PC"),
     ("lembretes", "Lembretes pendentes"),
     ("apagar", "Apaga um lembrete (ex.: /apagar 2)"),
     ("email", "E-mails não lidos"),
@@ -242,6 +272,8 @@ static CONFIRMS: LazyLock<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<bool>>
 static TURN: LazyLock<tokio::sync::Mutex<()>> = LazyLock::new(|| tokio::sync::Mutex::new(()));
 /// Números mostrados no último /lembretes -> id do lembrete (para o /apagar).
 static LISTED: Mutex<Vec<i64>> = Mutex::new(Vec::new());
+/// Arquivos achados no último /arquivo (o botão manda o índice, não o caminho).
+static FOUND: Mutex<Vec<(String, String, u64)>> = Mutex::new(Vec::new());
 
 /// A conversa do Telegram em andamento: responde e pede confirmação por botão.
 pub struct Remote {
@@ -341,7 +373,11 @@ Comandos rápidos (sem IA, sem custo):\n\
 /email — e-mails não lidos\n\
 /semana — relatório da semana agora\n\
 /novo — começa uma conversa nova\n\
-/ajuda — esta mensagem";
+/ajuda — esta mensagem\n\n\
+Controle do PC:\n\
+/print — print da tela agora\n\
+/arquivo contrato — procura e manda um arquivo do PC\n\
+/bloquear — bloqueia o PC (como Win+L)";
 
 fn status_text(app: &AppHandle) -> String {
     let state = app.state::<AppState>();
@@ -372,7 +408,147 @@ fn status_text(app: &AppHandle) -> String {
     if lol["running"] == true {
         lines.push(format!("LoL aberto ({})", lol["phase"].as_str().unwrap_or("")));
     }
+    let downloads = crate::actions::downloads::in_progress();
+    if !downloads.is_empty() {
+        let list: Vec<String> = downloads.iter().map(|(name, bytes)| format!("{name} ({})", size_text(*bytes))).collect();
+        lines.push(format!("Baixando: {}", list.join(", ")));
+    }
+    lines.push(format!("Ligado há {}", uptime_text(uptime_secs())));
     lines.join("\n")
+}
+
+fn uptime_secs() -> u64 {
+    #[cfg(windows)]
+    {
+        unsafe { windows_sys::Win32::System::SystemInformation::GetTickCount64() / 1000 }
+    }
+    #[cfg(not(windows))]
+    {
+        0
+    }
+}
+
+fn uptime_text(secs: u64) -> String {
+    let (days, hours, minutes) = (secs / 86_400, secs % 86_400 / 3600, secs % 3600 / 60);
+    match (days, hours) {
+        (0, 0) => format!("{minutes} min"),
+        (0, h) => format!("{h} h {minutes} min"),
+        (d, h) => format!("{d} {} e {h} h", if d == 1 { "dia" } else { "dias" }),
+    }
+}
+
+/// "820 KB", "3,4 MB".
+fn size_text(bytes: u64) -> String {
+    if bytes < 1024 * 1024 {
+        format!("{} KB", bytes.div_ceil(1024))
+    } else {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0).replace('.', ",")
+    }
+}
+
+// ---------- Fase 9.3: controle remoto do PC ----------
+
+const REMOTE_OFF: &str = "Os comandos que mexem no PC estão desligados. Para ligar: no Pipo do PC, ⚙ → Integrações → Telegram → \
+\"Controlar o PC pelo celular\".";
+
+fn remote_allowed(app: &AppHandle) -> bool {
+    app.state::<AppState>().settings.lock().unwrap().telegram_remote_pc
+}
+
+/// Avisa no PC que algo saiu pelo celular (para a pessoa saber, se não foi ela).
+fn tell_pc(app: &AppHandle, title: &str) {
+    crate::toast::notify_from(app, "remote", "info", title, "Pedido pelo seu Telegram. Se não foi você, desligue em ⚙ → Integrações → Telegram.", None);
+}
+
+async fn send_print(app: &AppHandle, remote: &Remote) -> String {
+    let _ = call(&remote.token, "sendChatAction", json!({ "chat_id": remote.chat, "action": "upload_photo" })).await;
+    let shot = tauri::async_runtime::spawn_blocking(crate::actions::screen::capture_png).await.map_err(|e| e.to_string()).and_then(|r| r);
+    let png = match shot {
+        Ok(png) => png,
+        Err(e) => return format!("Não consegui tirar o print: {e}"),
+    };
+    let name = format!("tela-{}.png", chrono::Local::now().format("%Y%m%d-%H%M%S"));
+    let caption = format!("🖥 Sua tela às {}", crate::actions::now_hm());
+    let (method, field) = if png.len() <= MAX_PHOTO { ("sendPhoto", "photo") } else { ("sendDocument", "document") };
+    match upload(&remote.token, &remote.chat, method, field, name, png, &caption).await {
+        Ok(()) => {
+            log(app, "print enviado");
+            tell_pc(app, "Print da tela enviado para o Telegram");
+            String::new()
+        }
+        Err(e) => format!("Não consegui mandar o print: {e}"),
+    }
+}
+
+/// Procura o arquivo e mostra até 6 opções como botões; o toque no botão manda o arquivo.
+async fn find_files(remote: &Remote, query: &str) -> String {
+    let query = query.trim().to_string();
+    if query.is_empty() {
+        return "Diga o nome (ou parte dele): /arquivo contrato aluguel".into();
+    }
+    let _ = call(&remote.token, "sendChatAction", json!({ "chat_id": remote.chat, "action": "typing" })).await;
+    let q = query.clone();
+    let found = tauri::async_runtime::spawn_blocking(move || crate::documents::search(&q, 6)).await.unwrap_or_default();
+    if found.is_empty() {
+        return format!("Não achei nenhum arquivo com \"{query}\" no nome em Documentos, Downloads, Área de Trabalho e Imagens.");
+    }
+    let buttons: Vec<Value> = found
+        .iter()
+        .enumerate()
+        .map(|(i, f)| {
+            let label: String = format!("📄 {} · {}", f.name, size_text(f.size_kb * 1024)).chars().take(60).collect();
+            json!([{ "text": label, "callback_data": format!("file:{i}") }])
+        })
+        .collect();
+    let lines: Vec<String> = found.iter().enumerate().map(|(i, f)| format!("{}. {} — {} · {}", i + 1, f.name, size_text(f.size_kb * 1024), f.modified)).collect();
+    *FOUND.lock().unwrap() = found.into_iter().map(|f| (f.path, f.name, f.size_kb * 1024)).collect();
+    let text = format!("Achei estes (os mais recentes primeiro). Toque no que eu devo mandar:\n{}", lines.join("\n"));
+    match call(&remote.token, "sendMessage", json!({ "chat_id": remote.chat, "text": text, "reply_markup": { "inline_keyboard": buttons } })).await {
+        Ok(_) => String::new(),
+        Err(e) => format!("Não consegui mostrar a lista: {e}"),
+    }
+}
+
+async fn send_file(app: &AppHandle, token: &str, chat: &str, index: usize) {
+    let picked = FOUND.lock().unwrap().get(index).cloned();
+    let remote = Remote { token: token.to_string(), chat: chat.to_string() };
+    let Some((path, name, size)) = picked else {
+        remote.say("Essa lista expirou. Mande /arquivo de novo.").await;
+        return;
+    };
+    if !remote_allowed(app) {
+        remote.say(REMOTE_OFF).await;
+        return;
+    }
+    if size > MAX_UPLOAD {
+        remote.say(&format!("{name} tem {}; o Telegram só aceita arquivos de até 50 MB vindos de bots.", size_text(size))).await;
+        return;
+    }
+    let _ = call(token, "sendChatAction", json!({ "chat_id": chat, "action": "upload_document" })).await;
+    let bytes = match std::fs::read(&path) {
+        Ok(b) => b,
+        Err(e) => {
+            remote.say(&format!("Não consegui abrir {name}: {e}")).await;
+            return;
+        }
+    };
+    match upload(token, chat, "sendDocument", "document", name.clone(), bytes, "").await {
+        Ok(()) => {
+            log(app, "arquivo enviado");
+            tell_pc(app, &format!("Arquivo enviado para o Telegram: {name}"));
+        }
+        Err(e) => remote.say(&format!("Não consegui mandar {name}: {e}")).await,
+    }
+}
+
+fn lock_pc(app: &AppHandle) -> String {
+    match crate::actions::screen::lock() {
+        Ok(()) => {
+            log(app, "PC bloqueado pelo celular");
+            "PC bloqueado. 🔒".into()
+        }
+        Err(e) => format!("Não consegui bloquear: {e}"),
+    }
 }
 
 fn reminders_text(app: &AppHandle) -> String {
@@ -416,6 +592,12 @@ async fn handle_message(app: AppHandle, remote: Remote, text: String) {
         let reply = match name.as_str() {
             "start" | "ajuda" | "help" => HELP.to_string(),
             "status" => status_text(&app),
+            "print" | "tela" | "foto" if !remote_allowed(&app) => REMOTE_OFF.into(),
+            "arquivo" | "arquivos" | "enviar" if !remote_allowed(&app) => REMOTE_OFF.into(),
+            "bloquear" | "travar" | "lock" if !remote_allowed(&app) => REMOTE_OFF.into(),
+            "print" | "tela" | "foto" => send_print(&app, &remote).await,
+            "arquivo" | "arquivos" | "enviar" => find_files(&remote, arg).await,
+            "bloquear" | "travar" | "lock" => lock_pc(&app),
             "lembretes" => reminders_text(&app),
             "apagar" => delete_reminder(&app, arg),
             "email" | "emails" => crate::world::email::summary_text(&app).unwrap_or_else(|e| e),
@@ -432,7 +614,9 @@ async fn handle_message(app: AppHandle, remote: Remote, text: String) {
             }
             _ => "Não conheço esse comando. Mande /ajuda para ver a lista.".into(),
         };
-        remote.say(&reply).await;
+        if !reply.is_empty() {
+            remote.say(&reply).await;
+        }
         return;
     }
     if crate::secrets::get().is_none() {
@@ -453,7 +637,8 @@ async fn handle_message(app: AppHandle, remote: Remote, text: String) {
     };
     let note = "A mensagem veio do celular do usuário, pelo Telegram, enquanto ele está longe do PC. \
                 Responda curto (no máximo umas 8 linhas), em texto simples, sem tabelas nem títulos. \
-                Ações que mudam algo no PC pedem confirmação por botão no próprio Telegram.";
+                Ações que mudam algo no PC pedem confirmação por botão no próprio Telegram. \
+                Se pedir print da tela, um arquivo do PC ou para bloquear o PC, indique os comandos /print, /arquivo nome e /bloquear.";
     let result = crate::chat::run_remote(&app, &text, &remote, conversation, note).await;
     typing.abort();
     match result {
@@ -466,9 +651,16 @@ async fn handle_message(app: AppHandle, remote: Remote, text: String) {
     }
 }
 
-/// Clique num botão Permitir/Negar.
-async fn handle_callback(token: &str, query: &Value) {
+/// Clique num botão: Permitir/Negar ou um arquivo do /arquivo.
+async fn handle_callback(app: AppHandle, token: String, chat: String, query: Value) {
+    let token = token.as_str();
+    let query = &query;
     let data = query["data"].as_str().unwrap_or("");
+    if let Some(index) = data.strip_prefix("file:").and_then(|i| i.parse::<usize>().ok()) {
+        let _ = call(token, "answerCallbackQuery", json!({ "callback_query_id": query["id"], "text": "Enviando…" })).await;
+        send_file(&app, token, &chat, index).await;
+        return;
+    }
     let (answer, id) = match data.split_once(':') {
         Some(("ok", id)) => (true, id.parse::<u64>().ok()),
         Some(("no", id)) => (false, id.parse::<u64>().ok()),
@@ -518,7 +710,7 @@ pub fn start(app: AppHandle) {
                 offset = offset.max(update["update_id"].as_i64().unwrap_or(0) + 1);
                 if let Some(query) = update.get("callback_query") {
                     if query["from"]["id"].as_i64().map(|id| id.to_string()) == Some(chat.clone()) {
-                        handle_callback(&token, query).await;
+                        tauri::async_runtime::spawn(handle_callback(app.clone(), token.clone(), chat.clone(), query.clone()));
                     }
                     continue;
                 }
@@ -569,5 +761,15 @@ mod tests {
         let parts = chunks(&long, 100);
         assert!(parts.len() > 5 && parts.iter().all(|p| p.chars().count() <= 100));
         assert_eq!(parts.join("\n"), long);
+    }
+
+    #[test]
+    fn mostra_tamanho_e_tempo_ligado() {
+        assert_eq!(size_text(500), "1 KB");
+        assert_eq!(size_text(3_565_158), "3,4 MB");
+        assert_eq!(uptime_text(125), "2 min");
+        assert_eq!(uptime_text(3 * 3600 + 20 * 60), "3 h 20 min");
+        assert_eq!(uptime_text(86_400 + 5 * 3600), "1 dia e 5 h");
+        assert_eq!(uptime_text(3 * 86_400), "3 dias e 0 h");
     }
 }

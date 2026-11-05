@@ -96,3 +96,90 @@ pub fn start(app: &AppHandle) -> Result<(), String> {
 pub fn screen_ask(app: AppHandle) -> Result<(), String> {
     start(&app)
 }
+
+/// Fase 9.3: print da tela inteira (todos os monitores), em PNG, para o /print do Telegram.
+#[cfg(windows)]
+pub fn capture_png() -> Result<Vec<u8>, String> {
+    use std::ptr::null_mut;
+    use windows_sys::Win32::Graphics::Gdi::{
+        BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits, ReleaseDC, SelectObject, BITMAPINFO,
+        BITMAPINFOHEADER, BI_RGB, CAPTUREBLT, DIB_RGB_COLORS, SRCCOPY,
+    };
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN};
+
+    let (x, y, w, h) = unsafe {
+        (
+            GetSystemMetrics(SM_XVIRTUALSCREEN),
+            GetSystemMetrics(SM_YVIRTUALSCREEN),
+            GetSystemMetrics(SM_CXVIRTUALSCREEN),
+            GetSystemMetrics(SM_CYVIRTUALSCREEN),
+        )
+    };
+    if w <= 0 || h <= 0 {
+        return Err("Não achei a tela.".into());
+    }
+    let mut bgra = vec![0u8; w as usize * h as usize * 4];
+    let ok = unsafe {
+        let screen = GetDC(null_mut());
+        if screen.is_null() {
+            return Err("Não consegui acessar a tela.".into());
+        }
+        let memory = CreateCompatibleDC(screen);
+        let bitmap = CreateCompatibleBitmap(screen, w, h);
+        let old = SelectObject(memory, bitmap);
+        let copied = BitBlt(memory, 0, 0, w, h, screen, x, y, SRCCOPY | CAPTUREBLT) != 0;
+        let mut info: BITMAPINFO = std::mem::zeroed();
+        info.bmiHeader = BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: w,
+            biHeight: -h, // de cima para baixo
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB,
+            ..std::mem::zeroed()
+        };
+        let lines = GetDIBits(memory, bitmap, 0, h as u32, bgra.as_mut_ptr().cast(), &mut info, DIB_RGB_COLORS);
+        SelectObject(memory, old);
+        DeleteObject(bitmap);
+        DeleteDC(memory);
+        ReleaseDC(null_mut(), screen);
+        copied && lines == h
+    };
+    if !ok {
+        return Err("Não consegui copiar a tela (ela pode estar bloqueada).".into());
+    }
+    let rgb: Vec<u8> = bgra.chunks_exact(4).flat_map(|p| [p[2], p[1], p[0]]).collect();
+    let mut out = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut out, w as u32, h as u32);
+        encoder.set_color(png::ColorType::Rgb);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_compression(png::Compression::Fast);
+        let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+        writer.write_image_data(&rgb).map_err(|e| e.to_string())?;
+    }
+    Ok(out)
+}
+
+/// Bloqueia o Windows (como Win+L).
+#[cfg(windows)]
+pub fn lock() -> Result<(), String> {
+    let ok = unsafe { windows_sys::Win32::System::Shutdown::LockWorkStation() } != 0;
+    if ok {
+        Ok(())
+    } else {
+        Err("O Windows não deixou bloquear agora.".into())
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    /// Tira um print de verdade (precisa de uma tela): `cargo test --lib captura -- --ignored`.
+    #[test]
+    #[ignore]
+    fn captura_a_tela_inteira() {
+        let png = super::capture_png().expect("print");
+        assert!(png.starts_with(b"\x89PNG") && png.len() > 1000);
+        println!("print com {} KB", png.len() / 1024);
+    }
+}

@@ -65,6 +65,7 @@ export type Settings = {
   telegramSources: string[];
   telegramCommands: boolean;
   telegramRemindersAlways: boolean;
+  telegramRemotePc: boolean;
   weeklyReport: boolean;
   weeklyReportDay: number;
   weeklyReportTime: string;

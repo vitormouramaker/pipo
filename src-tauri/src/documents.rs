@@ -284,10 +284,10 @@ pub fn fold(s: &str) -> String {
 
 #[derive(Serialize)]
 pub struct FoundFile {
-    path: String,
-    name: String,
-    size_kb: u64,
-    modified: String,
+    pub path: String,
+    pub name: String,
+    pub size_kb: u64,
+    pub modified: String,
 }
 
 /// Procura arquivos pelo nome (todas as palavras da busca), dos mais recentes para os mais antigos.

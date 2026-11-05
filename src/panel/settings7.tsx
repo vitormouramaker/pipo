@@ -310,6 +310,18 @@ export function TelegramSettings({ settings, update }: { settings: Settings; upd
               conversa é atendida.
             </p>
           )}
+          {settings.telegramCommands && (
+            <label className="check">
+              <input type="checkbox" checked={settings.telegramRemotePc} onChange={(e) => update({ telegramRemotePc: e.target.checked })} />
+              Controlar o PC pelo celular: /print (print da tela), /arquivo nome (manda um arquivo) e /bloquear
+            </label>
+          )}
+          {settings.telegramCommands && settings.telegramRemotePc && (
+            <p className="hint">
+              Quando um print ou arquivo sai pelo Telegram, o Pipo avisa aqui no PC. O /arquivo procura em Documentos, Downloads, Área de
+              Trabalho e Imagens e só manda o que você tocar na lista (até 50 MB).
+            </p>
+          )}
           <div className="chips">
             {SOURCES.map((s) => {
               const on = settings.telegramSources.includes(s.id);

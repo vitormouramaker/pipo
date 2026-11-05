@@ -112,6 +112,8 @@ pub struct Settings {
     /// Fase 8.0: conversar com o Pipo pelo Telegram e lembretes sempre no celular.
     pub telegram_commands: bool,
     pub telegram_reminders_always: bool,
+    /// Fase 9.3: comandos que mexem no PC pelo celular (/print, /arquivo, /bloquear).
+    pub telegram_remote_pc: bool,
     /// Relatório semanal: dia (1 = segunda … 7 = domingo), hora e comentário da Claude.
     pub weekly_report: bool,
     pub weekly_report_day: u8,
@@ -215,6 +217,7 @@ impl Default for Settings {
             telegram_sources: ["reminder", "live", "github", "alert", "email"].iter().map(|s| s.to_string()).collect(),
             telegram_commands: true,
             telegram_reminders_always: true,
+            telegram_remote_pc: true,
             weekly_report: true,
             weekly_report_day: 7,
             weekly_report_time: "19:00".into(),

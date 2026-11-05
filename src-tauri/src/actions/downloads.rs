@@ -74,6 +74,17 @@ fn age(meta: &std::fs::Metadata) -> Duration {
     meta.modified().ok().and_then(|m| SystemTime::now().duration_since(m).ok()).unwrap_or_default()
 }
 
+/// Fase 9.3: downloads em andamento (arquivos temporários dos navegadores mexidos há pouco).
+/// Devolve (nome sem a extensão temporária, bytes até agora).
+pub fn in_progress() -> Vec<(String, u64)> {
+    let Some(dir) = downloads_dir() else { return Vec::new() };
+    loose_files(&dir)
+        .into_iter()
+        .filter(|(path, meta)| matches!(ext(path).as_str(), "crdownload" | "part" | "partial" | "download" | "opdownload") && age(meta) < Duration::from_secs(120))
+        .map(|(path, meta)| (path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default(), meta.len()))
+        .collect()
+}
+
 fn ext(path: &Path) -> String {
     path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default()
 }
