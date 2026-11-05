@@ -748,6 +748,8 @@ pub fn radial_close(app: AppHandle) {
 /// Expressão pedida pela interface (ex.: "speaking" enquanto lê a resposta em voz alta).
 #[tauri::command]
 pub fn pet_express(app: AppHandle, state: String) {
+    // O "Ei, Pipo" não escuta enquanto o próprio Pipo fala.
+    crate::wake::set_speaking(state == "speaking");
     if matches!(state.as_str(), "speaking" | "clear") {
         set_pet_state(&app, &state);
     }

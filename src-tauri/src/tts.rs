@@ -174,6 +174,8 @@ fn rand_suffix() -> u64 {
 /// Pede para o painel parar de falar (clique no Pipo, atalho de voz, menu).
 #[tauri::command]
 pub fn speech_stop(app: AppHandle) {
+    // Mandar o Pipo calar também encerra a conversa por voz.
+    crate::voice::end_conversation();
     let _ = app.emit_to(windows::PANEL, "speech-stop", ());
     windows::set_pet_state(&app, "clear");
 }

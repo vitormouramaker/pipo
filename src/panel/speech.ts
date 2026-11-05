@@ -121,10 +121,10 @@ async function speakWindows(text: string, voiceName: string, id: number) {
   });
 }
 
-/** Lê o texto com a voz escolhida nas configurações. */
-export async function speak(text: string, settings?: Pick<Settings, "voiceEngine" | "voiceName">) {
+/** Lê o texto com a voz escolhida nas configurações. Devolve true se leu até o fim (sem ser interrompido). */
+export async function speak(text: string, settings?: Pick<Settings, "voiceEngine" | "voiceName">): Promise<boolean> {
   const clean = forSpeech(text);
-  if (!clean) return;
+  if (!clean) return false;
   stopSpeaking();
   const id = ++session;
   const s = settings ?? (await api.getSettings());
@@ -136,4 +136,5 @@ export async function speak(text: string, settings?: Pick<Settings, "voiceEngine
   } finally {
     if (id === session) setSpeaking(false);
   }
+  return id === session;
 }

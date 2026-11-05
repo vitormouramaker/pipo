@@ -1,6 +1,8 @@
 //! Fase 5: comandos de voz. O microfone só é aberto quando o usuário pede (atalho,
 //! botão do chat ou menu do Pipo). A fala é transcrita no próprio computador com o
 //! Whisper (whisper.cpp); nenhum áudio sai da máquina. O modelo é baixado uma vez.
+//! Fase 9.2: o "Ei, Pipo" (wake.rs) também abre a escuta, e no modo conversa o Pipo volta a
+//! ouvir depois de responder falando, até a pessoa parar de falar ou dizer "tchau".
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -20,6 +22,47 @@ static STOP: AtomicBool = AtomicBool::new(false);
 static DOWNLOADING: AtomicBool = AtomicBool::new(false);
 static DOWNLOADED: AtomicU64 = AtomicU64::new(0);
 static DOWNLOAD_TOTAL: AtomicU64 = AtomicU64::new(0);
+/// Conversa por voz em andamento: depois de responder falando, o Pipo volta a ouvir.
+static CONVERSATION: AtomicBool = AtomicBool::new(false);
+
+/// De onde veio a escuta.
+#[derive(Clone, Copy, PartialEq)]
+pub enum Mode {
+    /// Atalho, botão do chat ou menu.
+    Manual,
+    /// Depois do "Ei, Pipo".
+    Wake,
+    /// Continuação da conversa, depois da resposta falada.
+    FollowUp,
+}
+
+pub fn listening() -> bool {
+    LISTENING.load(Ordering::SeqCst)
+}
+
+pub fn end_conversation() {
+    CONVERSATION.store(false, Ordering::SeqCst);
+}
+
+pub fn start_conversation() {
+    CONVERSATION.store(true, Ordering::SeqCst);
+}
+
+/// "Tchau", "obrigado", "só isso": encerra a conversa por voz.
+pub fn is_goodbye(text: &str) -> bool {
+    let t: String = crate::documents::fold(text).chars().map(|c| if c.is_alphanumeric() || c == ' ' { c } else { ' ' }).collect();
+    let words: Vec<&str> = t.split_whitespace().collect();
+    if words.is_empty() || words.len() > 4 {
+        return false;
+    }
+    let joined = words.join(" ");
+    [
+        "tchau", "obrigado", "obrigada", "valeu", "so isso", "e so isso", "era so isso", "pode parar", "para", "chega", "ate mais", "ate logo", "nada", "nao obrigado",
+        "tchau pipo", "obrigado pipo", "valeu pipo",
+    ]
+    .iter()
+    .any(|g| joined == *g || joined.trim_end_matches(" pipo") == *g)
+}
 
 /// Sem fala nenhuma por este tempo, desiste.
 const NO_SPEECH_TIMEOUT: Duration = Duration::from_secs(7);
@@ -133,17 +176,26 @@ async fn download(app: &AppHandle, model: &str) -> Result<(), String> {
 
 /// Liga a escuta; se já estiver ouvindo, encerra e transcreve o que já foi falado.
 pub fn toggle(app: &AppHandle) {
-    // Falar com o Pipo interrompe o que ele estiver falando.
-    let _ = app.emit_to(windows::PANEL, "speech-stop", ());
     if LISTENING.load(Ordering::SeqCst) {
         STOP.store(true, Ordering::SeqCst);
         return;
     }
+    let conversation = app.state::<AppState>().settings.lock().unwrap().voice_conversation;
+    CONVERSATION.store(conversation, Ordering::SeqCst);
+    start(app, Mode::Manual);
+}
+
+/// Abre o microfone, espera a fala e manda o texto para o chat (marcado como fala).
+pub fn start(app: &AppHandle, mode: Mode) {
+    // Falar com o Pipo interrompe o que ele estiver falando.
+    let _ = app.emit_to(windows::PANEL, "speech-stop", ());
     let model = app.state::<AppState>().settings.lock().unwrap().voice_model.clone();
     let Some(path) = model_path(app, &model).filter(|p| p.exists()) else {
-        // O chat mostra o botão para baixar o modelo ali mesmo.
-        windows::show_panel(app, Some("chat"));
-        emit_state(app, "nomodel", None);
+        if mode == Mode::Manual {
+            // O chat mostra o botão para baixar o modelo ali mesmo.
+            windows::show_panel(app, Some("chat"));
+            emit_state(app, "nomodel", None);
+        }
         return;
     };
     if LISTENING.swap(true, Ordering::SeqCst) {
@@ -152,9 +204,16 @@ pub fn toggle(app: &AppHandle) {
     STOP.store(false, Ordering::SeqCst);
     let app = app.clone();
     std::thread::spawn(move || {
-        let result = listen(&app, &path);
+        // Na conversa e depois do "Ei, Pipo", espera um pouco menos antes de desistir.
+        let wait = if mode == Mode::Manual { NO_SPEECH_TIMEOUT } else { Duration::from_secs(6) };
+        let result = listen(&app, &path, wait);
         LISTENING.store(false, Ordering::SeqCst);
         match result {
+            Ok(text) if mode != Mode::Manual && is_goodbye(&text) => {
+                end_conversation();
+                emit_state(&app, "idle", None);
+                windows::set_pet_state(&app, "clear");
+            }
             Ok(text) => {
                 emit_state(&app, "idle", None);
                 windows::set_pet_state(&app, "clear");
@@ -162,7 +221,13 @@ pub fn toggle(app: &AppHandle) {
                 crate::chat::prefill(&app, text, false, true);
             }
             Err(message) => {
-                emit_state(&app, "error", Some(&message));
+                // Silêncio na conversa (ou depois do "Ei, Pipo"): encerra sem erro na tela.
+                if mode == Mode::Manual {
+                    emit_state(&app, "error", Some(&message));
+                } else {
+                    emit_state(&app, "idle", None);
+                }
+                end_conversation();
                 windows::set_pet_state(&app, "clear");
             }
         }
@@ -174,21 +239,34 @@ pub fn voice_toggle(app: AppHandle) {
     toggle(&app);
 }
 
-fn rms(samples: &[f32]) -> f32 {
+/// A conversa por voz está ligada (a resposta deve ser falada e o Pipo volta a ouvir)?
+#[tauri::command]
+pub fn voice_conversation_active() -> bool {
+    CONVERSATION.load(Ordering::SeqCst)
+}
+
+/// O Pipo terminou de falar a resposta: na conversa por voz, volta a ouvir.
+#[tauri::command]
+pub fn voice_follow_up(app: AppHandle) {
+    if CONVERSATION.load(Ordering::SeqCst) && !LISTENING.load(Ordering::SeqCst) {
+        start(&app, Mode::FollowUp);
+    }
+}
+
+pub(crate) fn rms(samples: &[f32]) -> f32 {
     if samples.is_empty() {
         return 0.0;
     }
     (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
 }
 
-/// Grava do microfone padrão até a pessoa parar de falar e devolve o texto.
-fn listen(app: &AppHandle, model: &std::path::Path) -> Result<String, String> {
+/// Abre o microfone padrão gravando em `buffer` (mono, f32). Devolve o fluxo e a taxa.
+pub(crate) fn open_mic(buffer: Arc<Mutex<Vec<f32>>>) -> Result<(cpal::Stream, u32), String> {
     let device = cpal::default_host().default_input_device().ok_or("Nenhum microfone encontrado.")?;
     let supported = device.default_input_config().map_err(|e| format!("Microfone indisponível: {e}"))?;
     let channels = supported.channels().max(1) as usize;
     let rate = supported.sample_rate();
     let config = supported.config();
-    let buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::with_capacity(rate as usize * 10)));
 
     // Converte para mono f32 qualquer que seja o formato do microfone.
     let push = {
@@ -227,6 +305,13 @@ fn listen(app: &AppHandle, model: &std::path::Path) -> Result<String, String> {
     }
     .map_err(|e| format!("Não consegui abrir o microfone: {e}"))?;
     stream.play().map_err(|e| format!("Não consegui abrir o microfone: {e}"))?;
+    Ok((stream, rate))
+}
+
+/// Grava do microfone padrão até a pessoa parar de falar e devolve o texto.
+fn listen(app: &AppHandle, model: &std::path::Path, no_speech_timeout: Duration) -> Result<String, String> {
+    let buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(Vec::with_capacity(16_000 * 10)));
+    let (stream, rate) = open_mic(buffer.clone())?;
 
     windows::set_pet_state(app, "listening");
     emit_state(app, "listening", None);
@@ -270,7 +355,7 @@ fn listen(app: &AppHandle, model: &std::path::Path) -> Result<String, String> {
         if STOP.load(Ordering::SeqCst) {
             break;
         }
-        if speech_at.is_none() && started.elapsed() > NO_SPEECH_TIMEOUT {
+        if speech_at.is_none() && started.elapsed() > no_speech_timeout {
             return Err("Não ouvi nada. Tente de novo mais perto do microfone.".into());
         }
         if speech_at.is_some() && last_voice.elapsed() > END_SILENCE {
@@ -292,7 +377,7 @@ fn listen(app: &AppHandle, model: &std::path::Path) -> Result<String, String> {
 }
 
 /// Reamostragem linear para os 16 kHz que o Whisper espera.
-fn resample(input: &[f32], from: u32, to: u32) -> Vec<f32> {
+pub(crate) fn resample(input: &[f32], from: u32, to: u32) -> Vec<f32> {
     if from == to || input.is_empty() {
         return input.to_vec();
     }
@@ -311,7 +396,7 @@ fn resample(input: &[f32], from: u32, to: u32) -> Vec<f32> {
 }
 
 /// Frases que o Whisper costuma "ouvir" no silêncio (vícios de legendas do treino).
-fn is_hallucination(text: &str) -> bool {
+pub(crate) fn is_hallucination(text: &str) -> bool {
     let t = text.to_lowercase();
     t.is_empty()
         || t.contains("amara.org")

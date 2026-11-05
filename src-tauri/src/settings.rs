@@ -137,6 +137,11 @@ pub struct Settings {
     pub calendar_remind_minutes: i64,
     /// Avisar a hora de sair X minutos antes quando o evento tem endereço (0 desliga).
     pub calendar_leave_minutes: i64,
+    /// Fase 9.2: escutar "Ei, Pipo" o tempo todo (no próprio PC) e em quais modos.
+    pub wake_word: bool,
+    pub wake_modes: Vec<String>,
+    /// Conversa por voz: depois de responder falando, o Pipo volta a ouvir.
+    pub voice_conversation: bool,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -225,6 +230,9 @@ impl Default for Settings {
             google_calendar: true,
             calendar_remind_minutes: 10,
             calendar_leave_minutes: 40,
+            wake_word: false,
+            wake_modes: vec!["normal".into(), "trabalho".into(), "estudo".into()],
+            voice_conversation: true,
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,

@@ -849,3 +849,8 @@
 }
 .panel .habit-days button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: rgba(45, 212, 232, 0.08); }
 .panel .link.danger { color: var(--danger); }
+
+/* Fase 9.2: "Ei, Pipo" */
+.wake-word { display: grid; gap: 6px; }
+.wake-word .habit-days { align-items: center; }
+.wake-word .habit-days .hint { margin: 0 4px 0 0; }

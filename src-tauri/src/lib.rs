@@ -12,6 +12,7 @@ mod documents;
 mod files_index;
 mod gdrive;
 mod habits;
+mod wake;
 mod install;
 mod island;
 mod life;
@@ -212,6 +213,7 @@ pub fn run() {
             world::github::start(app.handle().clone());
             world::calendar::start(app.handle().clone());
             habits::start(app.handle().clone());
+            wake::start(app.handle().clone());
             world::lol::start(app.handle().clone());
             world::email::start(app.handle().clone());
             world::telegram::start(app.handle().clone());
@@ -274,6 +276,9 @@ pub fn run() {
             habits::habit_save,
             habits::habit_delete,
             habits::habit_log,
+            voice::voice_conversation_active,
+            voice::voice_follow_up,
+            wake::wake_status,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

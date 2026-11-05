@@ -79,6 +79,9 @@ export type Settings = {
   googleCalendar: boolean;
   calendarRemindMinutes: number;
   calendarLeaveMinutes: number;
+  wakeWord: boolean;
+  wakeModes: string[];
+  voiceConversation: boolean;
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -463,6 +466,9 @@ export const api = {
   voiceStatus: (model?: string) => invoke<VoiceStatus>("voice_status", { model }),
   voiceDownload: (model?: string) => invoke<void>("voice_download", { model }),
   voiceToggle: () => invoke<void>("voice_toggle"),
+  voiceConversationActive: () => invoke<boolean>("voice_conversation_active"),
+  voiceFollowUp: () => invoke<void>("voice_follow_up"),
+  wakeStatus: () => invoke<{ active: boolean; error: string | null }>("wake_status"),
   screenAsk: () => invoke<void>("screen_ask"),
   petFind: () => invoke<void>("pet_find"),
   captionsToggle: () => invoke<void>("captions_toggle"),

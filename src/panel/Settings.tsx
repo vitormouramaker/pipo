@@ -267,6 +267,61 @@ function NaturalVoice({
   );
 }
 
+const WAKE_MODES = [
+  { id: "normal", label: "Normal" },
+  { id: "trabalho", label: "Trabalho" },
+  { id: "estudo", label: "Estudo" },
+  { id: "jogo", label: "Jogo" },
+];
+
+/** Fase 9.2: "Ei, Pipo" sem atalho (escuta local, no próprio PC). */
+function WakeWord({ settings, update, modelReady }: { settings: Settings; update: (patch: Partial<Settings>) => void; modelReady: boolean }) {
+  const [status, setStatus] = useState<{ active: boolean; error: string | null } | null>(null);
+  useEffect(() => {
+    const refresh = () => void api.wakeStatus().then(setStatus);
+    refresh();
+    const unlisten = listen("wake-changed", refresh);
+    const timer = window.setInterval(refresh, 3000);
+    return () => {
+      void unlisten.then((fn) => fn());
+      window.clearInterval(timer);
+    };
+  }, []);
+  const toggleMode = (id: string) => {
+    const has = settings.wakeModes.includes(id);
+    update({ wakeModes: has ? settings.wakeModes.filter((m) => m !== id) : [...settings.wakeModes, id] });
+  };
+  return (
+    <div className="wake-word">
+      <label className="check">
+        <input type="checkbox" checked={settings.wakeWord} onChange={(e) => update({ wakeWord: e.target.checked })} />
+        Chamar o Pipo pela voz: diga <strong>"Ei, Pipo"</strong> (ou "Ei, Pipo, abre o Spotify" de uma vez)
+      </label>
+      {settings.wakeWord && (
+        <>
+          <div className="habit-days" role="group" aria-label="Modos em que o Ei, Pipo escuta">
+            <span className="hint">Escuta nos modos:</span>
+            {WAKE_MODES.map((m) => (
+              <button key={m.id} aria-pressed={settings.wakeModes.includes(m.id)} onClick={() => toggleMode(m.id)}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {!modelReady && <p className="hint error">Baixe o modelo de voz acima para o "Ei, Pipo" funcionar.</p>}
+          {modelReady && status?.active && <p className="hint ok">Ouvindo "Ei, Pipo" ✓</p>}
+          {modelReady && !status?.active && !status?.error && <p className="hint">Pausado no modo atual.</p>}
+          {status?.error && <p className="hint error">{status.error}</p>}
+          <p className="hint">
+            O microfone fica aberto (o Windows mostra o ícone do microfone na barra), mas tudo é ouvido e entendido aqui no PC: só
+            frases curtas são analisadas, nada é gravado nem enviado, e ele não escuta enquanto o próprio Pipo fala. Usa um pouco de
+            memória (~200 MB) enquanto ligado.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function VoiceSettings({ settings, update }: { settings: Settings; update: (patch: Partial<Settings>) => void }) {
   const [status, setStatus] = useState<VoiceStatus | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -340,6 +395,11 @@ function VoiceSettings({ settings, update }: { settings: Settings; update: (patc
         <input type="checkbox" checked={settings.speakReplies} onChange={(e) => update({ speakReplies: e.target.checked })} />
         Ler em voz alta as respostas de perguntas feitas por voz
       </label>
+      <label className="check">
+        <input type="checkbox" checked={settings.voiceConversation} onChange={(e) => update({ voiceConversation: e.target.checked })} />
+        Modo conversa: depois de responder falando, o Pipo volta a ouvir (até você ficar em silêncio ou dizer "tchau")
+      </label>
+      <WakeWord settings={settings} update={update} modelReady={Boolean(status?.modelReady)} />
       <NaturalVoice settings={settings} update={update} voices={voices} />
     </fieldset>
   );

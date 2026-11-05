@@ -320,10 +320,14 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
     inputRef.current?.focus();
     if (failed) sfx.error();
     else sfx.reply();
-    // Pergunta feita por voz: a resposta também pode ser falada.
+    // Pergunta feita por voz: a resposta também pode ser falada. Na conversa por voz
+    // ("Ei, Pipo" ou modo conversa), a resposta é sempre falada e o Pipo volta a ouvir.
     if (spoken && reply.trim()) {
-      const settings = await api.getSettings();
-      if (settings.speakReplies) void speak(reply, settings);
+      const [settings, conversation] = await Promise.all([api.getSettings(), api.voiceConversationActive()]);
+      if (settings.speakReplies || conversation) {
+        const finished = await speak(reply, settings);
+        if (finished && conversation && !failed) void api.voiceFollowUp();
+      }
     }
   };
 
