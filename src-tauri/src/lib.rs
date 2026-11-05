@@ -5,6 +5,7 @@ mod automations;
 mod chat;
 mod clipboard;
 mod context;
+mod dance;
 mod db;
 mod documents;
 mod files_index;
@@ -208,6 +209,7 @@ pub fn run() {
             world::telegram::start(app.handle().clone());
             files_index::start(app.handle().clone());
             install::start(app.handle().clone());
+            dance::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

@@ -109,3 +109,8 @@ mod tests {
         println!("mídia: disponível={} tocando={} app={} título={}", now.available, now.playing, now.app, now.title);
     }
 }
+
+/// Tem mídia tocando agora (para o Pipo dançar).
+pub fn is_playing() -> bool {
+    now_playing().playing
+}

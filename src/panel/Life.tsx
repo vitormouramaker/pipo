@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, wornAccessories, type LifeStatus, type Settings } from "../api";
-import { Pipo, type PipoState } from "../pipo/Pipo";
+import { SKINS, Pipo, type PipoState } from "../pipo/Pipo";
 import { ICONS } from "../ui/icons";
 import { sfx } from "../ui/sound";
 import { sqliteDate } from "../format";
@@ -37,6 +37,7 @@ export default function Life() {
   const [life, setLife] = useState<LifeStatus | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   // Acessório "experimentado" ao passar o mouse (mesmo bloqueado).
+  const [trySkin, setTrySkin] = useState<string | null>(null);
   const [tryOn, setTryOn] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,6 +69,18 @@ export default function Life() {
   const unlockedCount = life.achievements.filter((a) => a.unlockedAt).length;
   const since = life.since ? life.since.split("-").reverse().join("/") : null;
   const heroAccessories = tryOn && !worn.includes(tryOn) ? [...worn, tryOn] : worn;
+  // Cor experimentada (passando o mouse) ou a escolhida.
+  const heroSkin = trySkin ?? settings.skin;
+  const chooseSkin = (id: string) => {
+    setSettings({ ...settings, skin: id });
+    void api.settingsUpdate({ skin: id });
+    sfx.tick();
+  };
+  const chooseIsland = (style: string) => {
+    setSettings({ ...settings, islandStyle: style });
+    void api.settingsUpdate({ islandStyle: style });
+    sfx.tick();
+  };
   // Ordem fixa (a mesma sempre), para o usuário achar cada conquista no mesmo lugar.
   const achievements = life.achievements;
 
@@ -76,7 +89,7 @@ export default function Life() {
       <div className="actions-body">
         <div className="life-hero">
           <div className="life-pet">
-            <Pipo state={tryOn ? "attentive" : "idle"} stage={life.stage} accessories={heroAccessories} />
+            <Pipo state={tryOn || trySkin ? "attentive" : "idle"} stage={life.stage} accessories={heroAccessories} skin={heroSkin} />
           </div>
           <div className="life-info">
             <div className="life-level">
@@ -125,6 +138,50 @@ export default function Life() {
         </div>
 
         <div className="block">
+          <h4>Cores</h4>
+          <p className="hint">Passe o mouse para ver no Pipo; clique para usar. Algumas cores liberam com o nível.</p>
+          <div className="wardrobe skins">
+            {Object.entries(SKINS).map(([id, s]) => {
+              const unlocked = life.level >= s.level;
+              const on = (settings.skin || "grafite") === id;
+              return (
+                <button
+                  key={id}
+                  className={`wardrobe-item${on ? " on" : ""}${unlocked ? "" : " locked"}`}
+                  aria-pressed={on}
+                  onMouseEnter={() => setTrySkin(id)}
+                  onMouseLeave={() => setTrySkin(null)}
+                  onClick={() => unlocked && chooseSkin(id)}
+                >
+                  <div className="wardrobe-pet">
+                    <Pipo state="idle" stage={life.stage} skin={id} />
+                  </div>
+                  <strong>{s.name}</strong>
+                  <span>{unlocked ? (on ? "Usando" : "Usar") : `Nível ${s.level}`}</span>
+                  {!unlocked && <span className="wardrobe-lock">{ICONS.lock}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="island-styles">
+            <span className="field-label">Ilha</span>
+            <div className="segmented" aria-label="Estilo da ilha">
+              {(
+                [
+                  ["pipo", "Cor do Pipo"],
+                  ["grafite", "Grafite"],
+                  ["vidro", "Vidro"],
+                ] as const
+              ).map(([id, label]) => (
+                <button key={id} aria-pressed={(settings.islandStyle || "pipo") === id} onClick={() => chooseIsland(id)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="block">
           <h4>Acessórios</h4>
           <p className="hint">Passe o mouse para experimentar no Pipo. Clique nos liberados para usar ou guardar.</p>
           <div className="wardrobe">
@@ -140,7 +197,7 @@ export default function Life() {
                   onClick={() => a.unlocked && toggleAccessory(a.id)}
                 >
                   <div className="wardrobe-pet">
-                    <Pipo state="idle" stage={life.stage} accessories={[a.id]} />
+                    <Pipo state="idle" stage={life.stage} accessories={[a.id]} skin={settings.skin} />
                   </div>
                   <strong>{a.name}</strong>
                   <span>{a.unlocked ? (wearing ? "Usando" : "Guardado") : `Nível ${a.level}`}</span>

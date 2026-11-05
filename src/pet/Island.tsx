@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { api, type FocusStatus } from "../api";
 import type { PipoState } from "../pipo/Pipo";
 import { ICONS } from "../ui/icons";
+import { skinColors } from "../pipo/Pipo";
 import { sfx } from "../ui/sound";
 
 export type Edge = "top" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -28,7 +29,15 @@ const clock = () => new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", mi
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
 // O Pipo encolhido: uma pílula grafite com os olhos dele, grudada na borda da tela.
-export default function Island({ edge, state, scale = 1 }: { edge: Edge; state: PipoState; scale?: number }) {
+/** Cores da ilha: as do Pipo, grafite (padrão antigo) ou vidro (translúcida). */
+function islandColors(skin?: string, style?: string): Record<string, string> {
+  const c = skinColors(skin);
+  if (style === "vidro") return { "--island-bg": "rgba(18, 20, 23, 0.55)", "--island-border": "rgba(255, 255, 255, 0.14)", "--island-eye": c.eye, "--island-blur": "blur(10px)" };
+  if (style === "grafite") return {};
+  return { "--island-bg": c.bottom, "--island-border": c.edge, "--island-eye": c.eye };
+}
+
+export default function Island({ edge, state, scale = 1, skin, islandStyle }: { edge: Edge; state: PipoState; scale?: number; skin?: string; islandStyle?: string }) {
   const vertical = edge === "left" || edge === "right";
   const [hover, setHover] = useState(false);
   // Redesenha quando a janela muda de tamanho (troca de borda, escala).
@@ -82,7 +91,7 @@ export default function Island({ edge, state, scale = 1 }: { edge: Edge; state: 
     <main className="island-stage">
       <div
         className={`island ${edge}${vertical ? " splat-v" : ""} s-${state}${hover ? " hover" : ""}${glow ? " glow" : ""}`}
-        style={{ left: x, top: y, width: w, height: h, "--k": scale } as CSSProperties}
+        style={{ left: x, top: y, width: w, height: h, "--k": scale, ...islandColors(skin, islandStyle) } as CSSProperties}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           press.current = { x: e.screenX, y: e.screenY };

@@ -33,6 +33,12 @@ export type Settings = {
   naturalVoice: "faber" | "cadu";
   followCursor: boolean;
   hiddenAccessories: string[];
+  skin: string;
+  islandStyle: string;
+  dance: boolean;
+  personality: string;
+  replyLength: string;
+  recentContext: boolean;
   sounds: boolean;
   soundVolume: number;
   proactive: boolean;

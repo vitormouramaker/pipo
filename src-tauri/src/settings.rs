@@ -60,6 +60,18 @@ pub struct Settings {
     pub follow_cursor: bool,
     /// Acessórios liberados que o usuário preferiu não usar.
     pub hidden_accessories: Vec<String>,
+    /// Fase 8.6: cor do Pipo ("grafite", "neve", "meianoite", "menta", "coral", "ouro") e da ilha
+    /// ("pipo" = igual ao Pipo, "grafite" ou "vidro").
+    pub skin: String,
+    pub island_style: String,
+    /// O Pipo dança no ritmo da música que estiver tocando.
+    pub dance: bool,
+    /// Jeito de falar: "equilibrado", "tecnico", "engracado", "direto" ou "professor".
+    pub personality: String,
+    /// Tamanho das respostas: "curto", "normal" ou "detalhado".
+    pub reply_length: String,
+    /// Lembrar dos assuntos das últimas conversas (títulos, sem custo extra).
+    pub recent_context: bool,
     /// Efeitos sonoros (0 a 100).
     pub sounds: bool,
     pub sound_volume: u8,
@@ -150,6 +162,12 @@ impl Default for Settings {
             natural_voice: "faber".into(),
             follow_cursor: true,
             hidden_accessories: Vec::new(),
+            skin: "grafite".into(),
+            island_style: "pipo".into(),
+            dance: true,
+            personality: "equilibrado".into(),
+            reply_length: "normal".into(),
+            recent_context: true,
             sounds: true,
             sound_volume: 60,
             proactive: true,

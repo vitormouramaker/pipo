@@ -187,6 +187,42 @@ fn strip_image_notes(text: &str) -> String {
     out.trim().to_string()
 }
 
+/// Fase 8.6: jeito de falar e tamanho das respostas escolhidos pelo usuário.
+fn personality_prompt(s: &settings::Settings) -> String {
+    let style = match s.personality.as_str() {
+        "tecnico" => "Jeito de falar escolhido pelo usuário: técnico e preciso. Use os termos corretos, números e detalhes de implementação; menos metáforas.",
+        "engracado" => "Jeito de falar escolhido pelo usuário: divertido. Use piadas leves e comparações bem-humoradas, sem perder a informação.",
+        "direto" => "Jeito de falar escolhido pelo usuário: direto ao ponto. A resposta vem na primeira frase, sem introdução nem rodeios.",
+        "professor" => "Jeito de falar escolhido pelo usuário: como um bom professor. Explique passo a passo, com exemplos e analogias do dia a dia, e mostre o porquê.",
+        _ => "",
+    };
+    let length = match s.reply_length.as_str() {
+        "curto" => "Tamanho das respostas: curtas — no máximo 3 ou 4 frases ou uma lista curta, a menos que ele peça detalhes.",
+        "detalhado" => "Tamanho das respostas: pode se estender — respostas completas e bem organizadas quando o assunto pedir.",
+        _ => "",
+    };
+    format!("{style}\n{length}").trim().to_string()
+}
+
+/// Assuntos das últimas conversas (só os títulos, sem custo extra), para o Pipo lembrar do contexto.
+fn recent_topics(db: &Db, current: i64) -> String {
+    let list: Vec<String> = db
+        .conversations()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|(id, _, _)| *id != current && *id > 0)
+        .take(8)
+        .map(|(_, first, updated)| format!("- {}: {}", updated.get(..10).unwrap_or(&updated), title_of(&first)))
+        .collect();
+    if list.is_empty() {
+        return String::new();
+    }
+    format!(
+        "Assuntos das últimas conversas com o usuário (só os títulos; use se ele mencionar algo de antes, sem puxar o assunto sozinho):\n{}",
+        list.join("\n")
+    )
+}
+
 /// Histórico para a tela: texto de cada mensagem e uma linha para cada ferramenta usada.
 fn history_of(db: &Db, conversation: i64) -> Result<Vec<ChatMessage>, String> {
     let messages = db.messages(conversation).map_err(|e| e.to_string())?;
@@ -398,7 +434,7 @@ async fn run(
     let text = if text.trim().is_empty() && !attachments.is_empty() { "Veja o anexo." } else { text };
     content.push(json!({ "type": "text", "text": text }));
 
-    let (settings, conversation) = {
+    let (settings, conversation, recent) = {
         let db = state.db.lock().unwrap();
         let settings = settings::load(&db);
         let conversation = match conversation {
@@ -407,8 +443,11 @@ async fn run(
         };
         db.add_message(conversation, "user", &Value::Array(content))
             .map_err(|e| e.to_string())?;
-        (settings, conversation)
+        let recent = if settings.recent_context { recent_topics(&db, conversation) } else { String::new() };
+        (settings, conversation, recent)
     };
+    let extra_system = format!("{}\n\n{}\n\n{extra_system}", personality_prompt(&settings), recent).trim().to_string();
+    let extra_system = extra_system.as_str();
 
     let client = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(15))
@@ -714,5 +753,18 @@ mod image_notes {
         assert_eq!(super::strip_image_notes("[Imagem anexada: tela.png]o que é isso?"), "o que é isso?");
         assert_eq!(super::strip_image_notes("[Imagem anexada: a.png][Imagem anexada: b.png]"), "");
         assert_eq!(super::strip_image_notes("sem nada"), "sem nada");
+    }
+}
+
+#[cfg(test)]
+mod personality_tests {
+    #[test]
+    fn monta_o_jeito_de_falar() {
+        let mut s = crate::settings::Settings::default();
+        assert_eq!(super::personality_prompt(&s), "");
+        s.personality = "professor".into();
+        s.reply_length = "curto".into();
+        let p = super::personality_prompt(&s);
+        assert!(p.contains("professor") && p.contains("curtas"));
     }
 }

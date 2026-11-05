@@ -17,7 +17,8 @@ export const PIPO_STATES = [
 ] as const;
 export type PipoState = (typeof PIPO_STATES)[number];
 
-const C = {
+// Cores do Pipo (Fase 8.6): o usuário escolhe em Evolução do Pipo. Algumas liberam por nível.
+const GRAFITE = {
   eye: "#2DD4E8",
   ok: "#4ADE80",
   warn: "#F5B544",
@@ -27,6 +28,18 @@ const C = {
   bottom: "#1B1D21",
   edge: "#3A3D44",
 };
+export type Skin = typeof GRAFITE;
+export const SKINS: Record<string, { name: string; level: number; colors: Skin }> = {
+  grafite: { name: "Grafite", level: 1, colors: GRAFITE },
+  neve: { name: "Neve", level: 1, colors: { ...GRAFITE, top: "#EEF1F5", bottom: "#C7CED8", edge: "#AAB3BF", eye: "#0E7490", rest: "#5B6470", dots: "#5B6470" } },
+  meianoite: { name: "Meia-noite", level: 1, colors: { ...GRAFITE, top: "#232A4D", bottom: "#121630", edge: "#363F6E", eye: "#8FA2FF" } },
+  menta: { name: "Menta", level: 4, colors: { ...GRAFITE, top: "#1F3D37", bottom: "#10241F", edge: "#2E5A50", eye: "#5EF2C2" } },
+  coral: { name: "Coral", level: 8, colors: { ...GRAFITE, top: "#3D2329", bottom: "#231318", edge: "#5A333B", eye: "#FF8A7A" } },
+  ouro: { name: "Ouro", level: 15, colors: { ...GRAFITE, top: "#3B3122", bottom: "#1F190F", edge: "#6B5730", eye: "#F5C451" } },
+};
+// Cores em uso nesta renderização (o Pipo define antes de desenhar; a renderização é síncrona).
+let C: Skin = GRAFITE;
+export const skinColors = (id?: string | null): Skin => SKINS[id ?? ""]?.colors ?? GRAFITE;
 const EL = 66;
 const ER = 134;
 const EY = 102;
@@ -234,7 +247,7 @@ function useBlink(enabled: boolean) {
 }
 
 // Borda do corpo em cada estágio de evolução (Alpha, Beta, Release, LTS).
-const RIMS = [
+const rims = () => [
   { stroke: C.edge, width: 1, opacity: 1 },
   { stroke: "#56606C", width: 2, opacity: 1 },
   { stroke: C.eye, width: 2, opacity: 0.55 },
@@ -270,6 +283,35 @@ function accessory(id: string, part: "behind" | "front") {
           <rect x="93" y="171" width="14" height="14" rx="4" fill="#1F9FB0" />
         </g>
       ) : null;
+    case "glasses":
+      return part === "front" ? (
+        <g key={id} opacity="0.92">
+          <rect x="40" y="84" width="52" height="34" rx="12" fill="#0B0C0E" fillOpacity="0.55" stroke="#0B0C0E" strokeWidth="4" />
+          <rect x="108" y="84" width="52" height="34" rx="12" fill="#0B0C0E" fillOpacity="0.55" stroke="#0B0C0E" strokeWidth="4" />
+          <path d="M92 96 Q100 90 108 96" fill="none" stroke="#0B0C0E" strokeWidth="4" />
+          <path d="M48 90 L62 90" stroke="#FFFFFF" strokeOpacity="0.35" strokeWidth="3" strokeLinecap="round" />
+          <path d="M116 90 L130 90" stroke="#FFFFFF" strokeOpacity="0.35" strokeWidth="3" strokeLinecap="round" />
+        </g>
+      ) : null;
+    case "scarf":
+      return part === "front" ? (
+        <g key={id}>
+          {/* Faixa grossa abraçando a base, com listras, nó e duas pontas caindo. */}
+          <path d="M16 146 Q100 178 184 146 L186 170 Q100 204 14 170 Z" fill={C.eye} />
+          <path d="M16 146 Q100 178 184 146 L186 170 Q100 204 14 170 Z" fill="#000" fillOpacity="0.12" transform="translate(0 8) scale(1 0.55) translate(0 128)" />
+          <g stroke="#FFFFFF" strokeOpacity="0.35" strokeWidth="4" strokeLinecap="round">
+            <path d="M44 160 L46 178" />
+            <path d="M72 166 L73 185" />
+            <path d="M128 166 L127 185" />
+            <path d="M156 160 L154 178" />
+          </g>
+          <path d="M138 168 L160 206 L144 210 L128 174 Z" fill={C.eye} />
+          <path d="M150 166 L178 198 L164 206 L142 172 Z" fill={C.eye} />
+          <path d="M150 166 L178 198 L164 206 L142 172 Z" fill="#000" fillOpacity="0.15" />
+          <circle cx="142" cy="170" r="10" fill={C.eye} />
+          <circle cx="142" cy="170" r="10" fill="#000" fillOpacity="0.1" />
+        </g>
+      ) : null;
     case "crown":
       return part === "front" ? (
         <path key={id} d="M24 30 L27 12 L36 21 L43 8 L50 21 L59 12 L62 30 Z" fill={C.warn} stroke="#C48A2C" strokeWidth="1.5" strokeLinejoin="round" />
@@ -285,13 +327,17 @@ type PipoProps = {
   gaze?: [number, number];
   stage?: number;
   accessories?: string[];
+  /** Cor do Pipo (id de SKINS). */
+  skin?: string | null;
 };
 
-export function Pipo({ state, gaze = [0, 0], stage = 0, accessories = [] }: PipoProps) {
+export function Pipo({ state, gaze = [0, 0], stage = 0, accessories = [], skin }: PipoProps) {
+  C = skinColors(skin);
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const l = look(state);
   const blinking = useBlink(l.blinks !== false);
-  const rim = RIMS[Math.min(Math.max(stage, 0), RIMS.length - 1)];
+  const all = rims();
+  const rim = all[Math.min(Math.max(stage, 0), all.length - 1)];
   const [gx, gy] = l.gaze === false ? [0, 0] : gaze;
 
   return (

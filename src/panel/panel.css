@@ -795,3 +795,5 @@
 .lol-sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
 .lol-tips { margin: 2px 0 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; line-height: 1.45; }
 .lol-game .lol-img { border-radius: 50%; }
+
+.island-styles { display: flex; align-items: center; gap: 10px; margin-top: 10px; }

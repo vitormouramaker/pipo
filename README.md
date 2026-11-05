@@ -57,7 +57,9 @@ O jeito certo de usar no dia a dia é instalado, como qualquer app: rode `src-ta
 
 O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquanto responde, satisfeito quando termina e em alerta quando algo dá errado. Também fica focado depois de alguns minutos programando, dorme com o computador parado e some sozinho quando um jogo ou vídeo está em tela cheia no mesmo monitor que ele (modo jogo; janela maximizada não conta).
 
-**Evolução:** o Pipo ganha XP quando você conversa, pede ações, conclui pomodoros, pesquisa, usa a voz e aparece todo dia. A cada nível ele fica mais completo: estágios Alpha, Beta (nível 5), Release (10) e LTS (20), com borda própria e acessórios liberados (antena, fone, gravata-borboleta e coroa), que podem ser guardados.
+**Visual e jeito:** na aba do Pipo, em Cores, escolha a cor dele (Grafite, Neve, Meia-noite e, com o nível, Menta, Coral e Ouro) e da ilha (cor do Pipo, grafite ou vidro). Ele dança no ritmo da música que estiver tocando e comemora vitórias no LoL. Em ⚙ → Inteligência dá para escolher o jeito de falar (equilibrado, técnico, engraçado, direto ou professor) e o tamanho das respostas; ele também lembra dos assuntos das últimas conversas.
+
+**Evolução:** o Pipo ganha XP quando você conversa, pede ações, conclui pomodoros, pesquisa, usa a voz e aparece todo dia. A cada nível ele fica mais completo: estágios Alpha, Beta (nível 5), Release (10) e LTS (20), com borda própria e acessórios liberados (antena, fone, óculos escuros, gravata-borboleta, cachecol e coroa), que podem ser guardados.
 
 **Abas do painel:**
 

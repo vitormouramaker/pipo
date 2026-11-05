@@ -47,7 +47,9 @@ pub const STAGES: &[(i64, &str, &str)] = &[
 pub const ACCESSORIES: &[(&str, &str, i64)] = &[
     ("antenna", "Antena", 3),
     ("headset", "Fone", 6),
+    ("glasses", "Óculos escuros", 8),
     ("bowtie", "Gravata-borboleta", 10),
+    ("scarf", "Cachecol", 14),
     ("crown", "Coroa", 20),
 ];
 

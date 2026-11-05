@@ -56,6 +56,7 @@ export default function PetApp() {
 
   const press = useRef<{ x: number; y: number } | null>(null);
   const petRef = useRef<HTMLDivElement>(null);
+  const danceRef = useRef<HTMLDivElement>(null);
   const physics = useDragPhysics(petRef, { onLift: sfx.pick, onDrop: sfx.drop });
   // Menu radial aberto agora (lido pelos ouvintes de eventos, que não veem o estado novo).
   const openRef = useRef(false);
@@ -115,6 +116,17 @@ export default function PetApp() {
       else if (isState(e.payload)) setOverride(e.payload);
     });
     const unlistenRadial = listen("radial-close", () => closeRadial());
+    // Dança: cada batida da música balança o Pipo (alternando os lados).
+    let side = false;
+    const unlistenBeat = listen<number>("pipo-beat", (e) => {
+      const el = danceRef.current;
+      if (!el || openRef.current) return;
+      side = !side;
+      el.style.setProperty("--beat", String(e.payload));
+      el.classList.remove("beat-l", "beat-r");
+      void el.offsetWidth;
+      el.classList.add(side ? "beat-l" : "beat-r");
+    });
     const unlistenFind = listen("pipo-find", () => {
       const key = Date.now();
       setFind(key);
@@ -127,6 +139,7 @@ export default function PetApp() {
       void unlistenState.then((fn) => fn());
       void unlistenRadial.then((fn) => fn());
       void unlistenFind.then((fn) => fn());
+      void unlistenBeat.then((fn) => fn());
     };
   }, []);
 
@@ -198,7 +211,7 @@ export default function PetApp() {
   const state: PipoState = override ?? base;
   openRef.current = Boolean(radial) && !closing;
 
-  if (island) return <Island edge={island} state={state} scale={islandScale} />;
+  if (island) return <Island edge={island} state={state} scale={islandScale} skin={settings?.skin} islandStyle={settings?.islandStyle} />;
 
   return (
     <main
@@ -251,12 +264,15 @@ export default function PetApp() {
             });
         }}
       >
+        <div className="pipo-dance" ref={danceRef}>
         <Pipo
           state={state}
           gaze={state === "sleep" || state === "gaming" ? [0, 0] : gaze}
           stage={life?.stage ?? 0}
           accessories={wornAccessories(life, settings)}
+          skin={settings?.skin}
         />
+        </div>
       </div>
 
       {radial &&

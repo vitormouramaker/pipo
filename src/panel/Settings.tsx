@@ -467,6 +467,28 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           </select>
         </label>
         <label>
+          Jeito de falar
+          <select value={settings.personality} onChange={(e) => update({ personality: e.target.value })}>
+            <option value="equilibrado">Equilibrado (padrão)</option>
+            <option value="tecnico">Técnico e preciso</option>
+            <option value="engracado">Engraçado</option>
+            <option value="direto">Direto ao ponto</option>
+            <option value="professor">Professor (explica com exemplos)</option>
+          </select>
+        </label>
+        <label>
+          Tamanho das respostas
+          <select value={settings.replyLength} onChange={(e) => update({ replyLength: e.target.value })}>
+            <option value="curto">Curtas</option>
+            <option value="normal">Normais</option>
+            <option value="detalhado">Detalhadas</option>
+          </select>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.recentContext} onChange={(e) => update({ recentContext: e.target.checked })} />
+          Lembrar dos assuntos das últimas conversas (só os títulos; não custa nada a mais)
+        </label>
+        <label>
           Sarcasmo: <strong>{SARCASM_LABELS[settings.sarcasm]}</strong>
           <input
             type="range"
@@ -591,6 +613,11 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           <input type="checkbox" checked={settings.followCursor} onChange={(e) => update({ followCursor: e.target.checked })} />
           Olhos do Pipo seguem o mouse
         </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.dance} onChange={(e) => update({ dance: e.target.checked })} />
+          Dançar no ritmo da música que estiver tocando
+        </label>
+        <p className="hint">Cores do Pipo e da ilha: na aba do Pipo (ícone dele no topo), em Cores.</p>
         <div className="row">
           <button onClick={() => void api.islandToggle()}>Modo ilha (encolher na borda da tela)</button>
         </div>

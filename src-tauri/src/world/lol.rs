@@ -360,6 +360,8 @@ async fn end_of_game(app: &AppHandle, client: &reqwest::Client, port: u16, passw
         "prompt:Analise minha última partida de League of Legends: {champion}{role}, {} com {k}/{d}/{a} e {cs:.1} de farm por minuto em {minutes:.0} minutos. Me dê 3 coisas para melhorar.",
         if won { "vitória" } else { "derrota" }
     );
+    // Expressão do Pipo: comemora a vitória, fica desconfiado com a derrota.
+    crate::windows::set_pet_state(app, if won { "levelup" } else { "skeptical" });
     crate::toast::notify_from(app, "lol", "lol", if won { "Vitória!" } else { "Derrota" }, &summary, Some(&prompt));
 }
 
