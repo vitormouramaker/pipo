@@ -4,6 +4,7 @@ pub mod briefing;
 pub mod calendar;
 pub mod ddragon;
 pub mod email;
+pub mod gcal;
 pub mod github;
 pub mod lives;
 pub mod lol;

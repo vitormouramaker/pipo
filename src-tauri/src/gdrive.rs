@@ -4,6 +4,7 @@
 //! cola o ID e a chave do cliente. O login é feito no navegador (OAuth com PKCE e retorno
 //! para 127.0.0.1); o Pipo guarda só o token de renovação, no Gerenciador de Credenciais.
 //! Escopo `drive.file`: o Pipo só enxerga os arquivos que ele mesmo criou no Drive.
+//! Fase 9.0: o mesmo login também pede `calendar.events` (Google Agenda, world/gcal.rs).
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -19,15 +20,15 @@ use crate::{secrets, AppState};
 
 const SECRET: &str = "gdrive-client-secret";
 const REFRESH: &str = "gdrive-refresh-token";
-const SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
+const SCOPES: &str = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events";
 const FOLDER_NAME: &str = "Pipo (backups)";
 const KEEP: usize = 10;
 
-fn client() -> reqwest::blocking::Client {
+pub(crate) fn client() -> reqwest::blocking::Client {
     reqwest::blocking::Client::builder().timeout(Duration::from_secs(120)).build().unwrap_or_default()
 }
 
-fn err(e: reqwest::Error) -> String {
+pub(crate) fn err(e: reqwest::Error) -> String {
     format!("Sem conexão com o Google: {}", e.without_url())
 }
 
@@ -84,7 +85,7 @@ fn percent_decode(s: &str) -> String {
 
 fn page(ok: bool) -> String {
     let (title, text) = if ok {
-        ("Pipo conectado ao Google Drive", "Pronto! Pode fechar esta aba e voltar para o Pipo.")
+        ("Pipo conectado ao Google", "Pronto! Pode fechar esta aba e voltar para o Pipo.")
     } else {
         ("Não deu certo", "O Google não autorizou. Volte para o Pipo e tente de novo.")
     };
@@ -95,9 +96,12 @@ fn page(ok: bool) -> String {
 }
 
 /// Login no navegador e troca do código pelo token de renovação.
+/// ID ou chave vazios: usa o cliente do Google Cloud já guardado (para pedir mais permissões).
 pub fn connect(app: &AppHandle, id: &str, secret: &str) -> Result<(), String> {
-    let id = id.trim();
-    let secret = secret.trim();
+    let saved_id = client_id(app);
+    let id = if id.trim().is_empty() { saved_id.as_str() } else { id.trim() };
+    let saved_secret = secrets::get_named(SECRET).unwrap_or_default();
+    let secret = if secret.trim().is_empty() { saved_secret.as_str() } else { secret.trim() };
     if !id.ends_with(".apps.googleusercontent.com") || secret.is_empty() {
         return Err("Confira o ID do cliente (termina com .apps.googleusercontent.com) e a chave secreta do cliente.".into());
     }
@@ -108,10 +112,10 @@ pub fn connect(app: &AppHandle, id: &str, secret: &str) -> Result<(), String> {
     let verifier = random(48);
     let state = random(16);
     let url = format!(
-        "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope={}&code_challenge={}&code_challenge_method=S256&access_type=offline&prompt=consent&state={}",
+        "https://accounts.google.com/o/oauth2/v2/auth?client_id={}&redirect_uri={}&response_type=code&scope={}&code_challenge={}&code_challenge_method=S256&access_type=offline&include_granted_scopes=true&prompt=consent&state={}",
         id,
         redirect,
-        SCOPE,
+        SCOPES.replace(' ', "%20"),
         challenge(&verifier),
         state
     );
@@ -136,7 +140,7 @@ pub fn connect(app: &AppHandle, id: &str, secret: &str) -> Result<(), String> {
                     break code;
                 }
                 if query_param(&line, "error").is_some() {
-                    return Err("O acesso ao Google Drive foi negado.".into());
+                    return Err("O acesso ao Google foi negado.".into());
                 }
             }
             Err(_) => std::thread::sleep(Duration::from_millis(150)),
@@ -159,16 +163,24 @@ pub fn connect(app: &AppHandle, id: &str, secret: &str) -> Result<(), String> {
     let refresh = token["refresh_token"].as_str().ok_or_else(|| {
         format!("O Google não devolveu a autorização: {}", token["error_description"].as_str().or(token["error"].as_str()).unwrap_or("erro desconhecido"))
     })?;
-    secrets::set_named(SECRET, secret)?;
+    let scopes = token["scope"].as_str().unwrap_or("").to_string();
+    let secret = secret.to_string();
+    let id = id.to_string();
+    secrets::set_named(SECRET, &secret)?;
     secrets::set_named(REFRESH, refresh)?;
-    crate::settings::settings_update(app.clone(), json!({ "gdriveClientId": id, "gdriveFolderId": "" }))?;
+    crate::settings::settings_update(app.clone(), json!({ "gdriveClientId": id, "gdriveFolderId": "", "googleScopes": scopes }))?;
     Ok(())
+}
+
+/// O login do Google tem a permissão da Google Agenda?
+pub fn has_calendar(app: &AppHandle) -> bool {
+    connected(app) && app.state::<AppState>().settings.lock().unwrap().google_scopes.contains("auth/calendar")
 }
 
 pub fn disconnect(app: &AppHandle) -> Result<(), String> {
     secrets::delete_named(REFRESH);
     secrets::delete_named(SECRET);
-    crate::settings::settings_update(app.clone(), json!({ "gdriveFolderId": "" })).map(|_| ())
+    crate::settings::settings_update(app.clone(), json!({ "gdriveFolderId": "", "googleScopes": "" })).map(|_| ())
 }
 
 pub fn connected(app: &AppHandle) -> bool {
@@ -176,9 +188,9 @@ pub fn connected(app: &AppHandle) -> bool {
 }
 
 /// Token de acesso novo (vale ~1 hora) a partir do token de renovação.
-fn access_token(app: &AppHandle) -> Result<String, String> {
-    let refresh = secrets::get_named(REFRESH).ok_or("O Google Drive não está conectado.")?;
-    let secret = secrets::get_named(SECRET).ok_or("O Google Drive não está conectado.")?;
+pub(crate) fn access_token(app: &AppHandle) -> Result<String, String> {
+    let refresh = secrets::get_named(REFRESH).ok_or("O Google não está conectado.")?;
+    let secret = secrets::get_named(SECRET).ok_or("O Google não está conectado.")?;
     let id = client_id(app);
     let v: Value = client()
         .post("https://oauth2.googleapis.com/token")
@@ -189,7 +201,7 @@ fn access_token(app: &AppHandle) -> Result<String, String> {
         .map_err(err)?;
     v["access_token"].as_str().map(String::from).ok_or_else(|| {
         if v["error"] == "invalid_grant" {
-            "A autorização do Google Drive expirou. Conecte de novo em ⚙ → Backup na nuvem (e publique o app no Google Cloud para não expirar).".into()
+            "A autorização do Google expirou. Conecte de novo em ⚙ → Backup na nuvem (e publique o app no Google Cloud para não expirar).".into()
         } else {
             format!("O Google recusou: {}", v["error_description"].as_str().or(v["error"].as_str()).unwrap_or("erro"))
         }

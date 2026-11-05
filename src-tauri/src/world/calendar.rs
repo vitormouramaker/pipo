@@ -1,6 +1,8 @@
 //! Fase 6.4: Google Agenda pelo "endereço secreto no formato iCal" (só leitura, sem login).
 //! Baixa o .ics a cada 15 minutos, expande os eventos que se repetem (RRULE) para hoje e
-//! amanhã e avisa 10 minutos antes de cada compromisso.
+//! amanhã e avisa antes de cada compromisso.
+//! Fase 9.0: junta os eventos da Google Agenda conectada pela API (gcal.rs) e avisa a hora
+//! de sair quando o evento tem endereço.
 
 use std::collections::HashSet;
 use std::str::FromStr;
@@ -14,23 +16,58 @@ use tauri::{AppHandle, Emitter, Manager};
 use super::http;
 use crate::{toast, AppState};
 
-const REMIND_BEFORE: i64 = 10;
-
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
-    title: String,
+    /// Id do evento na Google Agenda conectada (vazio nos eventos do endereço iCal).
+    pub(super) id: String,
+    pub(super) title: String,
     start: String,
     end: String,
     /// Horário local "HH:MM" (vazio no dia inteiro).
     time: String,
-    all_day: bool,
-    location: String,
-    link: Option<String>,
+    pub(super) all_day: bool,
+    pub(super) location: String,
+    pub(super) link: Option<String>,
     #[serde(skip)]
-    starts: DateTime<Local>,
+    pub(super) starts: DateTime<Local>,
+    #[serde(skip)]
+    pub(super) ends: DateTime<Local>,
     #[serde(skip)]
     key: String,
+}
+
+impl Event {
+    pub(super) fn new(id: String, title: String, starts: DateTime<Local>, ends: DateTime<Local>, all_day: bool, location: String, link: Option<String>) -> Self {
+        Event {
+            key: if id.is_empty() { format!("{title}@{}", starts.timestamp()) } else { format!("g:{id}@{}", starts.timestamp()) },
+            id,
+            time: if all_day { String::new() } else { starts.format("%H:%M").to_string() },
+            start: starts.to_rfc3339(),
+            end: ends.to_rfc3339(),
+            title,
+            all_day,
+            location,
+            link,
+            starts,
+            ends,
+        }
+    }
+}
+
+/// Link de reunião (Meet, Teams, Zoom) dentro do local ou da descrição.
+pub(super) fn meeting_link(texts: &[&str]) -> Option<String> {
+    texts
+        .iter()
+        .flat_map(|t| t.split_whitespace())
+        .find(|w| w.starts_with("https://meet.google.com/") || w.starts_with("https://teams.microsoft.com/") || w.starts_with("https://zoom.us/") || w.contains(".zoom.us/j/"))
+        .map(|w| w.trim_end_matches(['>', ')', ',']).to_string())
+}
+
+/// O local parece um endereço de verdade (e não um link ou "online")?
+fn physical(location: &str) -> bool {
+    let l = location.trim().to_lowercase();
+    l.chars().count() >= 4 && !l.contains("http") && !l.contains("meet.google") && !l.contains("zoom") && !l.contains("teams") && l != "online" && l != "remoto"
 }
 
 #[derive(Default)]
@@ -124,11 +161,7 @@ fn expand(props: &[(String, String, String)], from: DateTime<Local>, to: DateTim
     let title = get("SUMMARY").map(|(_, _, v)| unescape(v)).unwrap_or_else(|| "(sem título)".into());
     let location = get("LOCATION").map(|(_, _, v)| unescape(v)).unwrap_or_default();
     let description = get("DESCRIPTION").map(|(_, _, v)| unescape(v)).unwrap_or_default();
-    let link = [location.as_str(), description.as_str()]
-        .iter()
-        .flat_map(|t| t.split_whitespace())
-        .find(|w| w.starts_with("https://meet.google.com/") || w.starts_with("https://teams.microsoft.com/") || w.starts_with("https://zoom.us/") || w.contains(".zoom.us/j/"))
-        .map(|w| w.trim_end_matches(['>', ')', ',']).to_string());
+    let link = meeting_link(&[location.as_str(), description.as_str()]);
     let uid = get("UID").map(|(_, _, v)| v.clone()).unwrap_or_else(|| title.clone());
 
     // Datas do evento: uma só ou todas as repetições no intervalo.
@@ -156,34 +189,20 @@ fn expand(props: &[(String, String, String)], from: DateTime<Local>, to: DateTim
     starts
         .into_iter()
         .filter(|s| *s + duration > from && *s < to)
-        .map(|s| Event {
-            key: format!("{uid}@{}", s.timestamp()),
-            time: if all_day { String::new() } else { s.format("%H:%M").to_string() },
-            start: s.to_rfc3339(),
-            end: (s + duration).to_rfc3339(),
-            starts: s,
-            title: title.clone(),
-            all_day,
-            location: location.clone(),
-            link: link.clone(),
+        .map(|s| {
+            let mut e = Event::new(String::new(), title.clone(), s, s + duration, all_day, location.clone(), link.clone());
+            e.key = format!("{uid}@{}", s.timestamp());
+            e
         })
         .collect()
 }
 
-async fn refresh(app: &AppHandle) -> Result<usize, String> {
-    let url = app.state::<AppState>().settings.lock().unwrap().calendar_url.trim().to_string();
-    if url.is_empty() {
-        with(|c| {
-            c.events.clear();
-            c.error = None;
-        });
-        return Ok(0);
-    }
+async fn ics_events(url: &str, from: DateTime<Local>, to: DateTime<Local>) -> Result<Vec<Event>, String> {
     if !url.starts_with("https://") {
         return Err("Use o endereço https da agenda (termina em .ics).".into());
     }
     let ics = http()
-        .get(&url)
+        .get(url)
         .send()
         .await
         .map_err(|e| format!("Sem conexão com a agenda: {e}"))?
@@ -193,38 +212,132 @@ async fn refresh(app: &AppHandle) -> Result<usize, String> {
     if !ics.contains("BEGIN:VCALENDAR") {
         return Err("Esse endereço não é de uma agenda iCal (.ics).".into());
     }
+    Ok(events(&ics, from, to))
+}
+
+pub(crate) fn today_start() -> DateTime<Local> {
     let now = Local::now();
-    let today = Local.from_local_datetime(&now.date_naive().and_hms_opt(0, 0, 0).unwrap()).single().unwrap_or(now);
-    let list = events(&ics, today, today + chrono::Duration::days(2));
+    Local.from_local_datetime(&now.date_naive().and_hms_opt(0, 0, 0).unwrap()).earliest().unwrap_or(now)
+}
+
+/// Junta as duas fontes, sem repetir o mesmo evento (mesmo nome e horário).
+fn merge(mut google: Vec<Event>, ics: Vec<Event>) -> Vec<Event> {
+    for e in ics {
+        if !google.iter().any(|g| g.starts == e.starts && g.title.trim().eq_ignore_ascii_case(e.title.trim())) {
+            google.push(e);
+        }
+    }
+    google.sort_by_key(|e| e.starts);
+    google
+}
+
+/// Eventos de `from` a `to` das duas fontes (Google Agenda conectada e endereço iCal).
+pub(super) async fn fetch(app: &AppHandle, from: DateTime<Local>, to: DateTime<Local>) -> (Vec<Event>, Vec<String>) {
+    let url = app.state::<AppState>().settings.lock().unwrap().calendar_url.trim().to_string();
+    let mut errors = Vec::new();
+    let ics = if url.is_empty() {
+        Vec::new()
+    } else {
+        ics_events(&url, from, to).await.unwrap_or_else(|e| {
+            errors.push(e);
+            Vec::new()
+        })
+    };
+    let google = if super::gcal::enabled(app) {
+        let handle = app.clone();
+        match tauri::async_runtime::spawn_blocking(move || super::gcal::list(&handle, from, to)).await {
+            Ok(Ok(list)) => list,
+            Ok(Err(e)) => {
+                errors.push(e);
+                Vec::new()
+            }
+            Err(e) => {
+                errors.push(e.to_string());
+                Vec::new()
+            }
+        }
+    } else {
+        Vec::new()
+    };
+    (merge(google, ics), errors)
+}
+
+async fn refresh(app: &AppHandle) -> Result<usize, String> {
+    if !configured(app) {
+        with(|c| {
+            c.events.clear();
+            c.error = None;
+        });
+        return Ok(0);
+    }
+    let today = today_start();
+    let (list, errors) = fetch(app, today, today + chrono::Duration::days(2)).await;
+    if list.is_empty() && !errors.is_empty() {
+        return Err(errors.join(" · "));
+    }
     let count = list.len();
     with(|c| {
         c.events = list;
-        c.error = None;
+        c.error = errors.first().cloned();
         c.checked_at = Some(crate::actions::now_hm());
     });
     let _ = app.emit("calendar-changed", ());
     Ok(count)
 }
 
-/// Avisa 10 minutos antes de cada compromisso (uma vez só).
+/// Atualiza agora (depois de criar, mudar ou apagar um evento).
+pub(super) async fn refresh_now(app: &AppHandle) -> Result<usize, String> {
+    let result = refresh(app).await;
+    if let Err(e) = &result {
+        with(|c| c.error = Some(e.clone()));
+        let _ = app.emit("calendar-changed", ());
+    }
+    result
+}
+
+fn configured(app: &AppHandle) -> bool {
+    !app.state::<AppState>().settings.lock().unwrap().calendar_url.trim().is_empty() || super::gcal::enabled(app)
+}
+
+/// Avisa antes de cada compromisso e, quando ele tem endereço, na hora de sair (uma vez só cada).
 fn remind(app: &AppHandle) {
     let now = Local::now();
-    let due: Vec<Event> = with(|c| {
-        let list: Vec<Event> = c
+    let (before, leave) = {
+        let state = app.state::<AppState>();
+        let s = state.settings.lock().unwrap();
+        (s.calendar_remind_minutes.clamp(0, 240), s.calendar_leave_minutes.clamp(0, 240))
+    };
+    let (due, go): (Vec<Event>, Vec<Event>) = with(|c| {
+        let soon: Vec<Event> = c
             .events
             .iter()
-            .filter(|e| !e.all_day && !c.reminded.contains(&e.key))
-            .filter(|e| {
-                let minutes = (e.starts - now).num_minutes();
-                (0..=REMIND_BEFORE).contains(&minutes)
-            })
+            .filter(|e| !e.all_day && before > 0 && !c.reminded.contains(&e.key))
+            .filter(|e| (0..=before).contains(&(e.starts - now).num_minutes()))
             .cloned()
             .collect();
-        for e in &list {
+        let go: Vec<Event> = c
+            .events
+            .iter()
+            .filter(|e| !e.all_day && leave > before && physical(&e.location) && !c.reminded.contains(&format!("sair:{}", e.key)))
+            .filter(|e| (before + 1..=leave).contains(&(e.starts - now).num_minutes()))
+            .cloned()
+            .collect();
+        for e in &soon {
             c.reminded.insert(e.key.clone());
         }
-        list
+        for e in &go {
+            c.reminded.insert(format!("sair:{}", e.key));
+        }
+        (soon, go)
     });
+    for e in go {
+        let minutes = (e.starts - now).num_minutes().max(0);
+        let route = reqwest::Url::parse_with_params("https://www.google.com/maps/dir/", &[("api", "1"), ("destination", e.location.trim())])
+            .map(|u| u.to_string())
+            .unwrap_or_else(|_| "view:today".into());
+        crate::windows::set_pet_state(app, "alert");
+        toast::notify_from(app, "reminder", "reminder", &format!("Hora de se arrumar: {}", e.title), &format!("Começa às {} (em {minutes} min) · {}. Clique para ver o caminho.", e.time, e.location.trim()), Some(&route));
+    }
     for e in due {
         let minutes = (e.starts - now).num_minutes().max(0);
         let body = if e.location.is_empty() { format!("Às {}.", e.time) } else { format!("Às {} · {}", e.time, e.location) };
@@ -255,6 +368,8 @@ pub fn start(app: AppHandle) {
 #[serde(rename_all = "camelCase")]
 pub struct CalendarStatus {
     configured: bool,
+    /// A Google Agenda está conectada pela API (dá para criar e mudar eventos).
+    google: bool,
     today: Vec<Event>,
     tomorrow: Vec<Event>,
     error: Option<String>,
@@ -262,10 +377,12 @@ pub struct CalendarStatus {
 }
 
 pub fn status(app: &AppHandle) -> CalendarStatus {
-    let configured = !app.state::<AppState>().settings.lock().unwrap().calendar_url.trim().is_empty();
+    let configured = configured(app);
+    let google = super::gcal::enabled(app);
     let today = Local::now().date_naive();
     with(|c| CalendarStatus {
         configured,
+        google,
         today: c.events.iter().filter(|e| e.starts.date_naive() <= today).cloned().collect(),
         tomorrow: c.events.iter().filter(|e| e.starts.date_naive() > today).cloned().collect(),
         error: c.error.clone(),
@@ -280,11 +397,21 @@ pub fn calendar_status(app: AppHandle) -> CalendarStatus {
 
 #[tauri::command]
 pub async fn calendar_refresh(app: AppHandle) -> Result<usize, String> {
-    let result = refresh(&app).await;
-    if let Err(e) = &result {
-        with(|c| c.error = Some(e.clone()));
+    refresh_now(&app).await
+}
+
+/// Liga a Google Agenda: refaz o login do Google pedindo também a permissão da agenda
+/// (usa o cliente do Google Cloud já guardado, ou o ID e a chave informados).
+#[tauri::command]
+pub async fn google_calendar_connect(app: AppHandle, client_id: String, client_secret: String) -> Result<usize, String> {
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::gdrive::connect(&handle, &client_id, &client_secret)).await.map_err(|e| e.to_string())??;
+    if !crate::gdrive::has_calendar(&app) {
+        return Err("O Google não deu a permissão da agenda. Na tela do Google, deixe marcada a opção de ver e editar os eventos da agenda.".into());
     }
-    result
+    crate::settings::settings_update(app.clone(), serde_json::json!({ "googleCalendar": true }))?;
+    let _ = app.emit("cloud-changed", ());
+    refresh_now(&app).await
 }
 
 #[cfg(test)]

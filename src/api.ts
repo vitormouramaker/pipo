@@ -75,6 +75,10 @@ export type Settings = {
   cloudAuto: boolean;
   cloudMode: string;
   gdriveClientId: string;
+  googleScopes: string;
+  googleCalendar: boolean;
+  calendarRemindMinutes: number;
+  calendarLeaveMinutes: number;
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -120,8 +124,15 @@ export type DaySummary = {
   actions: number;
 };
 export type Memory = { id: number; text: string; createdAt: string };
-export type CalendarEvent = { title: string; start: string; end: string; time: string; allDay: boolean; location: string; link: string | null };
-export type CalendarStatus = { configured: boolean; today: CalendarEvent[]; tomorrow: CalendarEvent[]; error: string | null; checkedAt: string | null };
+export type CalendarEvent = { id: string; title: string; start: string; end: string; time: string; allDay: boolean; location: string; link: string | null };
+export type CalendarStatus = {
+  configured: boolean;
+  google: boolean;
+  today: CalendarEvent[];
+  tomorrow: CalendarEvent[];
+  error: string | null;
+  checkedAt: string | null;
+};
 export type Pr = { account: string; repo: string; number: number; title: string; url: string };
 export type CiRun = { repo: string; id: number; status: string; conclusion: string; title: string; url: string; branch: string; workflow: string };
 export type GithubStatus = { available: boolean; login: string | null; accounts: string[]; prs: Pr[]; reviews: Pr[]; runs: CiRun[]; error: string | null; checkedAt: string | null };
@@ -497,6 +508,7 @@ export const api = {
   daySummary: () => invoke<DaySummary>("day_summary"),
   calendarStatus: () => invoke<CalendarStatus>("calendar_status"),
   calendarRefresh: () => invoke<number>("calendar_refresh"),
+  googleCalendarConnect: (clientId: string, clientSecret: string) => invoke<number>("google_calendar_connect", { clientId, clientSecret }),
   githubStatus: () => invoke<GithubStatus>("github_status"),
   githubRefresh: () => invoke<GithubStatus>("github_refresh"),
   mediaStatus: () => invoke<NowPlaying>("media_status"),

@@ -1,5 +1,14 @@
 import SettingsNav from "./SettingsNav";
-import { CaptionsSettings, CloudSettings, EmailSettings, LolSettings, ModesSettings, ReportSettings, TelegramSettings } from "./settings7";
+import {
+  CaptionsSettings,
+  CloudSettings,
+  EmailSettings,
+  GoogleCalendarSettings,
+  LolSettings,
+  ModesSettings,
+  ReportSettings,
+  TelegramSettings,
+} from "./settings7";
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { type OldCopy, api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
@@ -28,7 +37,7 @@ function CalendarField({ value, onChange }: { value: string; onChange: (url: str
   };
   return (
     <div className="calendar-field">
-      <span className="field-label">Google Agenda (endereço secreto no formato iCal)</span>
+      <span className="field-label">Outras agendas pelo endereço iCal (só leitura, opcional)</span>
       <input
         type="password"
         placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
@@ -589,10 +598,11 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
 
       <fieldset>
         <legend>Integrações</legend>
+        <GoogleCalendarSettings settings={settings} update={update} />
         <CalendarField value={settings.calendarUrl} onChange={(calendarUrl) => update({ calendarUrl })} />
         <p className="hint">
-          Na Google Agenda (computador): Configurações → sua agenda → "Integrar agenda" → copie o "Endereço secreto no
-          formato iCal". O Pipo só lê; esse link dá acesso à sua agenda, então não compartilhe.
+          Para ver outra agenda (do trabalho, compartilhada): na Google Agenda, Configurações → a agenda → "Integrar agenda" → copie
+          o "Endereço secreto no formato iCal". Esse link dá acesso à agenda, então não compartilhe.
         </p>
         <label className="check">
           <input type="checkbox" checked={settings.githubNotify} onChange={(e) => update({ githubNotify: e.target.checked })} />

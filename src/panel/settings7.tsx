@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, type CloudStatus, type ModeRule, type ModeStatus, type Settings, type TelegramStatus } from "../api";
+import { api, type CalendarStatus, type CloudStatus, type ModeRule, type ModeStatus, type Settings, type TelegramStatus } from "../api";
 import { sfx } from "../ui/sound";
 
 type Update = (patch: Partial<Settings>) => void;
@@ -524,8 +524,18 @@ export function CaptionsSettings({ settings, update }: { settings: Settings; upd
   );
 }
 
-/** Passo a passo do registro único no Google Cloud (para conectar o Drive pela internet). */
-function DriveSetup({ settings, onConnected }: { settings: Settings; onConnected: () => void }) {
+/** Passo a passo do registro único no Google Cloud (para conectar o Drive e a Agenda pela internet). */
+function DriveSetup({
+  settings,
+  onConnected,
+  connect: connectWith = api.gdriveConnect,
+  label = "Conectar ao Google Drive",
+}: {
+  settings: Settings;
+  onConnected: () => void;
+  connect?: (id: string, secret: string) => Promise<unknown>;
+  label?: string;
+}) {
   const [id, setId] = useState(settings.gdriveClientId);
   const [secret, setSecret] = useState("");
   const [busy, setBusy] = useState(false);
@@ -534,8 +544,7 @@ function DriveSetup({ settings, onConnected }: { settings: Settings; onConnected
   const connect = () => {
     setBusy(true);
     setError(null);
-    void api
-      .gdriveConnect(id, secret)
+    void connectWith(id, secret)
       .then(() => {
         setSecret("");
         sfx.done();
@@ -564,7 +573,11 @@ function DriveSetup({ settings, onConnected }: { settings: Settings; onConnected
           <button className="link" onClick={open("https://console.cloud.google.com/apis/library/drive.googleapis.com")}>
             Ative a Google Drive API
           </button>{" "}
-          nesse projeto (botão "Ativar").
+          e a{" "}
+          <button className="link" onClick={open("https://console.cloud.google.com/apis/library/calendar-json.googleapis.com")}>
+            Google Calendar API
+          </button>{" "}
+          nesse projeto (botão "Ativar" em cada uma).
         </li>
         <li>
           <button className="link" onClick={open("https://console.cloud.google.com/auth/overview")}>
@@ -585,7 +598,7 @@ function DriveSetup({ settings, onConnected }: { settings: Settings; onConnected
       <div className="inline-form">
         <input className="grow" type="password" autoComplete="off" placeholder="Chave secreta do cliente" value={secret} onChange={(e) => setSecret(e.target.value)} />
         <button className="primary" disabled={busy || !id || !secret} onClick={connect}>
-          {busy ? "Esperando o navegador…" : "Conectar ao Google Drive"}
+          {busy ? "Esperando o navegador…" : label}
         </button>
       </div>
       {busy && (
@@ -723,5 +736,117 @@ export function CloudSettings({ settings, update }: { settings: Settings; update
       )}
       {message && <p className={`hint${message.ok ? " ok" : " error"}`}>{message.text}</p>}
     </fieldset>
+  );
+}
+
+/** Fase 9.0: Google Agenda conectada pela API (ler, criar, mudar e apagar eventos). */
+export function GoogleCalendarSettings({ settings, update }: { settings: Settings; update: Update }) {
+  const [cloud, setCloud] = useState<CloudStatus | null>(null);
+  const [cal, setCal] = useState<CalendarStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const refresh = () => {
+    void api.cloudStatus().then(setCloud);
+    void api.calendarStatus().then(setCal);
+  };
+  useEffect(refresh, [settings.googleScopes, settings.googleCalendar]);
+  useEffect(() => {
+    const a = listen("cloud-changed", refresh);
+    const b = listen("calendar-changed", refresh);
+    return () => {
+      void a.then((fn) => fn());
+      void b.then((fn) => fn());
+    };
+  }, []);
+  const done = (n: unknown) => {
+    setMessage({ ok: true, text: `Agenda conectada: ${Number(n) || 0} compromisso(s) hoje e amanhã.` });
+    sfx.done();
+    refresh();
+  };
+  const connectAgain = () => {
+    setBusy(true);
+    setMessage(null);
+    void api
+      .googleCalendarConnect("", "")
+      .then(done)
+      .catch((e) => {
+        setMessage({ ok: false, text: String(e) });
+        sfx.error();
+      })
+      .finally(() => setBusy(false));
+  };
+  const google = Boolean(cloud?.driveConnected);
+  const hasCalendar = google && settings.googleScopes.includes("auth/calendar");
+  return (
+    <div className="calendar-field">
+      <span className="field-label">Google Agenda</span>
+      {hasCalendar ? (
+        <>
+          <p className="hint ok">
+            Conectada ✓ · o Pipo lê, cria, muda e apaga eventos da sua agenda principal (sempre pedindo sua confirmação). Peça no chat
+            ou no Telegram: "marca dentista sexta às 15h", "muda a reunião para as 16h".
+          </p>
+          <label className="check">
+            <input type="checkbox" checked={settings.googleCalendar} onChange={(e) => update({ googleCalendar: e.target.checked })} />
+            Usar a Google Agenda conectada
+          </label>
+          {cal?.error && <p className="hint error">{cal.error}</p>}
+        </>
+      ) : google ? (
+        <>
+          <p className="hint">O Google do backup já está conectado. Falta dar ao Pipo a permissão da agenda:</p>
+          <ol className="steps">
+            <li>
+              <button className="link" onClick={() => void api.openUrl("https://console.cloud.google.com/apis/library/calendar-json.googleapis.com")}>
+                Ative a Google Calendar API
+              </button>{" "}
+              no seu projeto Pipo do Google Cloud (botão "Ativar").
+            </li>
+            <li>
+              Clique em <strong>Conectar a agenda</strong> e, na tela do Google, deixe marcada a permissão de ver e editar os eventos.
+            </li>
+          </ol>
+          <div className="btns">
+            <button className="primary" disabled={busy} onClick={connectAgain}>
+              {busy ? "Esperando o navegador…" : "Conectar a agenda"}
+            </button>
+          </div>
+          {busy && (
+            <p className="hint">
+              Se aparecer "o Google não verificou este app", é normal (o app é seu): clique em <strong>Avançado → Acessar Pipo</strong>.
+            </p>
+          )}
+        </>
+      ) : (
+        <DriveSetup settings={settings} onConnected={refresh} connect={(id, secret) => api.googleCalendarConnect(id, secret).then(done)} label="Conectar ao Google" />
+      )}
+      {message && <p className={`hint${message.ok ? " ok" : " error"}`}>{message.text}</p>}
+      <div className="inline-form">
+        <label>
+          Avisar
+          <input
+            className="short"
+            type="number"
+            min={0}
+            max={120}
+            value={settings.calendarRemindMinutes}
+            onChange={(e) => update({ calendarRemindMinutes: Math.max(0, Number(e.target.value) || 0) })}
+          />
+          min antes de cada compromisso
+        </label>
+        <label>
+          Hora de sair
+          <input
+            className="short"
+            type="number"
+            min={0}
+            max={240}
+            value={settings.calendarLeaveMinutes}
+            onChange={(e) => update({ calendarLeaveMinutes: Math.max(0, Number(e.target.value) || 0) })}
+          />
+          min antes (eventos com endereço; 0 desliga)
+        </label>
+      </div>
+    </div>
   );
 }

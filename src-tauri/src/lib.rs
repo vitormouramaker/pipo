@@ -267,6 +267,7 @@ pub fn run() {
             world::github::github_refresh,
             world::calendar::calendar_status,
             world::calendar::calendar_refresh,
+            world::calendar::google_calendar_connect,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

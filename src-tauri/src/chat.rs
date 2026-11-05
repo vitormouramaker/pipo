@@ -97,7 +97,8 @@ fn system_prompt(sarcasm: u8, city: &str) -> String {
         2 => "Use sarcasmo seco com frequência moderada, sempre junto de informação útil.",
         _ => "Seja bem ácido e sarcástico, sem deixar de ser útil e respeitoso.",
     };
-    let today = chrono::Local::now().format("%d/%m/%Y, %H:%M");
+    let now = chrono::Local::now();
+    let today = format!("{} {}", crate::world::gcal::weekday_pt(now.date_naive()), now.format("%d/%m/%Y, %H:%M"));
     let place = if city.trim().is_empty() {
         "A cidade do usuário não está configurada. Se a pergunta depender do local (clima, eventos, horários),          pergunte a cidade e lembre que dá para salvá-la em Configurações > Localização."
             .to_string()

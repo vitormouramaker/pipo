@@ -349,10 +349,12 @@ function Agenda() {
     <div className="block">
       <h4>Agenda</h4>
       {!cal.configured && (
-        <p className="hint">Ligue a Google Agenda em ⚙ → Integrações para ver seus compromissos aqui e ser avisado 10 minutos antes.</p>
+        <p className="hint">Conecte a Google Agenda em ⚙ → Integrações para ver seus compromissos aqui, ser avisado antes e marcar eventos pelo chat.</p>
       )}
       {cal.error && <p className="hint">{cal.error}</p>}
-      {cal.configured && !cal.error && cal.today.length === 0 && <p className="hint">Nada marcado para hoje.</p>}
+      {cal.configured && !cal.error && cal.today.length === 0 && (
+        <p className="hint">Nada marcado para hoje.{cal.google ? " Peça no chat para marcar algo (\"marca academia amanhã às 7h\")." : ""}</p>
+      )}
       {cal.today.map(row)}
       {cal.tomorrow.length > 0 && (
         <>

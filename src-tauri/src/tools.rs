@@ -115,7 +115,46 @@ pub fn definitions() -> Value {
             &["text"],
         ),
         tool("forget", "Apaga uma memória pelo número dela.", json!({ "id": { "type": "integer" } }), &["id"]),
-        tool("agenda", "Compromissos de hoje e amanhã da Google Agenda do usuário.", json!({}), &[]),
+        tool(
+            "agenda",
+            "Compromissos da agenda do usuário (padrão: hoje e amanhã; days até 30). Eventos com id são da Google Agenda conectada e podem ser mudados ou apagados com update_event e delete_event.",
+            json!({ "days": { "type": "integer", "description": "quantos dias a partir de hoje (1 a 30)" } }),
+            &[],
+        ),
+        tool(
+            "create_event",
+            "Cria um evento na Google Agenda do usuário (o usuário confirma antes). start: \"AAAA-MM-DD HH:MM\" no horário local (ou \"AAAA-MM-DD\" para o dia inteiro). Sem end nem duration_minutes, dura 1 hora. Calcule a data certa a partir de hoje (\"sexta\" = a próxima sexta).",
+            json!({
+                "title": { "type": "string" },
+                "start": { "type": "string" },
+                "end": { "type": "string" },
+                "duration_minutes": { "type": "integer" },
+                "location": { "type": "string", "description": "endereço (o Pipo avisa a hora de sair) ou link" },
+                "description": { "type": "string" }
+            }),
+            &["title", "start"],
+        ),
+        tool(
+            "update_event",
+            "Muda um evento da Google Agenda pelo id (da ferramenta agenda): nome, horário (start; mantém a duração), fim/duração ou local. Informe current_title para a confirmação. Só os campos que mudam.",
+            json!({
+                "id": { "type": "string" },
+                "current_title": { "type": "string" },
+                "title": { "type": "string" },
+                "start": { "type": "string" },
+                "end": { "type": "string" },
+                "duration_minutes": { "type": "integer" },
+                "location": { "type": "string" },
+                "description": { "type": "string" }
+            }),
+            &["id", "current_title"],
+        ),
+        tool(
+            "delete_event",
+            "Apaga um evento da Google Agenda pelo id (da ferramenta agenda). O usuário confirma antes.",
+            json!({ "id": { "type": "string" }, "title": { "type": "string" }, "when": { "type": "string", "description": "dia e hora, para a confirmação" } }),
+            &["id", "title"],
+        ),
         tool("github_status", "PRs abertos do usuário, revisões pedidas a ele e o último CI dos repositórios dos projetos recentes.", json!({}), &[]),
         tool(
             "media_control",
@@ -145,6 +184,9 @@ const CONFIRM: &[&str] = &[
     "organize_downloads",
     "reply_email",
     "save_email_draft",
+    "create_event",
+    "update_event",
+    "delete_event",
 ];
 
 pub fn needs_confirmation(name: &str) -> bool {
@@ -197,6 +239,9 @@ pub fn label(name: &str, input: &Value) -> String {
         "remember" => "Guardando na memória".into(),
         "forget" => "Apagando da memória".into(),
         "agenda" => "Olhando a agenda".into(),
+        "create_event" => format!("Criando \"{}\" na agenda", s(input, "title")),
+        "update_event" => format!("Mudando \"{}\" na agenda", s(input, "current_title")),
+        "delete_event" => format!("Apagando \"{}\" da agenda", s(input, "title")),
         "github_status" => "Olhando o GitHub".into(),
         "media_control" => match s(input, "action") {
             "status" => "Vendo o que está tocando".into(),
@@ -231,6 +276,30 @@ pub fn confirmation(name: &str, input: &Value) -> String {
             format!("Enviar esta resposta{}?\n\n{body}", if to.is_empty() { String::new() } else { format!(" para {to}") })
         }
         "save_email_draft" => "Salvar esta resposta nos rascunhos do Gmail?".into(),
+        "create_event" => crate::world::gcal::preview_create(&serde_json::from_value(input.clone()).unwrap_or_default()),
+        "update_event" => {
+            let mut changes = Vec::new();
+            if let Some(t) = input["title"].as_str() {
+                changes.push(format!("nome: {t}"));
+            }
+            if let Some(t) = input["start"].as_str() {
+                changes.push(format!("início: {}", t.replace('T', " ")));
+            }
+            if let Some(t) = input["end"].as_str() {
+                changes.push(format!("fim: {}", t.replace('T', " ")));
+            }
+            if let Some(m) = input["duration_minutes"].as_i64() {
+                changes.push(format!("duração: {m} min"));
+            }
+            if let Some(t) = input["location"].as_str() {
+                changes.push(format!("local: {t}"));
+            }
+            format!("Mudar \"{}\" na Google Agenda?\n\n{}", s(input, "current_title"), changes.join("\n"))
+        }
+        "delete_event" => {
+            let when = input["when"].as_str().map(|w| format!(" ({w})")).unwrap_or_default();
+            format!("Apagar \"{}\"{when} da Google Agenda?", s(input, "title"))
+        }
         other => format!("Executar {other}?"),
     }
 }
@@ -417,12 +486,24 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
         "remember" => crate::proactive::remember(app, input["text"].as_str().unwrap_or("")),
         "forget" => crate::proactive::forget(app, input["id"].as_i64().unwrap_or(0)),
         "agenda" => {
+            let days = input["days"].as_i64().unwrap_or(2).clamp(1, 30);
+            if days > 2 && crate::world::gcal::enabled(app) {
+                let from = crate::world::calendar::today_start();
+                let list = crate::world::gcal::list(app, from, from + chrono::Duration::days(days))?;
+                return to_json(json!({ "google": true, "from_today_days": days, "events": list }));
+            }
             let status = crate::world::calendar::status(app);
             if !status_configured(&status) {
-                return Ok("A agenda ainda não foi ligada. Peça ao usuário para colar o endereço secreto iCal da Google Agenda em Configurações > Integrações.".into());
+                return Ok("A agenda ainda não foi ligada. Peça ao usuário para conectar a Google Agenda em Configurações > Integrações.".into());
             }
             to_json(status)
         }
+        "create_event" | "update_event" | "delete_event" if !crate::world::gcal::enabled(app) => Err(
+            "A Google Agenda não está conectada para edição. Peça ao usuário para clicar em \"Conectar a agenda\" em Configurações > Integrações > Google Agenda.".into(),
+        ),
+        "create_event" => crate::world::gcal::create(app, &parse(input)?),
+        "update_event" => crate::world::gcal::update(app, s(input, "id"), &parse(input)?),
+        "delete_event" => crate::world::gcal::delete(app, s(input, "id")),
         "github_status" => to_json(crate::world::github::status()),
         "media_control" => {
             let action = s(input, "action");

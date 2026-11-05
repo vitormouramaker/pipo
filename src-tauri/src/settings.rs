@@ -129,6 +129,14 @@ pub struct Settings {
     /// ID do cliente OAuth do Google Cloud (a chave secreta fica no Gerenciador de Credenciais).
     pub gdrive_client_id: String,
     pub gdrive_folder_id: String,
+    /// Fase 9.0: permissões que o login do Google deu (ex.: drive.file e calendar.events).
+    pub google_scopes: String,
+    /// Usar a Google Agenda conectada pela API (ler, criar e mudar eventos).
+    pub google_calendar: bool,
+    /// Avisar X minutos antes de cada compromisso (0 desliga).
+    pub calendar_remind_minutes: i64,
+    /// Avisar a hora de sair X minutos antes quando o evento tem endereço (0 desliga).
+    pub calendar_leave_minutes: i64,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -213,6 +221,10 @@ impl Default for Settings {
             cloud_mode: "gdrive".into(),
             gdrive_client_id: String::new(),
             gdrive_folder_id: String::new(),
+            google_scopes: String::new(),
+            google_calendar: true,
+            calendar_remind_minutes: 10,
+            calendar_leave_minutes: 40,
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,
