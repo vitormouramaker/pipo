@@ -169,6 +169,26 @@ pub fn definitions() -> Value {
             &[],
         ),
         tool("stop_pomodoro", "Encerra o pomodoro.", json!({}), &[]),
+        tool("habits", "Hábitos e metas do usuário: progresso de hoje, sequência de dias e melhor sequência.", json!({}), &[]),
+        tool(
+            "log_habit",
+            "Marca progresso num hábito hoje (\"bebi 2 copos de água\" = amount 2; \"fui à academia\" = amount 1). amount negativo desfaz. Use o nome ou o id do hábito.",
+            json!({ "name": { "type": "string" }, "id": { "type": "integer" }, "amount": { "type": "integer" } }),
+            &[],
+        ),
+        tool(
+            "create_habit",
+            "Cria um hábito ou meta diária. target: meta por dia (1 = feito ou não; 8 = 8 copos); unit: unidade da meta; days: dias em que vale (seg, ter, qua, qui, sex, sáb, dom; vazio = todo dia); remind_at: lembrete HH:MM.",
+            json!({
+                "name": { "type": "string" },
+                "target": { "type": "integer" },
+                "unit": { "type": "string" },
+                "days": { "type": "array", "items": { "type": "string", "enum": ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"] } },
+                "remind_at": { "type": "string" }
+            }),
+            &["name"],
+        ),
+        tool("delete_habit", "Apaga um hábito pelo id (o usuário confirma antes).", json!({ "id": { "type": "integer" }, "name": { "type": "string" } }), &["id", "name"]),
     ])
 }
 
@@ -187,6 +207,7 @@ const CONFIRM: &[&str] = &[
     "create_event",
     "update_event",
     "delete_event",
+    "delete_habit",
 ];
 
 pub fn needs_confirmation(name: &str) -> bool {
@@ -250,6 +271,10 @@ pub fn label(name: &str, input: &Value) -> String {
             _ => "Tocar/pausar".into(),
         },
         "start_pomodoro" => "Começando pomodoro".into(),
+        "habits" => "Olhando seus hábitos".into(),
+        "log_habit" => format!("Marcando {}", input["name"].as_str().unwrap_or("o hábito")),
+        "create_habit" => format!("Criando o hábito {}", s(input, "name")),
+        "delete_habit" => format!("Apagando o hábito {}", s(input, "name")),
         "stop_pomodoro" => "Encerrando pomodoro".into(),
         other => other.to_string(),
     }
@@ -276,6 +301,7 @@ pub fn confirmation(name: &str, input: &Value) -> String {
             format!("Enviar esta resposta{}?\n\n{body}", if to.is_empty() { String::new() } else { format!(" para {to}") })
         }
         "save_email_draft" => "Salvar esta resposta nos rascunhos do Gmail?".into(),
+        "delete_habit" => format!("Apagar o hábito \"{}\"? O histórico fica guardado, mas some da lista.", s(input, "name")),
         "create_event" => crate::world::gcal::preview_create(&serde_json::from_value(input.clone()).unwrap_or_default()),
         "update_event" => {
             let mut changes = Vec::new();
@@ -526,6 +552,40 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
             focus::stop_pomodoro(app);
             Ok("Pomodoro encerrado.".into())
         }
+        "habits" => {
+            let list = crate::habits::list(app);
+            if list.is_empty() {
+                return Ok("Nenhum hábito criado ainda. Dá para criar com create_habit ou na aba Hoje.".into());
+            }
+            Ok(list.iter().map(crate::habits::line).collect::<Vec<_>>().join("\n"))
+        }
+        "log_habit" => {
+            let found = match input["id"].as_i64() {
+                Some(id) => crate::habits::list(app).into_iter().find(|h| h.id() == id),
+                None => crate::habits::find(app, input["name"].as_str().unwrap_or("")),
+            };
+            let Some(h) = found else {
+                return Err("Não achei esse hábito. Veja a lista com a ferramenta habits (ou crie com create_habit).".into());
+            };
+            let after = crate::habits::log(app, h.id(),input["amount"].as_i64().unwrap_or(1))?;
+            Ok(format!("Marcado. {}", crate::habits::line(&after)))
+        }
+        "create_habit" => {
+            let days: Vec<u8> = input["days"]
+                .as_array()
+                .map(|list| list.iter().filter_map(|d| d.as_str()).filter_map(|d| crate::habits::WEEKDAYS.iter().position(|w| crate::documents::fold(w) == crate::documents::fold(d.trim())).map(|i| i as u8)).collect())
+                .unwrap_or_default();
+            let habit = crate::habits::Habit {
+                id: 0,
+                name: s(input, "name").to_string(),
+                target: input["target"].as_i64().unwrap_or(1),
+                unit: input["unit"].as_str().unwrap_or("").to_string(),
+                days,
+                remind_at: input["remind_at"].as_str().unwrap_or("").to_string(),
+            };
+            crate::habits::save(app, habit).map(|id| format!("Hábito criado (id {id}). Aparece na aba Hoje; cumprir a meta dá XP ao Pipo."))
+        }
+        "delete_habit" => crate::habits::delete(app, input["id"].as_i64().unwrap_or(0)).map(|_| "Hábito apagado.".into()),
         other => Err(format!("Ferramenta desconhecida: {other}")),
     }
 }

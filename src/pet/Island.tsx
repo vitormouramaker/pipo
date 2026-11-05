@@ -109,9 +109,14 @@ export default function Island({
     return () => window.clearTimeout(timer);
   }, [glow]);
 
-  // Expandida: mostra o pomodoro (se houver) ou a hora.
+  // Expandida: mostra o pomodoro (se houver) ou a hora, com os hábitos do dia (ex.: "14:30 · 2/4 ✓").
+  const [habits, setHabits] = useState("");
   useEffect(() => {
     if (!hover) return;
+    void api.habitsList().then((list) => {
+      const today = list.filter((h) => h.scheduled);
+      setHabits(today.length ? ` · ${today.filter((h) => h.done).length}/${today.length} ✓` : "");
+    });
     const update = () =>
       void api.focusStatus().then((s: FocusStatus) => {
         const p = s.pomodoro;
@@ -171,7 +176,12 @@ export default function Island({
             </>
           )}
         </span>
-        {hover && !vertical && <span className="island-info">{info}</span>}
+        {hover && !vertical && (
+          <span className="island-info">
+            {info}
+            {habits && <span className="island-habits">{habits}</span>}
+          </span>
+        )}
         {hover && (
           <button className="island-exit" aria-label="Voltar ao Pipo">
             {ICONS.expand}

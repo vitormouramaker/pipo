@@ -413,3 +413,6 @@ body,
 @media (prefers-reduced-motion: reduce) {
   .island-beat.beat { animation: none; }
 }
+
+/* Hábitos do dia na ilha expandida */
+.island-habits { opacity: 0.7; }

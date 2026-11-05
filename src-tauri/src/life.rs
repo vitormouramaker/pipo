@@ -18,6 +18,8 @@ fn reward(kind: &str) -> (i64, Option<i64>) {
         "voice" => (8, Some(80)),
         "briefing" => (10, Some(10)),
         "checkin" => (15, Some(15)),
+        "habit" => (15, Some(90)),
+        "habit-streak" => (40, None),
         _ => (0, Some(0)),
     }
 }
@@ -70,6 +72,8 @@ const ACHIEVEMENTS: &[Achievement] = &[
     Achievement { id: "streak-7", title: "Rotina", detail: "7 dias seguidos com o Pipo." },
     Achievement { id: "days-30", title: "Veterano", detail: "30 dias de uso." },
     Achievement { id: "level-10", title: "Release estável", detail: "Chegou ao nível 10." },
+    Achievement { id: "habit-7", title: "Constância", detail: "7 dias seguidos num hábito." },
+    Achievement { id: "habit-30", title: "Hábito formado", detail: "30 dias seguidos num hábito." },
 ];
 
 fn stage_of(level: i64) -> (usize, &'static str) {
@@ -130,6 +134,8 @@ fn progress(conn: &rusqlite::Connection, id: &str) -> (i64, i64) {
         "streak-7" => (streak(conn), 7),
         "days-30" => (days(), 30),
         "level-10" => (level_of(total_xp(conn)).0, 10),
+        "habit-7" => (crate::habits::best_streak(conn), 7),
+        "habit-30" => (crate::habits::best_streak(conn), 30),
         _ => (0, 1),
     };
     (done.min(goal), goal)

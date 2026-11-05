@@ -4,6 +4,7 @@ import { ICONS } from "../ui/icons";
 import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus, type WeeklyReport, type FullMail, type LolHistory, type LolIcon, type LolBuild } from "../api";
 import { sqliteDate } from "../format";
 import { sfx } from "../ui/sound";
+import Habits from "./Habits";
 
 type Props = { onAsk: (prompt: string) => void };
 
@@ -861,6 +862,7 @@ export default function Today({ onAsk }: Props) {
     <section className="actions">
       <div className="actions-body">
         <Agenda />
+        <Habits />
         <Music />
         <MyDay onAsk={onAsk} />
         <League onAsk={onAsk} />

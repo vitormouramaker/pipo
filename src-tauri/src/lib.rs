@@ -11,6 +11,7 @@ mod db;
 mod documents;
 mod files_index;
 mod gdrive;
+mod habits;
 mod install;
 mod island;
 mod life;
@@ -210,6 +211,7 @@ pub fn run() {
             world::lives::start(app.handle().clone());
             world::github::start(app.handle().clone());
             world::calendar::start(app.handle().clone());
+            habits::start(app.handle().clone());
             world::lol::start(app.handle().clone());
             world::email::start(app.handle().clone());
             world::telegram::start(app.handle().clone());
@@ -268,6 +270,10 @@ pub fn run() {
             world::calendar::calendar_status,
             world::calendar::calendar_refresh,
             world::calendar::google_calendar_connect,
+            habits::habits_list,
+            habits::habit_save,
+            habits::habit_delete,
+            habits::habit_log,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

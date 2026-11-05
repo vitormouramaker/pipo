@@ -113,7 +113,27 @@ export type VoiceStatus = {
   listening: boolean;
   hasMicrophone: boolean;
 };
-export type Toast = { id: number; kind: string; title: string; body: string; url: string | null; view: string | null; prompt: string | null; mini: string | null };
+export type Toast = {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  url: string | null;
+  view: string | null;
+  prompt: string | null;
+  mini: string | null;
+  /** Lembrete de hábito: o balão mostra o botão "Feito". */
+  habit: number | null;
+};
+export type Habit = { id: number; name: string; target: number; unit: string; days: number[]; remindAt: string };
+export type HabitView = Habit & {
+  today: number;
+  done: boolean;
+  scheduled: boolean;
+  streak: number;
+  best: number;
+  week: ("done" | "miss" | "off" | "todo")[];
+};
 export type DaySummary = {
   day: string;
   activeSecs: number;
@@ -508,6 +528,10 @@ export const api = {
   daySummary: () => invoke<DaySummary>("day_summary"),
   calendarStatus: () => invoke<CalendarStatus>("calendar_status"),
   calendarRefresh: () => invoke<number>("calendar_refresh"),
+  habitsList: () => invoke<HabitView[]>("habits_list"),
+  habitSave: (habit: Habit) => invoke<number>("habit_save", { habit }),
+  habitDelete: (id: number) => invoke<void>("habit_delete", { id }),
+  habitLog: (id: number, delta: number) => invoke<HabitView>("habit_log", { id, delta }),
   googleCalendarConnect: (clientId: string, clientSecret: string) => invoke<number>("google_calendar_connect", { clientId, clientSecret }),
   githubStatus: () => invoke<GithubStatus>("github_status"),
   githubRefresh: () => invoke<GithubStatus>("github_refresh"),

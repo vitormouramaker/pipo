@@ -60,6 +60,19 @@ function Bubble({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       <div className="text">
         <strong>{toast.title}</strong>
         {toast.body && <span>{toast.body}</span>}
+        {toast.habit != null && (
+          <button
+            className="bubble-action"
+            onClick={(e) => {
+              e.stopPropagation();
+              sfx.done();
+              void api.habitLog(toast.habit!, 1);
+              onClose();
+            }}
+          >
+            Feito ✓
+          </button>
+        )}
       </div>
       <button
         className="close"

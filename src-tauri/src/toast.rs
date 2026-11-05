@@ -29,6 +29,8 @@ pub struct Toast {
     prompt: Option<String>,
     /// …ou abre esta live no mini-player.
     mini: Option<String>,
+    /// Lembrete de hábito: o balão ganha o botão "Feito".
+    habit: Option<i64>,
 }
 
 /// De onde vem o aviso (decide o que os modos deixam passar e o que vai para o celular).
@@ -45,7 +47,7 @@ fn source_of(kind: &str) -> &'static str {
 }
 
 /// Mostra um aviso. `action`: link http(s), aba do painel ("view:today"), pergunta para o
-/// chat ("prompt:…") ou live para o mini-player ("mini:twitch:canal").
+/// chat ("prompt:…"), live para o mini-player ("mini:twitch:canal") ou hábito ("habit:3").
 pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str, action: Option<&str>) {
     notify_from(app, source_of(kind), kind, title, body, action);
 }
@@ -56,7 +58,9 @@ pub fn notify_from(app: &AppHandle, source: &str, kind: &str, title: &str, body:
         return;
     }
     crate::world::telegram::mirror(app, source, title, body);
+    let habit = action.and_then(|a| a.strip_prefix("habit:")).and_then(|id| id.parse::<i64>().ok());
     let (url, view, prompt, mini) = match action {
+        Some(a) if a.starts_with("habit:") => (None, Some("today".to_string()), None, None),
         Some(a) if a.starts_with("view:") => (None, Some(a[5..].to_string()), None, None),
         Some(a) if a.starts_with("prompt:") => (None, None, Some(a[7..].to_string()), None),
         Some(a) if a.starts_with("mini:") => (None, None, None, Some(a[5..].to_string())),
@@ -72,6 +76,7 @@ pub fn notify_from(app: &AppHandle, source: &str, kind: &str, title: &str, body:
         view,
         prompt,
         mini,
+        habit,
     };
     app.state::<AppState>().toasts.lock().unwrap().push(toast);
     if app.get_webview_window(TOAST).is_some() {

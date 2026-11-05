@@ -267,7 +267,7 @@ fn search_roots() -> Vec<PathBuf> {
 
 const SKIP_DIRS: &[&str] = &["node_modules", ".git", "target", "dist", "build", "Library", ".venv", "venv", "__pycache__", ".next", "obj", "bin"];
 
-fn fold(s: &str) -> String {
+pub fn fold(s: &str) -> String {
     s.to_lowercase()
         .chars()
         .map(|c| match c {

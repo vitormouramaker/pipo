@@ -83,3 +83,19 @@
 @media (prefers-reduced-motion: reduce) {
   .bubble { animation: none; }
 }
+
+/* Botão "Feito" dos lembretes de hábito. */
+.bubble .bubble-action {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--tone);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tone);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bubble .bubble-action:hover { background: rgba(45, 212, 232, 0.12); }

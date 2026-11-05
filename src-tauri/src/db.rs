@@ -96,6 +96,22 @@ impl Db {
              CREATE TABLE IF NOT EXISTS achievements (
                  id          TEXT PRIMARY KEY,
                  unlocked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
+             CREATE TABLE IF NOT EXISTS habits (
+                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                 name       TEXT NOT NULL,
+                 target     INTEGER NOT NULL DEFAULT 1,
+                 unit       TEXT NOT NULL DEFAULT '',
+                 days       TEXT NOT NULL DEFAULT '',
+                 remind_at  TEXT NOT NULL DEFAULT '',
+                 archived   INTEGER NOT NULL DEFAULT 0,
+                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+             );
+             CREATE TABLE IF NOT EXISTS habit_log (
+                 habit_id INTEGER NOT NULL,
+                 day      TEXT NOT NULL,
+                 amount   INTEGER NOT NULL DEFAULT 0,
+                 PRIMARY KEY (habit_id, day)
              );",
         )?;
         // Colunas acrescentadas depois da primeira versão (o erro de coluna repetida é esperado).
