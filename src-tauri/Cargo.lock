@@ -3527,7 +3527,7 @@ dependencies = [
 
 [[package]]
 name = "pipo"
-version = "0.8.7"
+version = "0.8.8"
 dependencies = [
  "arboard",
  "base64 0.23.1",
