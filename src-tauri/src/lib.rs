@@ -280,6 +280,7 @@ pub fn run() {
             miniplayer::mini_close,
             modes::mode_status,
             world::lol::lol_status,
+            world::lol::lol_history,
             world::telegram::telegram_status,
             world::telegram::telegram_connect,
             world::telegram::telegram_link,

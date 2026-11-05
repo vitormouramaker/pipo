@@ -57,27 +57,43 @@ pub fn run(program: &str, args: &[&str], dir: Option<&Path>) -> Result<String, S
 
 /// Abre um arquivo, pasta, programa ou link com o app padrão do Windows,
 /// sem passar por um shell (nada no texto é interpretado como comando).
+///
+/// Roda numa thread própria com o COM inicializado: o Windows exige isso para alguns tipos
+/// de arquivo (ex.: PDF aberto pelo Acrobat), senão a abertura falha sem motivo aparente.
+/// Se mesmo assim falhar, tenta pelo Explorador de Arquivos, que usa o mesmo app padrão.
 #[cfg(windows)]
 pub fn shell_open(target: &str) -> Result<(), String> {
+    use windows_sys::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
     use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
-    let (verb, file) = (wide("open"), wide(target));
-    let result = unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            verb.as_ptr(),
-            file.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            SW_SHOWNORMAL,
-        )
-    };
-    if result as isize > 32 {
-        Ok(())
-    } else {
-        Err(format!("Não consegui abrir {target}."))
+    let owned = target.to_string();
+    let code = std::thread::spawn(move || {
+        let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+        let (verb, file) = (wide("open"), wide(&owned));
+        unsafe {
+            let com = CoInitializeEx(std::ptr::null(), (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32);
+            let result = ShellExecuteW(std::ptr::null_mut(), verb.as_ptr(), file.as_ptr(), std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL);
+            if com >= 0 {
+                CoUninitialize();
+            }
+            result as isize
+        }
+    })
+    .join()
+    .unwrap_or(0);
+    if code > 32 {
+        return Ok(());
     }
+    // Plano B para arquivos e pastas que existem: o Explorador abre com o app padrão.
+    if std::path::Path::new(target).exists() && command("explorer.exe").arg(target).spawn().is_ok() {
+        return Ok(());
+    }
+    Err(match code {
+        2 | 3 => format!("Não encontrei {target}."),
+        5 => format!("O Windows negou acesso a {target}."),
+        31 => format!("Nenhum programa está configurado para abrir {target}."),
+        _ => format!("O Windows não conseguiu abrir {target} (código {code})."),
+    })
 }
 
 #[cfg(not(windows))]

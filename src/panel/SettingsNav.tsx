@@ -18,9 +18,18 @@ export default function SettingsNav({ root }: { root: RefObject<HTMLElement | nu
   const [empty, setEmpty] = useState(false);
   const nav = useRef<HTMLElement>(null);
 
-  // A seção atual sempre visível no índice (ele rola de lado quando não cabe).
+  // Enquanto rola até a seção clicada, a seção marcada não muda a cada passo.
+  const jumping = useRef(0);
+
+  // A seção atual sempre visível no índice: rola só o índice, de lado (scrollIntoView
+  // aqui interromperia a rolagem suave da página e ela pararia na seção seguinte).
   useEffect(() => {
-    nav.current?.querySelector<HTMLElement>("button.on")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const bar = nav.current;
+    const chip = bar?.querySelector<HTMLElement>("button.on");
+    if (!bar || !chip) return;
+    const left = chip.offsetLeft - bar.offsetLeft;
+    if (left < bar.scrollLeft) bar.scrollTo({ left: left - 8, behavior: "smooth" });
+    else if (left + chip.offsetWidth > bar.scrollLeft + bar.clientWidth) bar.scrollTo({ left: left + chip.offsetWidth - bar.clientWidth + 8, behavior: "smooth" });
   }, [active]);
 
   // Lê as seções (e relê quando alguma aparece depois, ex.: as que carregam dados).
@@ -60,6 +69,7 @@ export default function SettingsNav({ root }: { root: RefObject<HTMLElement | nu
     const node = root.current;
     if (!node) return;
     const onScroll = () => {
+      if (Date.now() < jumping.current) return;
       const top = node.getBoundingClientRect().top + 110;
       let current: string | null = null;
       for (const s of sections) {
@@ -75,7 +85,14 @@ export default function SettingsNav({ root }: { root: RefObject<HTMLElement | nu
   }, [root, sections, query]);
 
   const go = (s: Section) => {
-    s.el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const node = root.current;
+    if (!node) return;
+    // Rola o próprio painel de configurações até a seção, descontando o topo fixo.
+    const header = node.querySelector<HTMLElement>(".settings-top")?.offsetHeight ?? 0;
+    const target = s.el.getBoundingClientRect().top - node.getBoundingClientRect().top + node.scrollTop - header - 8;
+    setActive(s.id);
+    jumping.current = Date.now() + 900;
+    node.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
     s.el.classList.remove("flash");
     void s.el.offsetWidth;
     s.el.classList.add("flash");

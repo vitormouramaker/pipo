@@ -102,6 +102,10 @@ impl Db {
         let _ = conn.execute("ALTER TABLE usage ADD COLUMN web_searches INTEGER NOT NULL DEFAULT 0", []);
         // Lembretes que se repetem: none, daily, weekdays, weekly, monthly.
         let _ = conn.execute("ALTER TABLE reminders ADD COLUMN repeat TEXT NOT NULL DEFAULT 'none'", []);
+        // Fase 8.4: partidas do LoL com id e horário (histórico importado do cliente sem repetir).
+        let _ = conn.execute("ALTER TABLE lol_games ADD COLUMN game_id INTEGER", []);
+        let _ = conn.execute("ALTER TABLE lol_games ADD COLUMN played_at INTEGER", []);
+        let _ = conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS lol_games_game ON lol_games (game_id)", []);
         Ok(Self { conn })
     }
 

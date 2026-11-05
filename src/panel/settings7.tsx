@@ -439,7 +439,23 @@ export function LolSettings({ settings, update }: { settings: Settings; update: 
         <input type="checkbox" checked={settings.lolTips} disabled={!settings.lolEnabled} onChange={(e) => update({ lolTips: e.target.checked })} />
         Dica da Claude ao travar o campeão (uma por partida, aparece em Gastos)
       </label>
-      <p className="hint">Usa só as APIs locais que o próprio LoL abre no seu PC; não mexe no jogo nem na sua conta.</p>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={settings.lolWebBuild}
+          disabled={!settings.lolEnabled || !settings.lolTips}
+          onChange={(e) => update({ lolWebBuild: e.target.checked })}
+        />
+        Dica com a build e as runas do patch atual (pesquisa na web, cerca de US$ 0,02 por partida)
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={settings.lolTiltAlert} disabled={!settings.lolEnabled} onChange={(e) => update({ lolTiltAlert: e.target.checked })} />
+        Avisar depois de 3 derrotas seguidas (alerta de tilt)
+      </label>
+      <p className="hint">
+        Usa só as APIs locais que o próprio LoL abre no seu PC; não mexe no jogo nem na sua conta. As últimas partidas são
+        importadas do cliente para o histórico da aba Hoje.
+      </p>
     </div>
   );
 }

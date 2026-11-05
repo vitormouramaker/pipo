@@ -764,3 +764,15 @@
 .mail-reply { display: grid; gap: 8px; }
 .panel .mail-draft { width: 100%; box-sizing: border-box; resize: vertical; min-height: 120px; font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink); }
 .panel .mail-draft:focus { outline: none; border-color: var(--accent); }
+
+/* LoL: resumo e histórico */
+.lol-summary { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); }
+.lol-summary strong { color: var(--ink); }
+.lol-games { display: grid; gap: 3px; }
+.lol-game { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 8px; background: var(--bg); border-left: 3px solid transparent; font-size: 12.5px; }
+.lol-game.win { border-left-color: #34d399; }
+.lol-game.loss { border-left-color: #f87171; }
+.lol-result { width: 14px; font-weight: 700; }
+.lol-game.win .lol-result { color: #34d399; }
+.lol-game.loss .lol-result { color: #f87171; }
+.lol-kda { font-variant-numeric: tabular-nums; }

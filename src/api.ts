@@ -46,6 +46,8 @@ export type Settings = {
   snippets: Snippet[];
   lolEnabled: boolean;
   lolTips: boolean;
+  lolWebBuild: boolean;
+  lolTiltAlert: boolean;
   telegramEnabled: boolean;
   telegramBot: string;
   telegramChatId: string;
@@ -147,6 +149,18 @@ export type LolStatus = {
   tip: string | null;
   lastGame: string | null;
 };
+export type LolGame = {
+  day: string;
+  champion: string;
+  position: string;
+  won: boolean;
+  kills: number;
+  deaths: number;
+  assists: number;
+  csMin: number;
+  minutes: number;
+};
+export type LolHistory = { games: LolGame[]; wins: number; top: [string, number][]; kda: number; csMin: number };
 export type TelegramStatus = {
   hasToken: boolean;
   linked: boolean;
@@ -403,6 +417,7 @@ export const api = {
   miniClose: () => invoke<void>("mini_close"),
   modeStatus: () => invoke<ModeStatus>("mode_status"),
   lolStatus: () => invoke<LolStatus>("lol_status"),
+  lolHistory: () => invoke<LolHistory>("lol_history"),
   telegramStatus: () => invoke<TelegramStatus>("telegram_status"),
   telegramConnect: (token: string) => invoke<string>("telegram_connect", { token }),
   telegramLink: () => invoke<string>("telegram_link"),

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { ICONS } from "../ui/icons";
-import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus, type WeeklyReport, type FullMail } from "../api";
+import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus, type WeeklyReport, type FullMail, type LolHistory } from "../api";
 import { sqliteDate } from "../format";
 import { sfx } from "../ui/sound";
 
@@ -699,27 +699,83 @@ const PHASE: Record<string, string> = {
 
 function League({ onAsk }: Props) {
   const [lol, setLol] = useState<LolStatus | null>(null);
+  const [history, setHistory] = useState<LolHistory | null>(null);
+  const [all, setAll] = useState(false);
   useEffect(() => {
-    const refresh = () => void api.lolStatus().then(setLol);
+    const refresh = () => {
+      void api.lolStatus().then(setLol);
+      void api.lolHistory().then(setHistory);
+    };
     refresh();
     const unlisten = listen("lol-changed", refresh);
     return () => void unlisten.then((fn) => fn());
   }, []);
-  if (!lol?.running && !lol?.lastGame) return null;
+  const games = history?.games ?? [];
+  if (!lol?.running && !lol?.lastGame && games.length === 0) return null;
+  const analyze = () =>
+    onAsk(
+      "Analise minha evolução no League of Legends com estas últimas partidas (mais recente primeiro) e me dê: o que estou fazendo bem, " +
+        "os 3 pontos que mais pesam nas derrotas e um foco prático para as próximas partidas.\n\n" +
+        games
+          .map((g) => `${g.day} · ${g.champion}${g.position ? ` (${g.position})` : ""} · ${g.won ? "vitória" : "derrota"} · ${g.kills}/${g.deaths}/${g.assists} · ${g.csMin.toFixed(1)} CS/min · ${Math.round(g.minutes)} min`)
+          .join("\n"),
+    );
   return (
     <div className="block">
       <div className="block-head">
-        <h4>League of Legends {lol.running ? `· ${PHASE[lol.phase] ?? lol.phase}` : ""}</h4>
+        <h4>League of Legends {lol?.running ? `· ${PHASE[lol.phase] ?? lol.phase}` : ""}</h4>
       </div>
-      {lol.champion && (
+      {lol?.champion && (
         <p className="hint">
           <strong>{lol.champion}</strong>
           {lol.position ? ` · ${lol.position}` : ""}
         </p>
       )}
-      {lol.tip && <p className="lol-tip">{lol.tip}</p>}
-      {lol.lastGame && <p className="hint">Última partida: {lol.lastGame}</p>}
-      {lol.champion && (
+      {lol?.tip && <p className="lol-tip">{lol.tip}</p>}
+      {lol?.lastGame && games.length === 0 && <p className="hint">Última partida: {lol.lastGame}</p>}
+      {games.length > 0 && history && (
+        <>
+          <div className="lol-summary">
+            <span>
+              <strong>{Math.round((100 * history.wins) / games.length)}%</strong> vitórias ({history.wins}/{games.length})
+            </span>
+            <span>
+              KDA <strong>{history.kda.toFixed(1)}</strong>
+            </span>
+            <span>
+              <strong>{history.csMin.toFixed(1)}</strong> CS/min
+            </span>
+            {history.top[0] && (
+              <span>
+                Mais jogado: <strong>{history.top[0][0]}</strong>
+              </span>
+            )}
+          </div>
+          <div className="lol-games">
+            {(all ? games : games.slice(0, 5)).map((g, i) => (
+              <div key={i} className={`lol-game ${g.won ? "win" : "loss"}`}>
+                <span className="lol-result">{g.won ? "V" : "D"}</span>
+                <span className="grow">
+                  <strong>{g.champion}</strong>
+                  {g.position && <span className="row-meta"> · {g.position}</span>}
+                </span>
+                <span className="lol-kda">
+                  {g.kills}/{g.deaths}/{g.assists}
+                </span>
+                <span className="row-meta">{g.csMin.toFixed(1)} CS/min</span>
+                <span className="row-meta">{g.day.slice(8, 10)}/{g.day.slice(5, 7)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="btns">
+            {games.length > 5 && <button onClick={() => setAll(!all)}>{all ? "Mostrar menos" : `Ver as ${games.length}`}</button>}
+            <button className="primary" onClick={analyze}>
+              Analisar minha evolução
+            </button>
+          </div>
+        </>
+      )}
+      {lol?.champion && (
         <div className="btns">
           <button onClick={() => onAsk(`Me explica melhor como jogar de ${lol.champion}${lol.position ? ` no ${lol.position}` : ""}: runas, build e plano de jogo.`)}>
             Mais dicas de {lol.champion}

@@ -82,6 +82,9 @@ pub struct Settings {
     /// Fase 7.6: League of Legends (dica na seleção de campeões usa a Claude).
     pub lol_enabled: bool,
     pub lol_tips: bool,
+    /// Fase 8.4: a dica pesquisa a build do patch atual na web; aviso de tilt.
+    pub lol_web_build: bool,
+    pub lol_tilt_alert: bool,
     /// Fase 7.7: avisos no Telegram (o token do bot fica no Gerenciador de Credenciais).
     pub telegram_enabled: bool,
     pub telegram_bot: String,
@@ -155,6 +158,8 @@ impl Default for Settings {
             snippets: Vec::new(),
             lol_enabled: true,
             lol_tips: true,
+            lol_web_build: true,
+            lol_tilt_alert: true,
             telegram_enabled: false,
             telegram_bot: String::new(),
             telegram_chat_id: String::new(),
