@@ -2,7 +2,7 @@ import SettingsNav from "./SettingsNav";
 import { EmailSettings, LolSettings, ModesSettings, ReportSettings, TelegramSettings } from "./settings7";
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
+import { type OldCopy, api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
 import { loadVoices, speak } from "./speech";
 
 const VOICE_MODELS = [
@@ -130,7 +130,51 @@ function UpdateSettings() {
         </div>
       )}
       {(error ?? status.error) && <p className="hint">{error ?? status.error}</p>}
+      <OldCopies />
     </fieldset>
+  );
+}
+
+/** Cópias antigas do Pipo que podem abrir no lugar desta (e desfazer configurações). */
+function OldCopies() {
+  const [copies, setCopies] = useState<OldCopy[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  useEffect(() => {
+    void api.oldCopies().then(setCopies);
+  }, []);
+  if (copies.length === 0 && !message) return null;
+  return (
+    <div className="subsection">
+      <span className="field-label">Cópias antigas do Pipo</span>
+      {copies.map((c) => (
+        <div key={c.path} className="trow">
+          <span className="grow" title={c.path}>
+            v{c.version} em {c.path.replace(/\pipo\.exe$/i, "")}
+          </span>
+          <button
+            className="danger"
+            onClick={() =>
+              void api
+                .oldCopyRemove(c.path)
+                .then(() => {
+                  setCopies((all) => all.filter((x) => x.path !== c.path));
+                  setMessage("Cópia antiga mandada para a Lixeira. A partir de agora só esta abre com o Windows.");
+                })
+                .catch((e) => setMessage(String(e)))
+            }
+          >
+            Mandar para a Lixeira
+          </button>
+        </div>
+      ))}
+      {copies.length > 0 && (
+        <p className="hint">
+          Uma versão antiga pode abrir com o Windows no lugar desta, voltar bugs antigos e desfazer configurações. Esta cópia já
+          corrigiu o "iniciar com o Windows" e os atalhos; tirar a antiga evita que aconteça de novo.
+        </p>
+      )}
+      {message && <p className="hint ok">{message}</p>}
+    </div>
   );
 }
 

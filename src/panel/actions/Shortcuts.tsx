@@ -440,15 +440,17 @@ function FileSearch() {
           {hits.map((h) => (
             <div key={h.path} className="file-hit">
               <div className="file-hit-head">
-                <strong title={h.path}>{h.name}</strong>
+                <button className="link file-hit-name" title={`Abrir ${h.path}`} onClick={() => void api.openPath(h.path)}>
+                  {h.name}
+                </button>
                 <span className="row-meta">{h.modified}</span>
               </div>
               {h.snippet && <Snippet text={h.snippet} />}
               <div className="file-hit-actions">
-                <span className="row-meta" title={h.folder}>
-                  {h.folder}
-                </span>
-                <button className="link" onClick={() => void api.recentOpen(h.path)}>
+                <button className="link muted file-hit-folder" title="Mostrar na pasta" onClick={() => void api.revealPath(h.path)}>
+                  📁 {h.folder}
+                </button>
+                <button className="link" onClick={() => void api.openPath(h.path)}>
                   Abrir
                 </button>
                 <button className="link" onClick={() => void api.chatAttach([h.path], true)}>

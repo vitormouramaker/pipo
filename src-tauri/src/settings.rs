@@ -175,10 +175,26 @@ impl Default for Settings {
     }
 }
 
+/// Cópia completa das configurações, gravada a cada salvamento. Uma versão antiga do Pipo
+/// que abra por engano só conhece parte dos campos e, ao salvar, apaga os outros (Telegram,
+/// Gmail, modos…): na próxima abertura de uma versão nova, eles voltam desta cópia.
+const KEY_GOOD: &str = "settings_last_good";
+
+/// Junta as configurações salvas com a cópia completa: campos que sumiram voltam.
+fn merged(current: Option<String>, good: Option<String>) -> serde_json::Value {
+    let mut value: serde_json::Value = current.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_else(|| serde_json::json!({}));
+    if let (Some(target), Some(good)) = (value.as_object_mut(), good.and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())) {
+        for (key, v) in good.as_object().into_iter().flatten() {
+            if !target.contains_key(key) {
+                target.insert(key.clone(), v.clone());
+            }
+        }
+    }
+    value
+}
+
 pub fn load(db: &Db) -> Settings {
-    db.get_setting(KEY)
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+    serde_json::from_value(merged(db.get_setting(KEY), db.get_setting(KEY_GOOD))).unwrap_or_default()
 }
 
 fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
@@ -268,17 +284,40 @@ pub fn save_settings(app: AppHandle, settings: Settings) -> Result<(), String> {
     let state = app.state::<AppState>();
     let old = load(&state.db.lock().unwrap());
     apply(&app, &settings, Some(&old))?;
-    let json = serde_json::to_string(&settings).map_err(|e| e.to_string())?;
-    state
-        .db
-        .lock()
-        .unwrap()
-        .set_setting(KEY, &json)
-        .map_err(|e| format!("Não consegui salvar: {e}"))?;
+    {
+        // Guarda os campos conhecidos por cima do que já estava salvo: campos de versões mais
+        // novas (que esta não conhece) continuam lá.
+        let db = state.db.lock().unwrap();
+        let mut value = merged(db.get_setting(KEY), db.get_setting(KEY_GOOD));
+        if let (Some(target), Ok(serde_json::Value::Object(mine))) = (value.as_object_mut(), serde_json::to_value(&settings)) {
+            target.extend(mine);
+        }
+        let json = serde_json::to_string(&value).map_err(|e| e.to_string())?;
+        db.set_setting(KEY, &json).map_err(|e| format!("Não consegui salvar: {e}"))?;
+        db.set_setting(KEY_GOOD, &json).map_err(|e| format!("Não consegui salvar: {e}"))?;
+    }
     if !settings.clipboard_history {
         state.clipboard.lock().unwrap().clear();
     }
     *state.settings.lock().unwrap() = settings.clone();
     let _ = app.emit("settings-changed", &settings);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn campos_apagados_por_versao_antiga_voltam() {
+        // Versão antiga salvou só o que conhecia; a cópia completa tem o Telegram.
+        let old = r#"{"model":"claude-haiku-5-5","island":true}"#.to_string();
+        let good = r#"{"model":"x","island":false,"telegramChatId":"123","telegramEnabled":true}"#.to_string();
+        let s: Settings = serde_json::from_value(merged(Some(old), Some(good))).unwrap();
+        assert_eq!(s.telegram_chat_id, "123");
+        assert!(s.telegram_enabled);
+        // O que a versão antiga mudou de propósito vale.
+        assert!(s.island);
+        assert_eq!(s.model, "claude-haiku-5-5");
+    }
 }

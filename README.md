@@ -72,7 +72,7 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
 - **Celular (Telegram)**: crie um bot no @BotFather, cole o token em ⚙ → Integrações e mande uma mensagem para ele: os avisos escolhidos (lembretes, lives, GitHub, e-mail…) chegam no Telegram, se quiser só quando você estiver longe do PC. E dá para **conversar com o Pipo pelo celular** como no chat ("me lembra às 18h de…", "o build terminou?"); ações no PC pedem Permitir/Negar por botão. Comandos sem custo: /status, /lembretes, /apagar, /email, /semana, /novo e /ajuda. Só a sua conversa é atendida.
 - **Automações** (Ações → Automações): "quando X, faça Y". Gatilhos: programa abriu/fechou, horário, modo ligou/desligou, voltou ao PC, Pipo abriu. Ações em sequência: abrir programa, pasta ou link (inclusive `spotify:`), rodar rotina, avisar, mandar no Telegram, trocar modo, pomodoro, música, modo ilha e esperar. Tem modelos prontos e "Testar agora".
 - **Relatório semanal** (domingo 19h, ajustável): tempo no PC por tipo de app comparado à semana anterior, pomodoros, commits, partidas de LoL, XP e gastos, com um comentário do Pipo, na aba Hoje e no Telegram.
-- **Gmail** (só leitura): com uma senha de app, a aba Hoje mostra os não lidos da caixa principal e o botão "Resumir com o Pipo"; no chat, pergunte "tenho e-mail importante?". Nada é marcado como lido.
+- **Gmail**: com uma senha de app, a aba Hoje mostra os não lidos da caixa principal e o botão "Resumir com o Pipo"; clique num e-mail para ler inteiro e **responder com o Pipo**: ele escreve um rascunho, você edita e envia (com confirmação) ou guarda nos rascunhos do Gmail. No chat: "tenho e-mail importante?", "responde o e-mail da Ana dizendo que topo". Nada é marcado como lido.
 - **Pipo proativo** (nível equilibrado): no máximo 3 dicas por hora e nunca em jogo, foco ou com você longe: erro copiado, muitas mudanças sem commit, horas seguidas no PC, madrugada e o resumo do fim do dia. Ele também **lembra** do que você contar ("lembra que eu prefiro TypeScript"); a lista fica em ⚙ → Memória do Pipo.
 - **Clipboard**: últimos textos e imagens copiados (só em memória; senhas e tokens são ignorados), com busca, filtros, itens fixados (os textos fixados ficam guardados), Resumir, Traduzir, Revisar e Perguntar ao Pipo sobre a imagem. **Ctrl + Alt + Shift + T** cola o que está copiado como texto puro.
 - **Buscar nos meus arquivos** (Ações → Atalhos, ou no chat "acha o PDF do contrato"): procura pelo assunto dentro de PDFs, Word, PowerPoint e textos de Documentos, Downloads, Área de Trabalho e Imagens. O índice fica só no PC.
@@ -82,6 +82,8 @@ O Pipo reage ao que acontece: fica atento quando o painel abre, pensativo enquan
 - **⚙ Configurações**: chave, modelo, sarcasmo, atalho, tamanho e cada sensor pode ser ligado ou desligado.
 
 Sensores e alertas são lidos só no computador; nada disso é enviado para a internet.
+
+**Instalação limpa:** ao abrir, o Pipo garante que o "iniciar com o Windows" e os atalhos apontam para ele mesmo e avisa se achar uma cópia antiga (que pode ser mandada para a Lixeira em ⚙ → Atualizações). As configurações têm uma cópia completa: se uma versão antiga abrir por engano e apagar campos novos, eles voltam.
 
 **Seus dados:** as configurações são salvas sozinhas assim que você muda algo. A cada início o Pipo guarda uma cópia de segurança do banco (as 15 mais recentes ficam em `%APPDATA%\com.vitormouramaker.pipo\backups`) e anota um resumo em `pipo.log` na mesma pasta.
 

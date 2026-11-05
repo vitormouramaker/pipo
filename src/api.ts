@@ -131,6 +131,7 @@ export type AutomationAction = {
   value: string;
 };
 export type Automation = { id: string; name: string; enabled: boolean; trigger: AutomationTrigger; actions: AutomationAction[] };
+export type OldCopy = { path: string; version: string };
 export type FileHit = { path: string; name: string; folder: string; snippet: string; modified: string };
 export type FileIndexStatus = { files: number; withContent: number; running: boolean; progress: number; updatedAt: string | null; error: string | null };
 export type WeeklyReport = { week: string; text: string; createdAt: string };
@@ -155,6 +156,7 @@ export type TelegramStatus = {
   lastMessage: string | null;
 };
 export type Mail = { uid: number; from: string; subject: string; date: string; snippet: string };
+export type FullMail = { uid: number; from: string; replyTo: string; subject: string; date: string; body: string };
 export type MailStatus = { configured: boolean; address: string; unread: Mail[]; checkedAt: string | null; error: string | null };
 export type DownloadsPlan = {
   loose: number;
@@ -409,6 +411,10 @@ export const api = {
   emailStatus: () => invoke<MailStatus>("email_status"),
   reportLatest: () => invoke<WeeklyReport | null>("report_latest"),
   filesSearch: (query: string) => invoke<FileHit[]>("files_search", { query }),
+  openPath: (path: string) => invoke<void>("open_path", { path }),
+  revealPath: (path: string) => invoke<void>("reveal_path", { path }),
+  oldCopies: () => invoke<OldCopy[]>("old_copies"),
+  oldCopyRemove: (path: string) => invoke<void>("old_copy_remove", { path }),
   filesIndexStatus: () => invoke<FileIndexStatus>("files_index_status"),
   filesReindex: () => invoke<void>("files_reindex"),
   automationTest: (automation: Automation) => invoke<string[]>("automation_test", { automation }),
@@ -418,6 +424,10 @@ export const api = {
   emailRefresh: () => invoke<MailStatus>("email_refresh"),
   emailConnect: (address: string, password: string) => invoke<number>("email_connect", { address, password }),
   emailDisconnect: () => invoke<void>("email_disconnect"),
+  emailRead: (uid: number) => invoke<FullMail>("email_read", { uid }),
+  emailDraft: (uid: number, instructions: string) => invoke<string>("email_draft", { uid, instructions }),
+  emailSend: (uid: number, body: string) => invoke<string>("email_send", { uid, body }),
+  emailSaveDraft: (uid: number, body: string) => invoke<string>("email_save_draft", { uid, body }),
   daySummary: () => invoke<DaySummary>("day_summary"),
   calendarStatus: () => invoke<CalendarStatus>("calendar_status"),
   calendarRefresh: () => invoke<number>("calendar_refresh"),

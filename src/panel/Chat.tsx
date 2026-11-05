@@ -14,9 +14,34 @@ type Props = {
 };
 
 // Formatação mínima: blocos ```código```, `código` em linha e **negrito**.
+/** Caminho do Windows ("C:\pasta\arquivo.pdf"): vira link que abre e botão que mostra na pasta. */
+const WIN_PATH = /^[A-Za-z]:\\[^<>"|?*\n]*$/;
+
+function PathLink({ path }: { path: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const isFile = /\.[A-Za-z0-9]{1,6}$/.test(path);
+  const name = path.split("\\").filter(Boolean).pop() ?? path;
+  const fail = (e: unknown) => setError(String(e));
+  return (
+    <span className="path-link" title={error ?? path}>
+      <button className="link" onClick={() => void api.openPath(path).catch(fail)}>
+        {isFile ? "📄" : "📁"} {name}
+      </button>
+      <button className="path-reveal" title="Mostrar na pasta" aria-label="Mostrar na pasta" onClick={() => void api.revealPath(path).catch(fail)}>
+        {ICONS.external}
+      </button>
+      {error && <span className="path-error">{error}</span>}
+    </span>
+  );
+}
+
 function renderInline(text: string): ReactNode[] {
   return text.split(/(`[^`\n]+`|\*\*[^*\n]+\*\*)/g).map((part, i) => {
-    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) return <code key={i}>{part.slice(1, -1)}</code>;
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+      const inner = part.slice(1, -1).trim();
+      if (WIN_PATH.test(inner)) return <PathLink key={i} path={inner} />;
+      return <code key={i}>{part.slice(1, -1)}</code>;
+    }
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>;
     return <Fragment key={i}>{part}</Fragment>;
   });
@@ -164,6 +189,10 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
 
   // Comandos de barra: lista enquanto digita o nome do comando.
   const [pick, setPick] = useState(0);
+  const slashMenu = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    slashMenu.current?.querySelector<HTMLElement>("button.on")?.scrollIntoView({ block: "nearest" });
+  }, [pick]);
   const typing = /^\/(\S*)$/.exec(input);
   const matches = typing ? COMMANDS.filter((c) => c.name.startsWith(typing[1].toLowerCase())) : [];
   const note = (text: string) => setMessages((m) => [...m, { role: "assistant", text }]);
@@ -482,7 +511,7 @@ export default function Chat({ hasKey, draft, onDraftUsed, onOpenSettings }: Pro
           </div>
         )}
         {matches.length > 0 && (
-          <div className="slash-menu" role="listbox" aria-label="Comandos">
+          <div className="slash-menu" role="listbox" aria-label="Comandos" ref={slashMenu}>
             {matches.map((c, i) => (
               <button
                 key={c.name}

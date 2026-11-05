@@ -348,7 +348,7 @@ pub fn summary_text(app: &AppHandle) -> Result<String, String> {
     if mails.is_empty() {
         return Ok("Nenhum e-mail não lido na caixa principal nos últimos 2 dias.".into());
     }
-    Ok(mails.iter().map(|m| format!("- [{}] {} — {}\n  {}", m.date, m.from, m.subject, m.snippet)).collect::<Vec<_>>().join("\n"))
+    Ok(mails.iter().map(|m| format!("- (uid {}) [{}] {} — {}\n  {}", m.uid, m.date, m.from, m.subject, m.snippet)).collect::<Vec<_>>().join("\n"))
 }
 
 #[tauri::command]
@@ -391,6 +391,296 @@ pub fn email_disconnect(app: AppHandle) -> Result<(), String> {
     crate::settings::settings_update(app.clone(), json!({ "emailEnabled": false }))?;
     let _ = app.emit("email-changed", ());
     Ok(())
+}
+
+// ---------- Fase 8.3: responder e-mail com rascunho do Pipo ----------
+
+use base64::Engine as _;
+//
+// O Pipo lê o e-mail inteiro (sem marcar como lido), escreve um rascunho de resposta com a
+// Claude e você revisa. Daí: "Enviar" (SMTP do Gmail, com a mesma senha de app, sempre com
+// confirmação) ou "Salvar nos rascunhos do Gmail" (IMAP APPEND), para terminar no Gmail.
+
+const SMTP_HOST: &str = "smtp.gmail.com";
+const MAX_BODY: usize = 12_000;
+
+/// Um e-mail aberto para ler ou responder.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FullMail {
+    pub uid: u32,
+    pub from: String,
+    /// Endereço para onde a resposta vai (Reply-To ou From).
+    pub reply_to: String,
+    pub subject: String,
+    pub date: String,
+    pub body: String,
+    #[serde(skip)]
+    message_id: String,
+    #[serde(skip)]
+    references: String,
+}
+
+/// "Fulano <a@b.com>" -> "a@b.com"
+fn address_of(header: &str) -> String {
+    match (header.rfind('<'), header.rfind('>')) {
+        (Some(a), Some(b)) if b > a => header[a + 1..b].trim().to_string(),
+        _ => header.trim().trim_matches('"').to_string(),
+    }
+}
+
+fn login(imap: &mut Imap, address: &str, password: &str) -> Result<(), String> {
+    imap.command(&format!("LOGIN {} {}", quote(address), quote(password)))
+        .map(|_| ())
+        .map_err(|_| "O Gmail recusou o login. Confira a senha de app em Configurações > Integrações.".to_string())
+}
+
+fn fetch_message(address: &str, password: &str, uid: u32) -> Result<FullMail, String> {
+    let mut imap = Imap::connect()?;
+    login(&mut imap, address, password)?;
+    imap.command("EXAMINE INBOX")?;
+    let responses = imap.command(&format!("UID FETCH {uid} (UID BODY.PEEK[]<0.400000>)"))?;
+    let _ = imap.command("LOGOUT");
+    let raw = responses
+        .iter()
+        .flat_map(|r| r.literals.iter())
+        .find(|(ctx, _)| ctx.contains("BODY["))
+        .map(|(_, d)| d.clone())
+        .ok_or("Não achei esse e-mail (ele pode ter sido apagado ou movido).")?;
+    let mail = mailparse::parse_mail(&raw).map_err(|e| e.to_string())?;
+    use mailparse::MailHeaderMap;
+    let h = &mail.headers;
+    let from = h.get_first_value("From").unwrap_or_default();
+    let reply = h.get_first_value("Reply-To").filter(|r| r.contains('@')).unwrap_or_else(|| from.clone());
+    let body: String = plain_text(&mail).unwrap_or_default();
+    let body = body.lines().map(str::trim_end).collect::<Vec<_>>().join("\n");
+    let body: String = body.trim().chars().take(MAX_BODY).collect();
+    Ok(FullMail {
+        uid,
+        from: sender(&from),
+        reply_to: address_of(&reply),
+        subject: h.get_first_value("Subject").unwrap_or_default().trim().to_string(),
+        date: when(&h.get_first_value("Date").unwrap_or_default()),
+        body,
+        message_id: h.get_first_value("Message-ID").unwrap_or_default().trim().to_string(),
+        references: h.get_first_value("References").unwrap_or_default().trim().to_string(),
+    })
+}
+
+/// Assunto em UTF-8 no cabeçalho (RFC 2047) quando tem acento.
+fn encode_header(text: &str) -> String {
+    if text.is_ascii() {
+        return text.to_string();
+    }
+    format!("=?UTF-8?B?{}?=", base64::engine::general_purpose::STANDARD.encode(text.as_bytes()))
+}
+
+fn reply_subject(subject: &str) -> String {
+    let s = subject.trim();
+    if s.to_lowercase().starts_with("re:") { s.to_string() } else { format!("Re: {s}") }
+}
+
+/// Monta a resposta (texto puro em UTF-8, base64).
+fn build_reply(from: &str, original: &FullMail, body: &str) -> String {
+    let encoded = base64::engine::general_purpose::STANDARD.encode(body.replace("\r\n", "\n").replace('\n', "\r\n").as_bytes());
+    let wrapped: Vec<String> = encoded.as_bytes().chunks(76).map(|c| String::from_utf8_lossy(c).into_owned()).collect();
+    let id = format!("<pipo.{}.{}@{}>", chrono::Utc::now().timestamp_millis(), original.uid, from.split('@').nth(1).unwrap_or("gmail.com"));
+    let mut headers = vec![
+        format!("From: {from}"),
+        format!("To: {}", original.reply_to),
+        format!("Subject: {}", encode_header(&reply_subject(&original.subject))),
+        format!("Date: {}", chrono::Local::now().to_rfc2822()),
+        format!("Message-ID: {id}"),
+    ];
+    if !original.message_id.is_empty() {
+        headers.push(format!("In-Reply-To: {}", original.message_id));
+        let refs = if original.references.is_empty() { original.message_id.clone() } else { format!("{} {}", original.references, original.message_id) };
+        headers.push(format!("References: {refs}"));
+    }
+    headers.push("MIME-Version: 1.0".into());
+    headers.push("Content-Type: text/plain; charset=utf-8".into());
+    headers.push("Content-Transfer-Encoding: base64".into());
+    format!("{}\r\n\r\n{}\r\n", headers.join("\r\n"), wrapped.join("\r\n"))
+}
+
+/// Cliente SMTP mínimo (TLS direto na porta 465).
+fn smtp_send(address: &str, password: &str, to: &str, message: &str) -> Result<(), String> {
+    let tcp = TcpStream::connect((SMTP_HOST, 465)).map_err(|e| format!("Sem conexão com o Gmail: {e}"))?;
+    let _ = tcp.set_read_timeout(Some(Duration::from_secs(30)));
+    let tls = native_tls::TlsConnector::new().map_err(|e| e.to_string())?;
+    let mut stream = tls.connect(SMTP_HOST, tcp).map_err(|e| format!("Falha na conexão segura com o Gmail: {e}"))?;
+    let mut buf: Vec<u8> = Vec::new();
+    // Lê uma resposta inteira (linhas "250-…" continuam até "250 …") e confere o código.
+    let mut expect = |stream: &mut native_tls::TlsStream<TcpStream>, code: &str| -> Result<(), String> {
+        loop {
+            while let Some(i) = buf.windows(2).position(|w| w == b"\r\n") {
+                let line = String::from_utf8_lossy(&buf[..i]).into_owned();
+                buf.drain(..i + 2);
+                if line.len() >= 4 && &line[3..4] == "-" {
+                    continue;
+                }
+                return if line.starts_with(code) { Ok(()) } else { Err(format!("O Gmail recusou o envio: {}", line.chars().take(160).collect::<String>())) };
+            }
+            let mut chunk = [0u8; 4096];
+            let n = stream.read(&mut chunk).map_err(|e| e.to_string())?;
+            if n == 0 {
+                return Err("O Gmail fechou a conexão.".into());
+            }
+            buf.extend_from_slice(&chunk[..n]);
+        }
+    };
+    let say = |stream: &mut native_tls::TlsStream<TcpStream>, line: &str| stream.write_all(format!("{line}\r\n").as_bytes()).map_err(|e| e.to_string());
+    expect(&mut stream, "220")?;
+    say(&mut stream, "EHLO pipo")?;
+    expect(&mut stream, "250")?;
+    let auth = base64::engine::general_purpose::STANDARD.encode(format!("\0{address}\0{password}"));
+    say(&mut stream, &format!("AUTH PLAIN {auth}"))?;
+    expect(&mut stream, "235").map_err(|_| "O Gmail recusou o login para enviar. Confira a senha de app.".to_string())?;
+    say(&mut stream, &format!("MAIL FROM:<{address}>"))?;
+    expect(&mut stream, "250")?;
+    say(&mut stream, &format!("RCPT TO:<{to}>"))?;
+    expect(&mut stream, "250")?;
+    say(&mut stream, "DATA")?;
+    expect(&mut stream, "354")?;
+    stream.write_all(message.as_bytes()).map_err(|e| e.to_string())?;
+    say(&mut stream, ".")?;
+    expect(&mut stream, "250")?;
+    let _ = say(&mut stream, "QUIT");
+    Ok(())
+}
+
+impl Imap {
+    /// APPEND com literal: espera o "+" do servidor antes de mandar os bytes.
+    fn append(&mut self, folder: &str, message: &[u8]) -> Result<(), String> {
+        self.tag += 1;
+        let tag = format!("p{}", self.tag);
+        self.stream
+            .write_all(format!("{tag} APPEND {} (\\Draft \\Seen) {{{}}}\r\n", quote(folder), message.len()).as_bytes())
+            .map_err(|e| e.to_string())?;
+        let line = String::from_utf8_lossy(&self.line()?).into_owned();
+        if !line.starts_with('+') {
+            return Err(format!("O Gmail não aceitou o rascunho: {}", line.trim()));
+        }
+        self.stream.write_all(message).map_err(|e| e.to_string())?;
+        self.stream.write_all(b"\r\n").map_err(|e| e.to_string())?;
+        loop {
+            let line = String::from_utf8_lossy(&self.line()?).into_owned();
+            if let Some(status) = line.strip_prefix(&format!("{tag} ")) {
+                return if status.starts_with("OK") { Ok(()) } else { Err(format!("O Gmail não aceitou o rascunho: {}", status.trim())) };
+            }
+        }
+    }
+}
+
+/// Pasta de rascunhos do Gmail (o nome muda com o idioma; a marca \Drafts não).
+fn drafts_folder(imap: &mut Imap) -> String {
+    imap.command("LIST \"\" \"*\"")
+        .ok()
+        .and_then(|list| {
+            list.iter().find(|r| r.text.contains("\\Drafts")).and_then(|r| {
+                let t = r.text.trim();
+                t.rsplit_once(" \"").map(|(_, name)| name.trim_end_matches('"').to_string())
+            })
+        })
+        .unwrap_or_else(|| "[Gmail]/Drafts".into())
+}
+
+fn credentials_any(app: &AppHandle) -> Result<(String, String), String> {
+    credentials(app).ok_or_else(|| "O Gmail não está ligado. Ligue em Configurações > Integrações.".to_string())
+}
+
+#[tauri::command]
+pub async fn email_read(app: AppHandle, uid: u32) -> Result<FullMail, String> {
+    let (address, password) = credentials_any(&app)?;
+    tauri::async_runtime::spawn_blocking(move || fetch_message(&address, &password, uid)).await.map_err(|e| e.to_string())?
+}
+
+/// Rascunho de resposta escrito pela Claude (não envia nada).
+#[tauri::command]
+pub async fn email_draft(app: AppHandle, uid: u32, instructions: String) -> Result<String, String> {
+    let (address, password) = credentials_any(&app)?;
+    let mail = tauri::async_runtime::spawn_blocking(move || fetch_message(&address, &password, uid)).await.map_err(|e| e.to_string())??;
+    let system = "Você escreve respostas de e-mail em nome do usuário, em português do Brasil (ou no idioma do e-mail recebido). \
+                  Tom educado e natural, direto ao ponto, sem inventar fatos, datas ou compromissos que o usuário não deu. \
+                  Devolva só o corpo da resposta, sem assunto e sem comentários seus. Termine sem assinatura de nome.";
+    let ask = if instructions.trim().is_empty() { "Escreva uma resposta adequada.".to_string() } else { format!("O que o usuário quer responder: {}", instructions.trim()) };
+    let prompt = format!("E-mail recebido de {} — assunto \"{}\":\n\n{}\n\n{ask}", mail.from, mail.subject, mail.body);
+    crate::ai::ask(&app, system, &prompt, 900).await
+}
+
+/// Envia a resposta (o painel e o chat pedem confirmação antes).
+pub fn send_reply(app: &AppHandle, uid: u32, body: &str) -> Result<String, String> {
+    let (address, password) = credentials_any(app)?;
+    if body.trim().is_empty() {
+        return Err("A resposta está vazia.".into());
+    }
+    let mail = fetch_message(&address, &password, uid)?;
+    if !mail.reply_to.contains('@') {
+        return Err("Não achei o endereço para responder.".into());
+    }
+    let message = build_reply(&address, &mail, body);
+    smtp_send(&address, &password, &mail.reply_to, &message)?;
+    Ok(format!("Resposta enviada para {}.", mail.reply_to))
+}
+
+#[tauri::command]
+pub async fn email_send(app: AppHandle, uid: u32, body: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || send_reply(&app, uid, &body)).await.map_err(|e| e.to_string())?
+}
+
+/// Guarda a resposta nos rascunhos do Gmail (para revisar e enviar por lá).
+pub fn save_draft(app: &AppHandle, uid: u32, body: &str) -> Result<String, String> {
+    let (address, password) = credentials_any(app)?;
+    let mail = fetch_message(&address, &password, uid)?;
+    let message = build_reply(&address, &mail, body);
+    let mut imap = Imap::connect()?;
+    login(&mut imap, &address, &password)?;
+    let folder = drafts_folder(&mut imap);
+    imap.append(&folder, message.as_bytes())?;
+    let _ = imap.command("LOGOUT");
+    Ok("Rascunho salvo no Gmail.".into())
+}
+
+#[tauri::command]
+pub async fn email_save_draft(app: AppHandle, uid: u32, body: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || save_draft(&app, uid, &body)).await.map_err(|e| e.to_string())?
+}
+
+/// Ferramenta do chat: e-mail inteiro em texto.
+pub fn read_text(app: &AppHandle, uid: u32) -> Result<String, String> {
+    let (address, password) = credentials_any(app)?;
+    let m = fetch_message(&address, &password, uid)?;
+    Ok(format!("De: {} <{}>\nAssunto: {}\nData: {}\n\n{}", m.from, m.reply_to, m.subject, m.date, m.body))
+}
+
+#[cfg(test)]
+mod reply_tests {
+    use super::*;
+
+    #[test]
+    fn monta_a_resposta() {
+        assert_eq!(address_of("\"Ana\" <ana@x.com>"), "ana@x.com");
+        assert_eq!(address_of("bob@y.com"), "bob@y.com");
+        assert_eq!(reply_subject("Reunião"), "Re: Reunião");
+        assert_eq!(reply_subject("RE: Oi"), "RE: Oi");
+        let original = FullMail {
+            uid: 7,
+            from: "Ana".into(),
+            reply_to: "ana@x.com".into(),
+            subject: "Reunião amanhã".into(),
+            date: String::new(),
+            body: String::new(),
+            message_id: "<abc@x.com>".into(),
+            references: String::new(),
+        };
+        let msg = build_reply("eu@gmail.com", &original, "Oi, Ana!\nPode ser às 10h.");
+        assert!(msg.contains("To: ana@x.com\r\n"));
+        assert!(msg.contains("Subject: =?UTF-8?B?"));
+        assert!(msg.contains("In-Reply-To: <abc@x.com>\r\nReferences: <abc@x.com>\r\n"));
+        let body = msg.split("\r\n\r\n").nth(1).unwrap().replace("\r\n", "");
+        let decoded = String::from_utf8(base64::engine::general_purpose::STANDARD.decode(body).unwrap()).unwrap();
+        assert_eq!(decoded, "Oi, Ana!\r\nPode ser às 10h.");
+    }
 }
 
 #[cfg(test)]

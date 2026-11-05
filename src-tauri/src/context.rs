@@ -216,7 +216,10 @@ mod win {
             let title = String::from_utf16_lossy(&buf[..len.max(0) as usize]);
             let exe = exe_name(pid).unwrap_or_default();
             let m = monitor_rect(hwnd).unwrap_or(RECT { left: 0, top: 0, right: 0, bottom: 0 });
-            let fullscreen = exe.to_lowercase() != "explorer.exe"
+            // O recorte de tela do Windows cobre o monitor inteiro, mas não é jogo.
+            let overlay = matches!(exe.to_lowercase().as_str(), "screenclippinghost.exe" | "snippingtool.exe" | "shellexperiencehost.exe");
+            let fullscreen = !overlay
+                && exe.to_lowercase() != "explorer.exe"
                 && !is_shell(hwnd)
                 && (covers_monitor(hwnd, &m) || exclusive_fullscreen());
             Some(Foreground { pid, exe, title, fullscreen, monitor: (m.left, m.top, m.right, m.bottom) })

@@ -130,7 +130,9 @@ pub fn start(app: AppHandle) {
                 crate::automations::tick(&app, idle);
 
                 let fullscreen = current.as_ref().filter(|c| c.fullscreen);
-                set_game_mode(&app, settings.game_mode && fullscreen.is_some(), fullscreen.map(|c| c.monitor));
+                // Durante um recorte de tela o modo jogo espera (o recorte cobre a tela toda).
+                let snipping = state.ocr_busy.load(std::sync::atomic::Ordering::SeqCst);
+                set_game_mode(&app, settings.game_mode && fullscreen.is_some() && !snipping, fullscreen.map(|c| c.monitor));
 
                 let developing = current.as_ref().is_some_and(|c| c.category == Category::Dev);
                 dev_since = if developing { dev_since.or(Some(Instant::now())) } else { None };

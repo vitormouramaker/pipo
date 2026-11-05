@@ -7,6 +7,7 @@ mod context;
 mod db;
 mod documents;
 mod files_index;
+mod install;
 mod island;
 mod life;
 mod proactive;
@@ -203,6 +204,7 @@ pub fn run() {
             world::email::start(app.handle().clone());
             world::telegram::start(app.handle().clone());
             files_index::start(app.handle().clone());
+            install::start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -285,6 +287,10 @@ pub fn run() {
             world::telegram::telegram_disconnect,
             report::report_latest,
             files_index::files_search,
+            install::old_copies,
+            install::old_copy_remove,
+            documents::reveal_path,
+            documents::open_path,
             files_index::files_index_status,
             files_index::files_reindex,
             automations::automation_test,
@@ -295,6 +301,10 @@ pub fn run() {
             world::email::email_refresh,
             world::email::email_connect,
             world::email::email_disconnect,
+            world::email::email_read,
+            world::email::email_draft,
+            world::email::email_send,
+            world::email::email_save_draft,
             menu::pet_menu_open,
             menu::menu_pending,
             menu::menu_layout,

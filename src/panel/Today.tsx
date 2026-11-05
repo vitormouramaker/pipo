@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { ICONS } from "../ui/icons";
-import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus, type WeeklyReport } from "../api";
+import { api, type Briefing, type CalendarStatus, type DaySummary, type GithubStatus, type LiveChannel, type NowPlaying, type Settings, type MailStatus, type LolStatus, type WeeklyReport, type FullMail } from "../api";
 import { sqliteDate } from "../format";
 import { sfx } from "../ui/sound";
 
@@ -518,7 +518,112 @@ function Weekly() {
   );
 }
 
+/** Um e-mail aberto: texto inteiro e resposta com rascunho do Pipo (Fase 8.3). */
+function MailOpen({ uid, onClose }: { uid: number; onClose: () => void }) {
+  const [mail, setMail] = useState<FullMail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [replying, setReplying] = useState(false);
+  const [instructions, setInstructions] = useState("");
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  useEffect(() => {
+    void api.emailRead(uid).then(setMail).catch((e) => setError(String(e)));
+  }, [uid]);
+  const run = (label: string, job: () => Promise<string>, after?: (r: string) => void) => {
+    setBusy(label);
+    setError(null);
+    void job()
+      .then((r) => {
+        after?.(r);
+        sfx.done();
+      })
+      .catch((e) => {
+        setError(String(e));
+        sfx.error();
+      })
+      .finally(() => setBusy(null));
+  };
+  if (!mail) return <div className="mail-open">{error ? <p className="hint error">{error}</p> : <p className="hint">Abrindo o e-mail…</p>}</div>;
+  return (
+    <div className="mail-open">
+      <div className="mail-open-head">
+        <div>
+          <strong>{mail.subject || "(sem assunto)"}</strong>
+          <span className="row-meta">
+            {mail.from} &lt;{mail.replyTo}&gt; · {mail.date}
+          </span>
+        </div>
+        <button className="link muted" aria-label="Fechar e-mail" onClick={onClose}>
+          ✕
+        </button>
+      </div>
+      <pre className="mail-body">{mail.body || "(sem texto)"}</pre>
+      {done ? (
+        <p className="hint ok">{done}</p>
+      ) : !replying ? (
+        <div className="btns">
+          <button className="primary" onClick={() => setReplying(true)}>
+            Responder com o Pipo
+          </button>
+        </div>
+      ) : (
+        <div className="mail-reply">
+          <div className="inline-form">
+            <input
+              className="grow"
+              placeholder='O que responder? (ex.: "aceito, pode ser às 10h") — ou deixe em branco'
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !busy && run("draft", () => api.emailDraft(uid, instructions), setDraft)}
+            />
+            <button disabled={busy !== null} onClick={() => run("draft", () => api.emailDraft(uid, instructions), setDraft)}>
+              {busy === "draft" ? "Escrevendo…" : draft ? "Escrever de novo" : "Escrever rascunho"}
+            </button>
+          </div>
+          {draft && (
+            <>
+              <textarea className="mail-draft" rows={8} value={draft} onChange={(e) => setDraft(e.target.value)} aria-label="Rascunho da resposta" />
+              {confirm ? (
+                <div className="confirm-actions">
+                  <span className="hint">Enviar para {mail.replyTo}?</span>
+                  <button
+                    className="primary"
+                    disabled={busy !== null}
+                    onClick={() => {
+                      setConfirm(false);
+                      run("send", () => api.emailSend(uid, draft), setDone);
+                    }}
+                  >
+                    {busy === "send" ? "Enviando…" : "Sim, enviar"}
+                  </button>
+                  <button onClick={() => setConfirm(false)}>Não</button>
+                </div>
+              ) : (
+                <div className="btns">
+                  <button className="primary" disabled={busy !== null || !draft.trim()} onClick={() => setConfirm(true)}>
+                    Enviar
+                  </button>
+                  <button disabled={busy !== null || !draft.trim()} onClick={() => run("save", () => api.emailSaveDraft(uid, draft), setDone)}>
+                    {busy === "save" ? "Salvando…" : "Salvar nos rascunhos do Gmail"}
+                  </button>
+                  <button className="link muted" onClick={() => setReplying(false)}>
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      {error && <p className="hint error">{error}</p>}
+    </div>
+  );
+}
+
 function Email({ onAsk }: Props) {
+  const [opened, setOpened] = useState<number | null>(null);
   const [mail, setMail] = useState<MailStatus | null>(null);
   const [checking, setChecking] = useState(false);
   useEffect(() => {
@@ -552,11 +657,19 @@ function Email({ onAsk }: Props) {
       {!mail.error && mail.unread.length === 0 && <p className="hint">Nada novo na caixa principal nos últimos 2 dias.</p>}
       <div className="table">
         {mail.unread.slice(0, 6).map((m) => (
-          <div key={m.uid} className="trow mail-row" title={m.snippet}>
-            <span className="mail-from">{m.from}</span>
-            <span className="grow mail-subject">{m.subject}</span>
-            <span className="row-meta">{m.date}</span>
-          </div>
+          <Fragment key={m.uid}>
+            <button
+              className={`trow mail-row${opened === m.uid ? " on" : ""}`}
+              title={m.snippet}
+              aria-expanded={opened === m.uid}
+              onClick={() => setOpened(opened === m.uid ? null : m.uid)}
+            >
+              <span className="mail-from">{m.from}</span>
+              <span className="grow mail-subject">{m.subject}</span>
+              <span className="row-meta">{m.date}</span>
+            </button>
+            {opened === m.uid && <MailOpen uid={m.uid} onClose={() => setOpened(null)} />}
+          </Fragment>
         ))}
       </div>
       {mail.unread.length > 0 && (

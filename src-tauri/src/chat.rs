@@ -118,7 +118,9 @@ fn system_prompt(sarcasm: u8, city: &str) -> String {
          blocos de código só quando ajudarem.\n\n\
          Você tem ferramentas para agir no computador: projetos e scripts, Git, portas, Docker, jogos, \
          rotinas, arquivos recentes, notas, lembretes e pomodoro. Também procura e lê arquivos do usuário \
-         (PDF, Word, PowerPoint, imagens, texto e código) quando ele pede. Quando o usuário contar algo \
+         (PDF, Word, PowerPoint, imagens, texto e código) quando ele pede; para achar pelo assunto use \
+         search_file_contents. Sempre que citar um arquivo ou pasta do computador, escreva o caminho \
+         completo entre crases (ex.: `C:\\Users\\voce\\arquivo.pdf`): o chat transforma em link para abrir. Quando o usuário contar algo \
          sobre si que valha lembrar (preferências, rotina, projetos, nomes) ou pedir para lembrar, use \
          remember; se pedir para esquecer, use forget com o número da memória. Você também vê a agenda \
          (agenda), o GitHub dele (github_status) e controla a música que está tocando (media_control). Quando o pedido depender delas, use-as \

@@ -335,6 +335,43 @@ pub fn search(query: &str, limit: usize) -> Vec<FoundFile> {
 }
 
 /// O arquivo está dentro da pasta do usuário (o chat não lê arquivos do sistema).
+/// Letras e números sem acento e em minúsculas (acento composto ou decomposto dá igual).
+fn loose(name: &str) -> String {
+    fold(name).chars().filter(|c| c.is_alphanumeric() && !('\u{300}'..='\u{36f}').contains(c)).collect()
+}
+
+/// Acha o arquivo mesmo se o nome veio com acento em outra forma, maiúsculas diferentes
+/// ou espaços/pontuação trocados (como acontece quando a IA reescreve um nome longo).
+pub fn resolve(path: &str) -> Option<PathBuf> {
+    let p = PathBuf::from(path.trim().trim_matches('"').replace('/', "\\"));
+    if p.exists() {
+        return Some(p);
+    }
+    let parent = p.parent()?;
+    let wanted = loose(&p.file_name()?.to_string_lossy());
+    std::fs::read_dir(parent).ok()?.flatten().map(|e| e.path()).find(|c| c.file_name().is_some_and(|n| loose(&n.to_string_lossy()) == wanted))
+}
+
+/// Abre um arquivo do usuário no programa padrão.
+#[tauri::command]
+pub fn open_path(path: String) -> Result<(), String> {
+    let p = resolve(&path).ok_or("Não encontrei esse arquivo (ele pode ter sido movido ou apagado).")?;
+    if !allowed(&p) {
+        return Err("Só abro arquivos dentro da sua pasta de usuário.".into());
+    }
+    crate::actions::shell_open(&p.to_string_lossy())
+}
+
+/// Mostra o arquivo selecionado na pasta dele (Explorador de Arquivos).
+#[tauri::command]
+pub fn reveal_path(path: String) -> Result<(), String> {
+    let p = resolve(&path).ok_or("Não encontrei esse arquivo (ele pode ter sido movido ou apagado).")?;
+    if !allowed(&p) {
+        return Err("Só mostro arquivos dentro da sua pasta de usuário.".into());
+    }
+    crate::actions::command("explorer.exe").arg(format!("/select,{}", p.display())).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 pub fn allowed(path: &Path) -> bool {
     let home = std::env::var("USERPROFILE").map(PathBuf::from).unwrap_or_default();
     match (path.canonicalize(), home.canonicalize()) {
@@ -345,7 +382,8 @@ pub fn allowed(path: &Path) -> bool {
 
 /// Resultado da ferramenta `read_file` do chat: blocos com o conteúdo do arquivo.
 pub fn read_for_chat(path: &str) -> Result<Vec<Value>, String> {
-    let path = Path::new(path);
+    let resolved = resolve(path).ok_or("Não encontrei esse arquivo. Use search_files para achar o caminho certo.")?;
+    let path = resolved.as_path();
     if !allowed(path) {
         return Err("Só leio arquivos dentro da sua pasta de usuário.".into());
     }
@@ -413,5 +451,21 @@ mod tests {
         assert_eq!(office_text(docx, "w"), "Olá mundo & cia\nLinha 2\n");
         let slide = r#"<p:sp><a:p><a:r><a:t>Título</a:t></a:r></a:p><a:p><a:r><a:t>Item &lt;1&gt;</a:t></a:r></a:p></p:sp>"#;
         assert_eq!(office_text(slide, "a"), "Título\nItem <1>\n");
+    }
+}
+
+#[cfg(test)]
+mod resolve_tests {
+    #[test]
+    fn acha_arquivo_com_acento_em_outra_forma() {
+        let dir = std::env::temp_dir().join(format!("pipo-resolve-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        // Nome no disco com "á" composto; a busca vem com "a" + acento separado (NFD) e sem os parênteses.
+        let real = dir.join("Aula CANAL DARK (Grátis).pdf");
+        std::fs::write(&real, b"x").unwrap();
+        let asked = dir.join("Aula CANAL DARK Gra\u{301}tis.pdf");
+        assert_eq!(super::resolve(&asked.to_string_lossy()).as_deref(), Some(real.as_path()));
+        assert!(super::resolve(&dir.join("outro.pdf").to_string_lossy()).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -226,6 +226,11 @@ fn to_recycle_bin(_paths: &[String]) -> Result<(), String> {
     Err("Só no Windows.".into())
 }
 
+/// Manda arquivos ou pastas para a Lixeira (usado também para remover uma cópia antiga do Pipo).
+pub fn to_trash(paths: &[String]) -> Result<(), String> {
+    to_recycle_bin(paths)
+}
+
 /// Manda para a Lixeira (dá para restaurar de lá) os arquivos escolhidos, só dentro de Downloads.
 #[tauri::command]
 pub fn downloads_trash(paths: Vec<String>) -> Result<usize, String> {

@@ -77,6 +77,19 @@ pub fn definitions() -> Value {
             json!({ "query": { "type": "string" } }),
             &["query"],
         ),
+        tool("read_email", "Lê um e-mail inteiro pelo uid (o check_email mostra o uid de cada um). Só leitura.", json!({ "uid": { "type": "integer" } }), &["uid"]),
+        tool(
+            "reply_email",
+            "Envia uma resposta ao e-mail de uid informado, pelo Gmail do usuário. Escreva o corpo completo; o usuário confirma antes de enviar. Só use se ele pediu para responder.",
+            json!({ "uid": { "type": "integer" }, "body": { "type": "string" }, "to": { "type": "string", "description": "Nome ou endereço de quem vai receber (para a confirmação)" } }),
+            &["uid", "body"],
+        ),
+        tool(
+            "save_email_draft",
+            "Guarda uma resposta ao e-mail de uid informado nos rascunhos do Gmail (não envia). Bom quando o usuário quer revisar no Gmail.",
+            json!({ "uid": { "type": "integer" }, "body": { "type": "string" } }),
+            &["uid", "body"],
+        ),
         tool("check_email", "Lista os e-mails não lidos da caixa principal do Gmail (últimos 2 dias): remetente, assunto e começo do texto. Só leitura.", json!({}), &[]),
         tool("watch_live", "Abre a live de um canal seguido no mini-player (janela pequena por cima de tudo). channel: nome do canal.", json!({ "channel": { "type": "string" } }), &["channel"]),
         tool("organize_downloads", "Separa os arquivos soltos da pasta Downloads em pastas por tipo (dá para desfazer em Ações > Atalhos).", json!({}), &[]),
@@ -130,6 +143,8 @@ const CONFIRM: &[&str] = &[
     "open_recent_file",
     "open_file",
     "organize_downloads",
+    "reply_email",
+    "save_email_draft",
 ];
 
 pub fn needs_confirmation(name: &str) -> bool {
@@ -169,6 +184,9 @@ pub fn label(name: &str, input: &Value) -> String {
         "open_file" => format!("Abrindo {}", s(input, "name")),
         "organize_downloads" => "Organizando Downloads".into(),
         "check_email" => "Lendo os e-mails não lidos".into(),
+        "read_email" => "Lendo o e-mail".into(),
+        "reply_email" => "Enviando a resposta".into(),
+        "save_email_draft" => "Salvando o rascunho no Gmail".into(),
         "search_file_contents" => format!("Procurando nos seus arquivos: {}", s(input, "query")),
         "watch_live" => format!("Abrindo a live de {}", s(input, "channel")),
         "open_recent_file" => format!("Abrindo {}", s(input, "name")),
@@ -207,6 +225,12 @@ pub fn confirmation(name: &str, input: &Value) -> String {
         "open_recent_file" => format!("Abrir {}?", s(input, "name")),
         "open_file" => format!("Abrir {}?", s(input, "name")),
         "organize_downloads" => "Organizar a pasta Downloads em pastas por tipo?".into(),
+        "reply_email" => {
+            let body: String = s(input, "body").chars().take(600).collect();
+            let to = s(input, "to");
+            format!("Enviar esta resposta{}?\n\n{body}", if to.is_empty() { String::new() } else { format!(" para {to}") })
+        }
+        "save_email_draft" => "Salvar esta resposta nos rascunhos do Gmail?".into(),
         other => format!("Executar {other}?"),
     }
 }
@@ -237,6 +261,9 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
             }
         }
         "check_email" => crate::world::email::summary_text(app),
+        "read_email" => crate::world::email::read_text(app, input["uid"].as_u64().unwrap_or(0) as u32),
+        "reply_email" => crate::world::email::send_reply(app, input["uid"].as_u64().unwrap_or(0) as u32, input["body"].as_str().unwrap_or("")),
+        "save_email_draft" => crate::world::email::save_draft(app, input["uid"].as_u64().unwrap_or(0) as u32, input["body"].as_str().unwrap_or("")),
         "search_file_contents" => {
             let hits = crate::files_index::search(app, input["query"].as_str().unwrap_or(""), 12)?;
             if hits.is_empty() {
@@ -263,13 +290,7 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
             }
         }
         "organize_downloads" => crate::actions::downloads::organize(app).map(|n| format!("{n} arquivo(s) organizados em pastas por tipo.")),
-        "open_file" => {
-            let path = std::path::Path::new(input["path"].as_str().unwrap_or(""));
-            if !crate::documents::allowed(path) {
-                return Err("Só abro arquivos dentro da pasta do usuário.".into());
-            }
-            crate::actions::shell_open(&path.to_string_lossy()).map(|_| "Aberto.".into())
-        }
+        "open_file" => crate::documents::open_path(input["path"].as_str().unwrap_or("").to_string()).map(|_| "Aberto.".into()),
 
         "system_status" => {
             let state = app.state::<AppState>();
