@@ -6,7 +6,8 @@ import { ICONS } from "../ui/icons";
 import { sfx } from "../ui/sound";
 import "./toast.css";
 
-// Quanto tempo cada balão fica na tela (pausa com o mouse em cima).
+// Quanto tempo cada balão fica na tela (pausa com o mouse em cima). O tempo só começa a
+// contar quando o balão aparece: com mais de MAX avisos, os outros esperam na fila.
 const DURATION = 7000;
 const MAX = 3;
 
@@ -43,9 +44,10 @@ function Bubble({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   }, [paused]);
 
   const clickable = Boolean(toast.url || toast.view || toast.prompt || toast.mini);
+  // No máximo duas linhas: título e texto em uma linha cada (ou o título em duas, sem texto).
   return (
     <div
-      className={`bubble ${TONE[toast.kind] ?? ""}${clickable ? " clickable" : ""}`}
+      className={`bubble ${TONE[toast.kind] ?? ""}${clickable ? " clickable" : ""}${toast.body ? " has-body" : ""}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onClick={() => {
@@ -103,7 +105,7 @@ export default function ToastApp() {
           else if (kinds.includes("achievement")) sfx.achievement();
           else if (kinds.includes("error")) sfx.error();
           else sfx.notify();
-          setToasts((t) => [...t, ...fresh].slice(-MAX));
+          setToasts((t) => [...t, ...fresh]);
         }
         setReady(true);
       });
@@ -123,11 +125,17 @@ export default function ToastApp() {
     void api.toastLayout(Math.ceil(height));
   }, [toasts, ready]);
 
+  const waiting = Math.max(0, toasts.length - MAX);
   return (
     <div className="toast-stack" ref={stack}>
-      {toasts.map((t) => (
+      {toasts.slice(0, MAX).map((t) => (
         <Bubble key={t.id} toast={t} onClose={() => setToasts((all) => all.filter((x) => x.id !== t.id))} />
       ))}
+      {waiting > 0 && (
+        <div className="toast-more">
+          +{waiting} {waiting === 1 ? "aviso" : "avisos"} na fila
+        </div>
+      )}
     </div>
   );
 }

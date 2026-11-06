@@ -121,6 +121,7 @@ pub fn start(app: AppHandle) {
                 }
                 let idle = context::idle_seconds();
                 crate::proactive::record(&app, current.as_ref(), idle);
+                crate::journal::observe(&app, current.as_ref(), idle);
                 if tick % 30 == 0 {
                     let gaming_now = state.sense.lock().unwrap().gaming;
                     crate::proactive::tick(&app, current.as_ref(), idle, gaming_now);

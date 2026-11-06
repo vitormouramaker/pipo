@@ -85,6 +85,21 @@ pub fn in_progress() -> Vec<(String, u64)> {
         .collect()
 }
 
+/// Fase 9.4: arquivos que chegaram em Downloads depois de `since` (sem os temporários).
+/// Devolve (nome, bytes, quando).
+pub fn finished_since(since: SystemTime) -> Vec<(String, u64, SystemTime)> {
+    let Some(dir) = downloads_dir() else { return Vec::new() };
+    loose_files(&dir)
+        .into_iter()
+        .filter(|(path, _)| !matches!(ext(path).as_str(), "crdownload" | "part" | "partial" | "download" | "opdownload" | "tmp" | "ini"))
+        .filter_map(|(path, meta)| {
+            let modified = meta.modified().ok()?;
+            let name = path.file_name()?.to_string_lossy().into_owned();
+            (modified > since && age(&meta).as_secs() >= 5).then_some((name, meta.len(), modified))
+        })
+        .collect()
+}
+
 fn ext(path: &Path) -> String {
     path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default()
 }

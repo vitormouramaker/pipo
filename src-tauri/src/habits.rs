@@ -276,6 +276,7 @@ pub fn log(app: &AppHandle, id: i64, delta: i64) -> Result<HabitView, String> {
         (before, view(conn, &row, today))
     };
     if !before.done && after.done {
+        crate::journal::add(app, "habito", &after.habit.name, "", "");
         crate::life::award(app, "habit", 1);
         crate::windows::set_pet_state(app, "done");
         if MILESTONES.contains(&after.streak) && after.streak > before.streak {

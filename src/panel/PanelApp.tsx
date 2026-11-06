@@ -11,6 +11,7 @@ import SystemView from "./System";
 import Today from "./Today";
 import Life from "./Life";
 import Usage from "./Usage";
+import Journal from "./Journal";
 import "./panel.css";
 import { ICONS } from "../ui/icons";
 import { sfx } from "../ui/sound";
@@ -19,6 +20,7 @@ import { stopSpeaking } from "./speech";
 const TABS: { view: PanelView; icon: keyof typeof ICONS; title: string }[] = [
   { view: "chat", icon: "chat", title: "Chat" },
   { view: "today", icon: "today", title: "Hoje: briefing, lives e pesquisa" },
+  { view: "journal", icon: "journal", title: "Diário: o que você fez no PC" },
   { view: "actions", icon: "actions", title: "Ações: dev, foco e atalhos" },
   { view: "clipboard", icon: "clipboard", title: "Área de transferência" },
   { view: "system", icon: "system", title: "Sistema" },
@@ -148,6 +150,7 @@ export default function PanelApp() {
         />
       )}
       {view === "today" && <Today onAsk={(prompt) => void api.chatPrefill(prompt, true)} />}
+      {view === "journal" && <Journal onAsk={(prompt) => void api.chatPrefill(prompt, true)} />}
       {view === "actions" && <Actions onAsk={(prompt) => void api.chatPrefill(prompt)} />}
       {view === "clipboard" && (
         <Clipboard

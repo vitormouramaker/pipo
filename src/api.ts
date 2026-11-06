@@ -83,6 +83,8 @@ export type Settings = {
   wakeWord: boolean;
   wakeModes: string[];
   voiceConversation: boolean;
+  journal: boolean;
+  journalTitles: boolean;
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -326,7 +328,11 @@ export type ChatEvent =
   | { type: "done"; stopReason: string | null }
   | { type: "error"; message: string };
 
-export type PanelView = "pipo" | "chat" | "today" | "actions" | "clipboard" | "system" | "usage" | "settings";
+export type PanelView = "pipo" | "chat" | "today" | "journal" | "actions" | "clipboard" | "system" | "usage" | "settings";
+
+/** Fase 9.4: diário automático. */
+export type JournalEntry = { day: string; start: string; end: string; kind: string; title: string; detail: string; tag: string };
+export type JournalDay = { day: string; entries: JournalEntry[]; hasBefore: boolean };
 
 export type UsageSummary = {
   today: number;
@@ -470,6 +476,9 @@ export const api = {
   voiceConversationActive: () => invoke<boolean>("voice_conversation_active"),
   voiceFollowUp: () => invoke<void>("voice_follow_up"),
   wakeStatus: () => invoke<{ active: boolean; error: string | null }>("wake_status"),
+  journalDay: (day?: string) => invoke<JournalDay>("journal_day", { day: day ?? null }),
+  journalSearch: (query: string) => invoke<JournalEntry[]>("journal_search", { query }),
+  journalClear: () => invoke<void>("journal_clear"),
   screenAsk: () => invoke<void>("screen_ask"),
   petFind: () => invoke<void>("pet_find"),
   captionsToggle: () => invoke<void>("captions_toggle"),

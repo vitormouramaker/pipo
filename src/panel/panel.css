@@ -854,3 +854,50 @@
 .wake-word { display: grid; gap: 6px; }
 .wake-word .habit-days { align-items: center; }
 .wake-word .habit-days .hint { margin: 0 4px 0 0; }
+
+/* Fase 9.4: diário */
+.journal { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.journal-nav { display: flex; align-items: center; gap: 6px; padding: 10px 12px 0; }
+.journal-nav strong { font-size: 14px; min-width: 120px; text-align: center; }
+.journal-nav .icon-btn { font-size: 18px; line-height: 1; }
+.journal-nav .icon-btn:disabled { opacity: 0.3; cursor: default; }
+.journal-nav .journal-ask { margin-left: auto; }
+.journal-totals { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 8px 12px 0; font-size: 12px; color: var(--muted); }
+.journal-totals span { display: inline-flex; align-items: center; gap: 5px; }
+.journal-list { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; }
+.journal-list .empty { margin: 40px 16px; color: var(--muted); text-align: center; }
+.journal-list > .hint { margin: 0 0 8px; }
+.journal-row { --dot: var(--muted); display: grid; grid-template-columns: 92px 14px 1fr; align-items: start; padding: 5px 0; position: relative; }
+.journal-row::before { content: ""; position: absolute; left: 98px; top: 0; bottom: 0; width: 2px; background: var(--line); }
+.journal-row:first-of-type::before { top: 12px; }
+.journal-row:last-child::before { bottom: calc(100% - 12px); }
+.journal-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; display: grid; }
+.journal-time em { font-style: normal; font-size: 11px; opacity: 0.8; }
+.journal-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dot); margin: 5px 0 0 3px; position: relative; z-index: 1; display: inline-block; }
+.journal-totals .journal-dot { margin: 0; }
+.journal-main { display: grid; gap: 2px; min-width: 0; padding-left: 6px; }
+.journal-title { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.journal-title small { margin-left: 6px; color: var(--muted); font-size: 11.5px; }
+.journal .journal-detail {
+  all: unset; cursor: pointer; font-size: 12px; color: var(--muted); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.journal .journal-detail.open { -webkit-line-clamp: unset; }
+.journal .journal-detail:hover { color: var(--ink); }
+.cat-dev { --dot: #2dd4e8; }
+.cat-docs { --dot: #60a5fa; }
+.cat-browser { --dot: #a78bfa; }
+.cat-live { --dot: #f87171; }
+.cat-games { --dot: #4ade80; }
+.cat-chat { --dot: #f472b6; }
+.cat-ai { --dot: #fb923c; }
+.cat-other { --dot: #8a919c; }
+.journal-row.kind-aviso, .journal-row.kind-download, .journal-row.kind-chat, .journal-row.kind-nota { --dot: transparent; }
+.journal-row.kind-aviso .journal-dot, .journal-row.kind-download .journal-dot,
+.journal-row.kind-chat .journal-dot, .journal-row.kind-nota .journal-dot { border: 2px solid var(--muted); width: 4px; height: 4px; background: var(--bg, #17191d); }
+.journal-row.kind-aviso .journal-title, .journal-row.kind-download .journal-title { color: var(--muted); }
+.journal-row.kind-habito { --dot: var(--ok); }
+.journal-row.kind-lol.win { --dot: var(--ok); }
+.journal-row.kind-lol.loss { --dot: var(--danger); }
+.journal-foot { border-top: 1px solid var(--line); padding: 8px 12px 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; font-size: 12.5px; }
+.journal-foot .hint { flex-basis: 100%; margin: 2px 0 0; }

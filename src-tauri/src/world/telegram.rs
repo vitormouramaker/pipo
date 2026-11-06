@@ -162,6 +162,7 @@ const COMMANDS: &[(&str, &str)] = &[
     ("lembretes", "Lembretes pendentes"),
     ("apagar", "Apaga um lembrete (ex.: /apagar 2)"),
     ("email", "E-mails não lidos"),
+    ("diario", "O que rolou hoje no PC (ex.: /diario ontem)"),
     ("semana", "Relatório da semana agora"),
     ("novo", "Começa uma conversa nova"),
     ("ajuda", "Como falar com o Pipo"),
@@ -371,6 +372,7 @@ Comandos rápidos (sem IA, sem custo):\n\
 /lembretes — lembretes pendentes\n\
 /apagar 2 — apaga o lembrete nº 2 da lista\n\
 /email — e-mails não lidos\n\
+/diario — o que rolou hoje no PC (ou /diario ontem)\n\
 /semana — relatório da semana agora\n\
 /novo — começa uma conversa nova\n\
 /ajuda — esta mensagem\n\n\
@@ -601,6 +603,10 @@ async fn handle_message(app: AppHandle, remote: Remote, text: String) {
             "lembretes" => reminders_text(&app),
             "apagar" => delete_reminder(&app, arg),
             "email" | "emails" => crate::world::email::summary_text(&app).unwrap_or_else(|e| e),
+            "diario" | "diário" => match crate::journal::parse_day(if arg.trim().is_empty() { "hoje" } else { arg }) {
+                Some(day) => crate::journal::day_text(&app, &day),
+                None => "Use /diario, /diario ontem ou /diario 03/11.".into(),
+            },
             "novo" => match conversation(&app, true) {
                 Ok(_) => "Conversa nova começada. 🧹".into(),
                 Err(e) => format!("Não consegui: {e}"),

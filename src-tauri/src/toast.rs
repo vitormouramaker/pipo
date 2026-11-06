@@ -54,6 +54,10 @@ pub fn notify(app: &AppHandle, kind: &str, title: &str, body: &str, action: Opti
 
 /// Como `notify`, dizendo a origem (ex.: "github", "email", "lol", "proactive").
 pub fn notify_from(app: &AppHandle, source: &str, kind: &str, title: &str, body: &str, action: Option<&str>) {
+    // O diário anota o aviso mesmo quando o modo atual o esconde (dicas do LoL ficam de fora).
+    if kind != "lol" {
+        crate::journal::add(app, "aviso", title, body, kind);
+    }
     if !crate::modes::allows(app, source) {
         return;
     }

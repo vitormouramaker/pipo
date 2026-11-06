@@ -12,6 +12,7 @@ mod documents;
 mod files_index;
 mod gdrive;
 mod habits;
+mod journal;
 mod wake;
 mod install;
 mod island;
@@ -279,6 +280,9 @@ pub fn run() {
             voice::voice_conversation_active,
             voice::voice_follow_up,
             wake::wake_status,
+            journal::journal_day,
+            journal::journal_search,
+            journal::journal_clear,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

@@ -25,6 +25,12 @@ export const ICONS = {
       <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
     </>,
   ),
+  journal: icon(
+    <>
+      <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z" />
+      <path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19M9 7h6M9 10.5h4" />
+    </>,
+  ),
   actions: icon(<path d="M13 2 4 14h7l-1 8 9-12h-7z" />),
   clipboard: icon(
     <>

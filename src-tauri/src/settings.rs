@@ -144,6 +144,9 @@ pub struct Settings {
     pub wake_modes: Vec<String>,
     /// Conversa por voz: depois de responder falando, o Pipo volta a ouvir.
     pub voice_conversation: bool,
+    /// Fase 9.4: diário automático (e se guarda o título das janelas).
+    pub journal: bool,
+    pub journal_titles: bool,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -236,6 +239,8 @@ impl Default for Settings {
             wake_word: false,
             wake_modes: vec!["normal".into(), "trabalho".into(), "estudo".into()],
             voice_conversation: true,
+            journal: true,
+            journal_titles: true,
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,

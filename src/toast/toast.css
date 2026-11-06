@@ -32,15 +32,39 @@
 
 .bubble .face { width: 40px; height: 40px; flex-shrink: 0; }
 .bubble .text { display: grid; gap: 2px; min-width: 0; }
-.bubble strong { font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+/* No máximo duas linhas por aviso: título + texto (uma cada) ou só o título (até duas). */
+.bubble strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.bubble.has-body strong { -webkit-line-clamp: 1; }
 .bubble span {
   font-size: 12.5px;
   color: #8a919c;
   line-height: 1.35;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* Avisos esperando a vez (aparecem quando um balão some). */
+.toast-more {
+  align-self: flex-end;
+  padding: 3px 10px;
+  border: 1px solid #2f333a;
+  border-radius: 999px;
+  background: #1f2227;
+  color: #8a919c;
+  font-size: 11.5px;
+  animation: bubble-in 220ms ease both;
 }
 
 .bubble .close {

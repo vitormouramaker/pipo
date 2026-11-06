@@ -188,6 +188,15 @@ pub fn definitions() -> Value {
             }),
             &["name"],
         ),
+        tool(
+            "journal",
+            "Diário automático do PC (últimos 90 dias): em que app/projeto o usuário passou cada trecho do dia (com títulos das janelas), \
+avisos, downloads, hábitos cumpridos, conversas com o Pipo, notas e partidas de LoL. Use day para um dia (\"hoje\", \"ontem\", \
+\"AAAA-MM-DD\" ou \"DD/MM\") ou query para procurar em todos os dias (ex.: \"contrato\", \"figma\"). Bom para \"o que eu fiz ontem?\", \
+\"quando baixei X?\", \"quanto tempo fiquei no projeto Y hoje?\".",
+            json!({ "day": { "type": "string" }, "query": { "type": "string" } }),
+            &[],
+        ),
         tool("delete_habit", "Apaga um hábito pelo id (o usuário confirma antes).", json!({ "id": { "type": "integer" }, "name": { "type": "string" } }), &["id", "name"]),
     ])
 }
@@ -272,6 +281,7 @@ pub fn label(name: &str, input: &Value) -> String {
         },
         "start_pomodoro" => "Começando pomodoro".into(),
         "habits" => "Olhando seus hábitos".into(),
+        "journal" => "Lendo o diário".into(),
         "log_habit" => format!("Marcando {}", input["name"].as_str().unwrap_or("o hábito")),
         "create_habit" => format!("Criando o hábito {}", s(input, "name")),
         "delete_habit" => format!("Apagando o hábito {}", s(input, "name")),
@@ -551,6 +561,19 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
         "stop_pomodoro" => {
             focus::stop_pomodoro(app);
             Ok("Pomodoro encerrado.".into())
+        }
+        "journal" => {
+            let query = input["query"].as_str().unwrap_or("").trim();
+            if !query.is_empty() {
+                let found = crate::journal::search(app, query, 40);
+                if found.is_empty() {
+                    return Ok(format!("Nada com \"{query}\" no diário dos últimos 90 dias."));
+                }
+                return Ok(found.iter().map(|e| crate::journal::line(e, true)).collect::<Vec<_>>().join("\n"));
+            }
+            let day = input["day"].as_str().unwrap_or("hoje");
+            let day = crate::journal::parse_day(day).ok_or("Dia não entendido. Use hoje, ontem, AAAA-MM-DD ou DD/MM.")?;
+            Ok(crate::journal::day_text(app, &day))
         }
         "habits" => {
             let list = crate::habits::list(app);

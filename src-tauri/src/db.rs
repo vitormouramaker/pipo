@@ -122,6 +122,8 @@ impl Db {
         let _ = conn.execute("ALTER TABLE lol_games ADD COLUMN game_id INTEGER", []);
         let _ = conn.execute("ALTER TABLE lol_games ADD COLUMN played_at INTEGER", []);
         let _ = conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS lol_games_game ON lol_games (game_id)", []);
+        // Fase 9.4: diário automático.
+        crate::journal::create_table(&conn)?;
         Ok(Self { conn })
     }
 
