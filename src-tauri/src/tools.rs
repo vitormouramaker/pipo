@@ -189,6 +189,14 @@ pub fn definitions() -> Value {
             &["name"],
         ),
         tool(
+            "summarize",
+            "Resume algo grande: link do YouTube (usa a legenda quando o YouTube libera; senão, título e descrição), página da web, \
+PDF da web ou arquivo do PC (PDF, Word, PowerPoint, texto; passe o caminho). Textos longos são resumidos em partes. Use focus para \
+o que o usuário quer saber (ex.: \"só as conclusões\"). Devolva o resumo ao usuário, com a observação do fim, se houver.",
+            json!({ "source": { "type": "string" }, "focus": { "type": "string" } }),
+            &["source"],
+        ),
+        tool(
             "journal",
             "Diário automático do PC (últimos 90 dias): em que app/projeto o usuário passou cada trecho do dia (com títulos das janelas), \
 avisos, downloads, hábitos cumpridos, conversas com o Pipo, notas e partidas de LoL. Use day para um dia (\"hoje\", \"ontem\", \
@@ -282,6 +290,7 @@ pub fn label(name: &str, input: &Value) -> String {
         "start_pomodoro" => "Começando pomodoro".into(),
         "habits" => "Olhando seus hábitos".into(),
         "journal" => "Lendo o diário".into(),
+        "summarize" => "Lendo e resumindo".into(),
         "log_habit" => format!("Marcando {}", input["name"].as_str().unwrap_or("o hábito")),
         "create_habit" => format!("Criando o hábito {}", s(input, "name")),
         "delete_habit" => format!("Apagando o hábito {}", s(input, "name")),
@@ -561,6 +570,13 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
         "stop_pomodoro" => {
             focus::stop_pomodoro(app);
             Ok("Pomodoro encerrado.".into())
+        }
+        "summarize" => {
+            let source = input["source"].as_str().unwrap_or("").trim();
+            if source.is_empty() {
+                return Err("Diga o link ou o arquivo.".into());
+            }
+            tauri::async_runtime::block_on(crate::digest::run(app, source, input["focus"].as_str().unwrap_or("")))
         }
         "journal" => {
             let query = input["query"].as_str().unwrap_or("").trim();

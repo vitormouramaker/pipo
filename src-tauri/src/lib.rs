@@ -15,6 +15,7 @@ mod habits;
 mod journal;
 mod guardian;
 mod writer;
+mod digest;
 mod wake;
 mod install;
 mod island;
@@ -295,6 +296,8 @@ pub fn run() {
             writer::write_run,
             writer::write_apply,
             writer::write_close,
+            digest::digest_run,
+            digest::digest_pick,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

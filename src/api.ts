@@ -335,6 +335,8 @@ export type PanelView = "pipo" | "chat" | "today" | "journal" | "actions" | "cli
 
 /** Fase 9.4: diário automático. */
 export type JournalEntry = { day: string; start: string; end: string; kind: string; title: string; detail: string; tag: string };
+/** Fase 9.7: resumo de vídeo, página ou arquivo. */
+export type Digest = { title: string; kind: string; summary: string; note: string | null; url: string | null; chars: number };
 /** Fase 9.6: texto selecionado em qualquer app. */
 export type WriteSession = { text: string; appName: string; hasKey: boolean };
 /** Fase 9.5: guardião do PC. */
@@ -498,6 +500,8 @@ export const api = {
   writeRun: (action: string, custom?: string) => invoke<string>("write_run", { action, custom: custom ?? null }),
   writeApply: (text: string, mode: "replace" | "copy") => invoke<void>("write_apply", { text, mode }),
   writeClose: () => invoke<void>("write_close"),
+  digestRun: (input: string, focus?: string) => invoke<Digest>("digest_run", { input, focus: focus ?? null }),
+  digestPick: () => invoke<string | null>("digest_pick"),
   screenAsk: () => invoke<void>("screen_ask"),
   petFind: () => invoke<void>("pet_find"),
   captionsToggle: () => invoke<void>("captions_toggle"),

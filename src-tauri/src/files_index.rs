@@ -119,6 +119,11 @@ fn walk() -> Vec<(PathBuf, u64, i64)> {
 
 /// Texto do PDF num processo separado (com tempo máximo).
 fn pdf_text(path: &Path) -> Option<String> {
+    pdf_text_with(path, Duration::from_secs(25))
+}
+
+/// Igual, com o tempo máximo escolhido (PDFs grandes para resumir levam mais).
+pub(crate) fn pdf_text_with(path: &Path, timeout: Duration) -> Option<String> {
     let exe = std::env::current_exe().ok()?;
     let mut cmd = Command::new(exe);
     cmd.arg("--pdf-text").arg(path).stdout(Stdio::piped()).stderr(Stdio::null()).stdin(Stdio::null());
@@ -138,7 +143,7 @@ fn pdf_text(path: &Path) -> Option<String> {
     loop {
         match child.try_wait() {
             Ok(Some(_)) => break,
-            Ok(None) if started.elapsed() < Duration::from_secs(25) => std::thread::sleep(Duration::from_millis(50)),
+            Ok(None) if started.elapsed() < timeout => std::thread::sleep(Duration::from_millis(50)),
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();

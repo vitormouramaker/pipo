@@ -210,6 +210,21 @@ pub fn plain_text(a: &Attachment) -> Result<String, String> {
     text_of(a)
 }
 
+/// Fase 9.7: o texto inteiro, sem cortar (para resumir em partes).
+pub fn full_text(a: &Attachment) -> Result<String, String> {
+    let path = Path::new(&a.path);
+    let text = match a.kind {
+        Kind::Docx => docx_text(path)?,
+        Kind::Pptx => pptx_text(path)?,
+        Kind::Text => String::from_utf8_lossy(&std::fs::read(path).map_err(|e| e.to_string())?).into_owned(),
+        _ => return Err("Esse tipo de arquivo não tem texto para resumir.".into()),
+    };
+    if text.trim().is_empty() {
+        return Err("O arquivo não tem texto para ler.".into());
+    }
+    Ok(text)
+}
+
 /// Texto puro de um arquivo de texto, Word ou PowerPoint.
 fn text_of(a: &Attachment) -> Result<String, String> {
     let path = Path::new(&a.path);

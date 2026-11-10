@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import Summarize from "./Summarize";
 import { type DownloadsPlan, type FileHit, type FileIndexStatus, type Snippet, api, type Game, type RecentFile, type Routine, type RoutineStep } from "../../api";
 
 const STEP_LABEL: Record<RoutineStep["kind"], string> = {
@@ -570,6 +571,7 @@ function AskScreen() {
 export default function Shortcuts() {
   return (
     <>
+      <Summarize />
       <FileSearch />
       <LiveCaptions />
       <AskScreen />
