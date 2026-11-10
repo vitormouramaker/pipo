@@ -147,6 +147,10 @@ pub struct Settings {
     /// Fase 9.4: diário automático (e se guarda o título das janelas).
     pub journal: bool,
     pub journal_titles: bool,
+    /// Fase 9.5: guardião do PC (disco cheio, app travado, Windows Update no jogo) e
+    /// organização automática da pasta Downloads (uma vez por dia).
+    pub guardian: bool,
+    pub downloads_auto: bool,
     /// Fase 7.8: Gmail (só leitura; a senha de app fica no Gerenciador de Credenciais).
     pub email_enabled: bool,
     pub email_address: String,
@@ -241,6 +245,8 @@ impl Default for Settings {
             voice_conversation: true,
             journal: true,
             journal_titles: true,
+            guardian: true,
+            downloads_auto: false,
             email_enabled: false,
             email_address: String::new(),
             email_notify: false,

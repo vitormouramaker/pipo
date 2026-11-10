@@ -13,6 +13,7 @@ mod files_index;
 mod gdrive;
 mod habits;
 mod journal;
+mod guardian;
 mod wake;
 mod install;
 mod island;
@@ -283,6 +284,9 @@ pub fn run() {
             journal::journal_day,
             journal::journal_search,
             journal::journal_clear,
+            guardian::guardian_status,
+            guardian::guardian_enable_game_mode,
+            guardian::guardian_open_updates,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

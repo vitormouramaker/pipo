@@ -211,19 +211,35 @@ function RecentFiles() {
   );
 }
 
+const KINDS: { id: string; label: string }[] = [
+  { id: "duplicate", label: "Repetidos (mesmo conteúdo)" },
+  { id: "installer", label: "Instaladores antigos" },
+  { id: "extracted", label: "Compactados já extraídos" },
+  { id: "image", label: "Imagens de disco antigas" },
+  { id: "incomplete", label: "Downloads incompletos" },
+];
+
 function Downloads() {
   const [plan, setPlan] = useState<DownloadsPlan | null>(null);
+  const [auto, setAuto] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
-  const refresh = () =>
+  const refresh = () => {
+    setLoading(true);
     void api
       .downloadsPlan()
       .then((p) => {
         setPlan(p);
         setPicked(p.candidates.map((c) => c.path));
       })
-      .catch((e) => setMessage(String(e)));
-  useEffect(refresh, []);
+      .catch((e) => setMessage(String(e)))
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => {
+    refresh();
+    void api.getSettings().then((s) => setAuto(s.downloadsAuto));
+  }, []);
   const mb = (b: number) => (b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1e6))} MB`);
   const run = (p: Promise<number>, text: (n: number) => string) =>
     void p
@@ -232,7 +248,13 @@ function Downloads() {
         refresh();
       })
       .catch((e) => setMessage(String(e)));
-  if (!plan) return null;
+  if (!plan)
+    return (
+      <div className="block">
+        <h4>Pasta Downloads</h4>
+        <p className="hint">{loading ? "Olhando a pasta e comparando os arquivos…" : message}</p>
+      </div>
+    );
   const toMove = plan.groups.reduce((n, g) => n + g.count, 0);
   const trashBytes = plan.candidates.filter((c) => picked.includes(c.path)).reduce((n, c) => n + c.bytes, 0);
   return (
@@ -257,20 +279,60 @@ function Downloads() {
       ) : (
         <p className="hint">Nada solto para organizar agora.</p>
       )}
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={auto}
+          onChange={(e) => {
+            setAuto(e.target.checked);
+            void api.settingsUpdate({ downloadsAuto: e.target.checked });
+          }}
+        />
+        Organizar sozinho uma vez por dia (só o que chegou antes de ontem, com o PC parado)
+      </label>
       {plan.candidates.length > 0 && (
         <>
-          <p className="hint">Provavelmente dá para apagar (vai para a Lixeira, dá para restaurar):</p>
-          {plan.candidates.map((c) => (
-            <label key={c.path} className="trow check-row">
-              <input
-                type="checkbox"
-                checked={picked.includes(c.path)}
-                onChange={(e) => setPicked((p) => (e.target.checked ? [...p, c.path] : p.filter((x) => x !== c.path)))}
-              />
-              <span className="grow" title={c.name}>{c.name}</span>
-              <span className="row-meta">{c.reason} · {mb(c.bytes)}</span>
-            </label>
-          ))}
+          <p className="hint">
+            Provavelmente dá para apagar ({mb(plan.candidates.reduce((n, c) => n + c.bytes, 0))} no total). Vai para a Lixeira, dá para
+            restaurar:
+          </p>
+          {KINDS.filter((k) => plan.candidates.some((c) => c.kind === k.id)).map((k) => {
+            const list = plan.candidates.filter((c) => c.kind === k.id);
+            const all = list.every((c) => picked.includes(c.path));
+            return (
+              <div key={k.id} className="dl-group">
+                <label className="check dl-group-head">
+                  <input
+                    type="checkbox"
+                    checked={all}
+                    onChange={(e) =>
+                      setPicked((p) => (e.target.checked ? [...new Set([...p, ...list.map((c) => c.path)])] : p.filter((x) => !list.some((c) => c.path === x))))
+                    }
+                  />
+                  <strong>{k.label}</strong>
+                  <span className="row-meta">
+                    {list.length} · {mb(list.reduce((n, c) => n + c.bytes, 0))}
+                  </span>
+                </label>
+                {list.map((c) => (
+                  <label key={c.path} className="trow check-row">
+                    <input
+                      type="checkbox"
+                      checked={picked.includes(c.path)}
+                      onChange={(e) => setPicked((p) => (e.target.checked ? [...p, c.path] : p.filter((x) => x !== c.path)))}
+                    />
+                    <span className="grow" title={c.folder ? `${c.folder}\\${c.name}` : c.name}>
+                      {c.folder && <span className="muted">{c.folder}{"\\"}</span>}
+                      {c.name}
+                    </span>
+                    <span className="row-meta">
+                      {c.reason} · {mb(c.bytes)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            );
+          })}
           <div className="btns">
             <button disabled={picked.length === 0} onClick={() => run(api.downloadsTrash(picked), (n) => `${n} arquivo(s) foram para a Lixeira.`)}>
               Mandar {picked.length} para a Lixeira ({mb(trashBytes)})

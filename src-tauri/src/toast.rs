@@ -163,6 +163,10 @@ pub async fn toast_open(app: AppHandle, url: Option<String>, view: Option<String
         return crate::miniplayer::open_key(&app, &key).await;
     }
     if let Some(url) = url {
+        // A tela do Windows Update (aviso do guardião depois de um jogo).
+        if url == crate::guardian::UPDATE_SETTINGS {
+            return crate::actions::shell_open(&url);
+        }
         return crate::world::open_url(url);
     }
     if let Some(prompt) = prompt {

@@ -85,6 +85,8 @@ export type Settings = {
   voiceConversation: boolean;
   journal: boolean;
   journalTitles: boolean;
+  guardian: boolean;
+  downloadsAuto: boolean;
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -255,7 +257,7 @@ export type MailStatus = { configured: boolean; address: string; unread: Mail[];
 export type DownloadsPlan = {
   loose: number;
   groups: { folder: string; count: number; bytes: number }[];
-  candidates: { path: string; name: string; reason: string; bytes: number }[];
+  candidates: { path: string; name: string; reason: string; bytes: number; kind: string; folder: string }[];
   canUndo: boolean;
 };
 export type VoiceState = { phase: "idle" | "listening" | "transcribing" | "error" | "nomodel"; message: string | null };
@@ -332,6 +334,12 @@ export type PanelView = "pipo" | "chat" | "today" | "journal" | "actions" | "cli
 
 /** Fase 9.4: diário automático. */
 export type JournalEntry = { day: string; start: string; end: string; kind: string; title: string; detail: string; tag: string };
+/** Fase 9.5: guardião do PC. */
+export type GuardianStatus = {
+  drives: { letter: string; free: number; total: number; level: number }[];
+  gameMode: boolean;
+  rebootPending: boolean;
+};
 export type JournalDay = { day: string; entries: JournalEntry[]; hasBefore: boolean };
 
 export type UsageSummary = {
@@ -479,6 +487,9 @@ export const api = {
   journalDay: (day?: string) => invoke<JournalDay>("journal_day", { day: day ?? null }),
   journalSearch: (query: string) => invoke<JournalEntry[]>("journal_search", { query }),
   journalClear: () => invoke<void>("journal_clear"),
+  guardianStatus: () => invoke<GuardianStatus>("guardian_status"),
+  guardianEnableGameMode: () => invoke<void>("guardian_enable_game_mode"),
+  guardianOpenUpdates: () => invoke<void>("guardian_open_updates"),
   screenAsk: () => invoke<void>("screen_ask"),
   petFind: () => invoke<void>("pet_find"),
   captionsToggle: () => invoke<void>("captions_toggle"),

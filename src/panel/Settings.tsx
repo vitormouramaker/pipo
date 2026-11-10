@@ -11,7 +11,7 @@ import {
 } from "./settings7";
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { type OldCopy, api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
+import { type OldCopy, type GuardianStatus, api, MODELS, type Memory, type Settings, type UpdateStatus, type VoiceStatus } from "../api";
 import { loadVoices, speak } from "./speech";
 
 const VOICE_MODELS = [
@@ -316,6 +316,65 @@ function WakeWord({ settings, update, modelReady }: { settings: Settings; update
             frases curtas são analisadas, nada é gravado nem enviado, e ele não escuta enquanto o próprio Pipo fala. Usa um pouco de
             memória (~200 MB) enquanto ligado.
           </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Fase 9.5: guardião do PC (disco, app travado, Windows Update no jogo). */
+function Guardian({ settings, update }: { settings: Settings; update: (patch: Partial<Settings>) => void }) {
+  const [status, setStatus] = useState<GuardianStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const refresh = () => void api.guardianStatus().then(setStatus);
+  useEffect(refresh, []);
+  const gb = (b: number) => `${(b / 1e9).toFixed(b >= 1e11 ? 0 : 1).replace(".", ",")} GB`;
+  return (
+    <div className="guardian">
+      <label className="check">
+        <input type="checkbox" checked={settings.guardian} onChange={(e) => update({ guardian: e.target.checked })} />
+        Guardião do PC: avisar disco quase cheio, app travado e Windows Update atrapalhando o jogo
+      </label>
+      {settings.guardian && status && (
+        <>
+          <div className="guardian-drives">
+            {status.drives.map((d) => (
+              <span key={d.letter} className={`guardian-drive level-${d.level}`} title={`${gb(d.free)} livres de ${gb(d.total)}`}>
+                <strong>{d.letter}</strong>
+                <span className="meter">
+                  <span className={`meter-fill${d.level === 2 ? " high" : d.level === 1 ? " mid" : ""}`} style={{ width: `${Math.round((1 - d.free / d.total) * 100)}%` }} />
+                </span>
+                {gb(d.free)} livres
+              </span>
+            ))}
+          </div>
+          {status.gameMode ? (
+            <p className="hint ok">Modo de Jogo do Windows ligado: ele segura o Windows Update e os pedidos de reinício enquanto um jogo está aberto. ✓</p>
+          ) : (
+            <p className="hint error">
+              O Modo de Jogo do Windows está desligado, então o Windows Update pode baixar e instalar coisas no meio da partida.{" "}
+              <button
+                className="link"
+                onClick={() =>
+                  void api
+                    .guardianEnableGameMode()
+                    .then(refresh)
+                    .catch((e) => setError(String(e)))
+                }
+              >
+                Ligar o Modo de Jogo
+              </button>
+            </p>
+          )}
+          {status.rebootPending && (
+            <p className="hint">
+              O Windows está esperando reiniciar para terminar uma atualização. Reinicie quando puder, antes de jogar.{" "}
+              <button className="link" onClick={() => void api.guardianOpenUpdates()}>
+                Abrir o Windows Update
+              </button>
+            </p>
+          )}
+          {error && <p className="hint error">{error}</p>}
         </>
       )}
     </div>
@@ -747,6 +806,7 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
           />
           Avisar quando a CPU ou a memória ficarem no limite
         </label>
+        <Guardian settings={settings} update={update} />
         <label className="check">
           <input
             type="checkbox"

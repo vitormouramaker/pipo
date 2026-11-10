@@ -1,6 +1,6 @@
 [package]
 name = "pipo"
-version = "0.9.4"
+version = "0.9.5"
 description = "Pipo, bichinho virtual de desktop"
 authors = ["vitormouramaker"]
 edition = "2024"
@@ -57,7 +57,9 @@ windows-sys = { version = "0.59", features = [
     "Win32_Graphics_Gdi",
     "Win32_System_Com",
     "Win32_System_DataExchange",
+    "Win32_Storage_FileSystem",
     "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
     "Win32_System_Shutdown",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",
