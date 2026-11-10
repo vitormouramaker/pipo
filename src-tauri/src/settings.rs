@@ -149,6 +149,8 @@ pub struct Settings {
     /// Fase 9.4: diário automático (e se guarda o título das janelas).
     pub journal: bool,
     pub journal_titles: bool,
+    /// Fase 9.11: servidores MCP (os segredos ficam no Gerenciador de Credenciais).
+    pub mcp_servers: Vec<crate::mcp::McpServer>,
     /// Fase 9.5: guardião do PC (disco cheio, app travado, Windows Update no jogo) e
     /// organização automática da pasta Downloads (uma vez por dia).
     pub guardian: bool,
@@ -248,6 +250,7 @@ impl Default for Settings {
             voice_conversation: true,
             journal: true,
             journal_titles: true,
+            mcp_servers: Vec::new(),
             guardian: true,
             downloads_auto: false,
             email_enabled: false,

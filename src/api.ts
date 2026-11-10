@@ -85,6 +85,7 @@ export type Settings = {
   voiceConversation: boolean;
   journal: boolean;
   journalTitles: boolean;
+  mcpServers: McpServer[];
   guardian: boolean;
   downloadsAuto: boolean;
   writeShortcut: string;
@@ -114,6 +115,19 @@ export type LifeStatus = {
   pets: number;
   games: number;
 };
+/** Fase 9.11: servidor MCP. */
+export type McpServer = {
+  name: string;
+  kind: "stdio" | "http" | string;
+  command: string;
+  args: string[];
+  url: string;
+  enabled: boolean;
+  trusted: boolean;
+  secretEnv: string[];
+  hasToken: boolean;
+};
+export type McpServerStatus = McpServer & { connected: boolean; tools: { name: string; description: string }[]; error: string | null };
 /** Fase 9.8: recorde de um mini-jogo. */
 export type GameScore = { game: string; best: number; plays: number; record: boolean };
 
@@ -509,6 +523,11 @@ export const api = {
   minigameFinish: (game: string, score: number) => invoke<GameScore>("minigame_finish", { game, score }),
   minigameScores: () => invoke<GameScore[]>("minigame_scores"),
   petAffection: () => invoke<void>("pet_affection"),
+  mcpStatus: () => invoke<McpServerStatus[]>("mcp_status"),
+  mcpSave: (server: McpServer, original: string | null, secretsIn: Record<string, string>) =>
+    invoke<void>("mcp_save", { server, original, secretsIn }),
+  mcpRemove: (name: string) => invoke<void>("mcp_remove", { name }),
+  mcpTest: (name: string) => invoke<{ name: string; description: string }[]>("mcp_test", { name }),
   screenAsk: () => invoke<void>("screen_ask"),
   petFind: () => invoke<void>("pet_find"),
   captionsToggle: () => invoke<void>("captions_toggle"),

@@ -463,6 +463,13 @@ async fn run(
             .collect();
 
         let mut all_tools = tools::definitions().as_array().cloned().unwrap_or_default();
+        // Fase 9.11: ferramentas dos servidores MCP ligados (conectar pode demorar: fora da thread async).
+        if settings.mcp_servers.iter().any(|s| s.enabled) {
+            let handle = app.clone();
+            if let Ok(mcp) = tauri::async_runtime::spawn_blocking(move || crate::mcp::tool_definitions(&handle)).await {
+                all_tools.extend(mcp);
+            }
+        }
         let web = settings.web_search && !WEB_UNSUPPORTED.load(Ordering::SeqCst);
         if web {
             all_tools.extend(web_tools(&settings.model, &settings.city, 5));
@@ -594,8 +601,9 @@ async fn run(
 
 /// Pede confirmação quando a ação tem efeito e executa fora da thread principal.
 async fn run_tool(app: &AppHandle, name: &str, input: &Value, sink: &Sink<'_>) -> Result<String, String> {
-    if tools::needs_confirmation(name) {
-        let question = tools::confirmation(name, input);
+    let mcp = crate::mcp::is_mcp(name);
+    if tools::needs_confirmation(name) || (mcp && crate::mcp::needs_confirmation(app, name)) {
+        let question = if mcp { crate::mcp::confirmation(app, name, input) } else { tools::confirmation(name, input) };
         let approved = match sink {
             Sink::Remote(remote) => remote.confirm(&question, CONFIRM_TIMEOUT).await,
             Sink::Panel(_) => {

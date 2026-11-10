@@ -295,6 +295,11 @@ pub fn label(name: &str, input: &Value) -> String {
         "create_habit" => format!("Criando o hábito {}", s(input, "name")),
         "delete_habit" => format!("Apagando o hábito {}", s(input, "name")),
         "stop_pomodoro" => "Encerrando pomodoro".into(),
+        // mcp__servidor__ferramenta -> "Usando ferramenta (servidor)".
+        other if crate::mcp::is_mcp(other) => match other.trim_start_matches("mcp__").split_once("__") {
+            Some((server, tool)) => format!("Usando {tool} ({server})"),
+            None => "Usando uma ferramenta MCP".into(),
+        },
         other => other.to_string(),
     }
 }
@@ -625,6 +630,8 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
             crate::habits::save(app, habit).map(|id| format!("Hábito criado (id {id}). Aparece na aba Hoje; cumprir a meta dá XP ao Pipo."))
         }
         "delete_habit" => crate::habits::delete(app, input["id"].as_i64().unwrap_or(0)).map(|_| "Hábito apagado.".into()),
+        // Fase 9.11: ferramentas dos servidores MCP.
+        other if crate::mcp::is_mcp(other) => crate::mcp::call(app, other, input),
         other => Err(format!("Ferramenta desconhecida: {other}")),
     }
 }

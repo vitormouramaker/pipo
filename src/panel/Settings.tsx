@@ -1,4 +1,5 @@
 import SettingsNav from "./SettingsNav";
+import McpSettings from "./McpSettings";
 import {
   CaptionsSettings,
   CloudSettings,
@@ -738,6 +739,7 @@ export default function SettingsView({ onKeyChange }: { onKeyChange: () => void 
         <TelegramSettings settings={settings} update={update} />
         <EmailSettings settings={settings} update={update} />
         <LolSettings settings={settings} update={update} />
+        <McpSettings />
       </fieldset>
 
       <VoiceSettings settings={settings} update={update} />

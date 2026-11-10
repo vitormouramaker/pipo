@@ -17,6 +17,7 @@ mod guardian;
 mod writer;
 mod digest;
 mod play;
+mod mcp;
 mod wake;
 mod install;
 mod island;
@@ -302,6 +303,10 @@ pub fn run() {
             play::minigame_finish,
             play::minigame_scores,
             play::pet_affection,
+            mcp::mcp_status,
+            mcp::mcp_save,
+            mcp::mcp_remove,
+            mcp::mcp_test,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

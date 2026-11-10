@@ -958,3 +958,19 @@
 @media (prefers-reduced-motion: reduce) {
   .reflex-pipo { animation: none; }
 }
+
+/* Fase 9.11: servidores MCP */
+.mcp { display: grid; gap: 8px; margin-top: 10px; }
+.mcp-help { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 12.5px; line-height: 1.45; }
+.mcp-help p { margin: 0; }
+.mcp-help code, .mcp-tools code { font-size: 11.5px; overflow-wrap: anywhere; }
+.mcp-form .segmented { justify-self: start; }
+.mcp-vars { display: grid; gap: 6px; }
+.mcp-vars .link { justify-self: start; }
+.mcp-server { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.mcp-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mcp-head .row-meta { flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.mcp-server .hint { margin: 0; }
+.mcp-server .btns { flex-wrap: wrap; gap: 4px 12px; }
+.mcp-trust { margin-right: auto; font-size: 12.5px; }
+.mcp-tools { margin: 2px 0; padding-left: 18px; font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
