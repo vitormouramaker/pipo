@@ -14,6 +14,7 @@ mod gdrive;
 mod habits;
 mod journal;
 mod guardian;
+mod writer;
 mod wake;
 mod install;
 mod island;
@@ -118,9 +119,9 @@ pub fn run() {
                     if event.state() != ShortcutState::Pressed {
                         return;
                     }
-                    let (voice, screen, find, plain, captions) = {
+                    let (voice, screen, find, plain, captions, write) = {
                         let s = app.state::<AppState>().settings.lock().unwrap().clone();
-                        (s.voice_shortcut, s.screen_shortcut, s.find_shortcut, s.plain_paste_shortcut, s.captions_shortcut)
+                        (s.voice_shortcut, s.screen_shortcut, s.find_shortcut, s.plain_paste_shortcut, s.captions_shortcut, s.write_shortcut)
                     };
                     let is = |text: &str| text.parse::<tauri_plugin_global_shortcut::Shortcut>().is_ok_and(|v| v == *shortcut);
                     if is(&voice) {
@@ -133,6 +134,8 @@ pub fn run() {
                         clipboard::paste_plain(app);
                     } else if is(&captions) {
                         captions::toggle(app);
+                    } else if is(&write) {
+                        writer::start(app);
                     } else {
                         windows::toggle_panel(app);
                     }
@@ -287,6 +290,11 @@ pub fn run() {
             guardian::guardian_status,
             guardian::guardian_enable_game_mode,
             guardian::guardian_open_updates,
+            writer::write_pending,
+            writer::write_layout,
+            writer::write_run,
+            writer::write_apply,
+            writer::write_close,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

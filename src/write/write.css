@@ -1,0 +1,73 @@
+/* Fase 9.6: janelinha do texto selecionado (mesma identidade dos avisos e do painel). */
+html,
+body {
+  background: transparent;
+}
+.write {
+  box-sizing: border-box;
+  width: 400px;
+  padding: 10px 12px 12px;
+  background: #1f2227;
+  border: 1px solid #2f333a;
+  border-left: 3px solid #2dd4e8;
+  border-radius: 14px;
+  color: #e8eaed;
+  font-family: "Segoe UI Variable Text", "Segoe UI", Inter, system-ui, sans-serif;
+  font-size: 13px;
+  display: grid;
+  gap: 8px;
+  animation: write-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+@keyframes write-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .write { animation: none; }
+}
+
+.write-head { display: flex; align-items: center; gap: 8px; cursor: default; user-select: none; }
+.write-face { width: 28px; height: 28px; flex-shrink: 0; }
+.write-title { flex: 1; font-weight: 600; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.write-title small { color: #8a919c; font-weight: 400; font-size: 11.5px; }
+.write-close {
+  border: 0; background: transparent; color: #8a919c; cursor: pointer; width: 24px; height: 24px; border-radius: 6px; font-size: 12px;
+}
+.write-close:hover { background: #2f333a; color: #e8eaed; }
+
+.write-preview {
+  margin: 0; color: #8a919c; font-size: 12.5px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.write-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.write button {
+  font: inherit; color: inherit; cursor: pointer;
+}
+.write-actions button, .write-buttons button:not(.link) {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 8px;
+  border: 1px solid #2f333a; border-radius: 9px; background: #262a30; font-size: 12.5px; white-space: nowrap;
+}
+.write-actions button:hover:not(:disabled), .write-buttons button:not(.link):hover { border-color: #2dd4e8; }
+.write-actions button:disabled { opacity: 0.4; cursor: default; }
+.write kbd {
+  font-family: inherit; font-size: 10.5px; color: #8a919c; border: 1px solid #3a3f47; border-radius: 4px; padding: 0 4px; line-height: 15px;
+}
+.write-buttons button.primary { background: #2dd4e8; border-color: #2dd4e8; color: #0f1215; font-weight: 600; }
+.write-buttons button.primary kbd { color: #0f1215; border-color: rgba(15, 18, 21, 0.35); }
+
+.write-custom input {
+  width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid #2f333a; border-radius: 9px;
+  background: #17191d; color: #e8eaed; font: inherit; font-size: 12.5px; outline: none;
+}
+.write-custom input:focus { border-color: #2dd4e8; }
+
+.write-wait { margin: 2px 0; color: #8a919c; }
+.write-result {
+  max-height: 240px; overflow-y: auto; padding: 8px 10px; border-radius: 9px; background: #17191d; border: 1px solid #2f333a;
+  white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; user-select: text; outline: none;
+}
+.write-buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.write-buttons .link { border: 0; background: transparent; color: #2dd4e8; padding: 4px; font-size: 12.5px; }
+.write-buttons .link:hover { text-decoration: underline; }
+.write-error { margin: 0; color: #f5b544; font-size: 12.5px; }

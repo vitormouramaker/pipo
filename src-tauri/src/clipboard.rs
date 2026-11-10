@@ -49,7 +49,7 @@ pub struct ClipboardHistory {
     next_id: u64,
     last_seq: u32,
     /// Sequência da última cópia feita pelo próprio Pipo (não entra de novo no topo).
-    own_seq: Option<u32>,
+    pub(crate) own_seq: Option<u32>,
 }
 
 impl ClipboardHistory {
@@ -119,12 +119,12 @@ pub fn looks_like_error(text: &str) -> bool {
 }
 
 #[cfg(windows)]
-fn sequence_number() -> u32 {
+pub(crate) fn sequence_number() -> u32 {
     unsafe { windows_sys::Win32::System::DataExchange::GetClipboardSequenceNumber() }
 }
 
 #[cfg(not(windows))]
-fn sequence_number() -> u32 {
+pub(crate) fn sequence_number() -> u32 {
     0
 }
 

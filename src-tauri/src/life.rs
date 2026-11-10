@@ -20,6 +20,7 @@ fn reward(kind: &str) -> (i64, Option<i64>) {
         "checkin" => (15, Some(15)),
         "habit" => (15, Some(90)),
         "habit-streak" => (40, None),
+        "write" => (5, Some(50)),
         _ => (0, Some(0)),
     }
 }

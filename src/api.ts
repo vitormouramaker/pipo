@@ -87,6 +87,7 @@ export type Settings = {
   journalTitles: boolean;
   guardian: boolean;
   downloadsAuto: boolean;
+  writeShortcut: string;
   emailEnabled: boolean;
   emailAddress: string;
   emailNotify: boolean;
@@ -334,6 +335,8 @@ export type PanelView = "pipo" | "chat" | "today" | "journal" | "actions" | "cli
 
 /** Fase 9.4: diário automático. */
 export type JournalEntry = { day: string; start: string; end: string; kind: string; title: string; detail: string; tag: string };
+/** Fase 9.6: texto selecionado em qualquer app. */
+export type WriteSession = { text: string; appName: string; hasKey: boolean };
 /** Fase 9.5: guardião do PC. */
 export type GuardianStatus = {
   drives: { letter: string; free: number; total: number; level: number }[];
@@ -490,6 +493,11 @@ export const api = {
   guardianStatus: () => invoke<GuardianStatus>("guardian_status"),
   guardianEnableGameMode: () => invoke<void>("guardian_enable_game_mode"),
   guardianOpenUpdates: () => invoke<void>("guardian_open_updates"),
+  writePending: () => invoke<WriteSession | null>("write_pending"),
+  writeLayout: (width: number, height: number) => invoke<void>("write_layout", { width, height }),
+  writeRun: (action: string, custom?: string) => invoke<string>("write_run", { action, custom: custom ?? null }),
+  writeApply: (text: string, mode: "replace" | "copy") => invoke<void>("write_apply", { text, mode }),
+  writeClose: () => invoke<void>("write_close"),
   screenAsk: () => invoke<void>("screen_ask"),
   petFind: () => invoke<void>("pet_find"),
   captionsToggle: () => invoke<void>("captions_toggle"),

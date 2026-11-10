@@ -46,6 +46,8 @@ pub struct Settings {
     pub plain_paste_shortcut: String,
     /// Fase 8.5: legenda ao vivo do som do PC.
     pub captions_shortcut: String,
+    /// Fase 9.6: corrigir/traduzir/resumir o texto selecionado em qualquer app.
+    pub write_shortcut: String,
     pub captions_translate: bool,
     pub captions_original: bool,
     pub captions_size: u8,
@@ -183,6 +185,7 @@ impl Default for Settings {
             find_shortcut: "Ctrl+Alt+Shift+P".into(),
             plain_paste_shortcut: "Ctrl+Alt+Shift+T".into(),
             captions_shortcut: "Ctrl+Alt+Shift+L".into(),
+            write_shortcut: "Ctrl+Alt+Shift+E".into(),
             captions_translate: true,
             captions_original: true,
             captions_size: 22,
@@ -301,12 +304,16 @@ fn register_shortcuts(app: &AppHandle, s: &Settings) -> Result<(), String> {
         gs.register(s.find_shortcut.as_str())
             .map_err(|e| format!("Atalho para encontrar o Pipo inválido ou em uso por outro app ({}): {e}", s.find_shortcut))?;
     }
+    if !s.write_shortcut.trim().is_empty() {
+        gs.register(s.write_shortcut.as_str())
+            .map_err(|e| format!("Atalho do texto selecionado inválido ou em uso por outro app ({}): {e}", s.write_shortcut))?;
+    }
     Ok(())
 }
 
 /// Aplica as configurações no sistema. Na inicialização `old` é `None`.
 pub fn apply(app: &AppHandle, new: &Settings, old: Option<&Settings>) -> Result<(), String> {
-    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut || o.find_shortcut != new.find_shortcut || o.plain_paste_shortcut != new.plain_paste_shortcut || o.captions_shortcut != new.captions_shortcut) {
+    if old.map_or(true, |o| o.shortcut != new.shortcut || o.voice_shortcut != new.voice_shortcut || o.screen_shortcut != new.screen_shortcut || o.find_shortcut != new.find_shortcut || o.plain_paste_shortcut != new.plain_paste_shortcut || o.captions_shortcut != new.captions_shortcut || o.write_shortcut != new.write_shortcut) {
         if let Err(e) = register_shortcuts(app, new) {
             if let Some(o) = old {
                 let _ = register_shortcuts(app, o);
