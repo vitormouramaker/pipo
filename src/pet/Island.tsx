@@ -45,9 +45,12 @@ export default function Island({
   skin,
   islandStyle,
   gaze = [0, 0],
+  hearts = null,
 }: {
   edge: Edge;
   state: PipoState;
+  /** Carinho: chave dos corações (null = sem corações). */
+  hearts?: number | null;
   scale?: number;
   skin?: string;
   islandStyle?: string;
@@ -190,6 +193,13 @@ export default function Island({
       </div>
       </div>
       </div>
+      {hearts && (
+        <span className="hearts-fx island-hearts" key={hearts} aria-hidden="true" style={{ left: x, top: y, width: w, height: h }}>
+          <span>♥</span>
+          <span>♥</span>
+          <span>♥</span>
+        </span>
+      )}
     </main>
   );
 }

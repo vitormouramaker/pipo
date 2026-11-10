@@ -530,21 +530,34 @@ mod stroke_tests {
 
     #[test]
     fn reconhece_o_carinho() {
-        let mut s = Stroke::default();
         let t0 = Instant::now();
         let ms = |n: u64| t0 + Duration::from_millis(n);
-        // Vai e volta 2 vezes (3 viradas) em ~1 s.
+        // De lado: vai e volta 2 vezes (3 viradas) em ~1 s.
+        let mut s = Stroke::default();
         let xs = [100.0, 130.0, 160.0, 130.0, 100.0, 130.0, 160.0, 130.0];
-        let fired: Vec<bool> = xs.iter().enumerate().map(|(i, &x)| s.feed(true, x, ms(i as u64 * 140), 8.0)).collect();
+        let fired: Vec<bool> = xs.iter().enumerate().map(|(i, &x)| s.feed(true, (x, 50.0), ms(i as u64 * 140), 8.0)).collect();
         assert_eq!(fired.iter().filter(|f| **f).count(), 1, "{fired:?}");
         // Logo depois, ainda em espera: não dispara de novo.
-        assert!(!(0..8).any(|i| s.feed(true, if i % 2 == 0 { 100.0 } else { 140.0 }, ms(1200 + i * 100), 8.0)));
-        // Tremidinha (menos que o passo) não conta; sair de cima zera.
+        assert!(!(0..8).any(|i| s.feed(true, (if i % 2 == 0 { 100.0 } else { 140.0 }, 50.0), ms(1200 + i * 100), 8.0)));
+
+        // De cima para baixo também vale.
+        let mut v = Stroke::default();
+        let ys = [10.0, 40.0, 70.0, 40.0, 10.0, 40.0, 70.0, 40.0];
+        assert!(ys.iter().enumerate().any(|(i, &y)| v.feed(true, (200.0, y), ms(i as u64 * 150), 8.0)));
+
+        // Passando da borda a cada ida (fora por pouco tempo) continua contando.
+        let mut b = Stroke::default();
+        let path = [(100.0, true), (160.0, true), (220.0, false), (160.0, true), (100.0, true), (40.0, false), (100.0, true), (160.0, true), (220.0, false), (160.0, true)];
+        assert!(path.iter().enumerate().any(|(i, &(x, near))| b.feed(near, (x, 50.0), ms(i as u64 * 120), 8.0)));
+
+        // Tremidinha (menos que o passo) não conta.
         let mut q = Stroke::default();
-        assert!(!(0..20).any(|i| q.feed(true, 100.0 + (i % 2) as f64 * 3.0, ms(i * 50), 8.0)));
+        assert!(!(0..20).any(|i| q.feed(true, (100.0 + (i % 2) as f64 * 3.0, 50.0), ms(i * 50), 8.0)));
+
+        // Longe por mais de 0,8 s: zera.
         let mut r = Stroke::default();
-        assert!(!r.feed(true, 100.0, ms(0), 8.0) && !r.feed(true, 140.0, ms(100), 8.0) && !r.feed(true, 100.0, ms(200), 8.0));
-        assert!(!r.feed(false, 0.0, ms(300), 8.0));
+        assert!(!r.feed(true, (100.0, 0.0), ms(0), 8.0) && !r.feed(true, (140.0, 0.0), ms(100), 8.0) && !r.feed(true, (100.0, 0.0), ms(200), 8.0));
+        assert!(!r.feed(false, (0.0, 0.0), ms(300), 8.0) && !r.feed(false, (0.0, 0.0), ms(1200), 8.0));
         assert!(r.turns.is_empty());
     }
 }
@@ -614,49 +627,82 @@ fn gaze(pos: PhysicalPosition<i32>, size: PhysicalSize<u32>, cursor: (f64, f64))
 /// Fase 9.8: carinho = cursor indo e voltando em cima do Pipo (sem botão apertado).
 /// Lido aqui, no laço do cursor, porque a janela do Pipo nem sempre recebe o movimento
 /// do mouse (ela deixa o mouse passar fora do corpo, e a ilha é outra interface).
+///
+/// O vaivém pode ser em qualquer direção (de lado ou de cima para baixo), e o cursor pode
+/// passar um pouco da borda a cada ida: só zera se ficar longe por mais de 0,8 s.
 #[derive(Default)]
 pub(crate) struct Stroke {
-    last_x: Option<f64>,
-    dir: i8,
+    last: Option<(f64, f64)>,
+    /// Direção atual em cada eixo (-1, 0, 1).
+    dir: (i8, i8),
     turns: Vec<std::time::Instant>,
+    away_since: Option<std::time::Instant>,
     cooldown: Option<std::time::Instant>,
 }
 
 /// Viradas de direção para contar como carinho, dentro desta janela de tempo.
 const PET_TURNS: usize = 3;
-const PET_WINDOW: Duration = Duration::from_millis(2200);
-const PET_COOLDOWN: Duration = Duration::from_millis(3500);
+const PET_WINDOW: Duration = Duration::from_millis(2500);
+const PET_AWAY: Duration = Duration::from_millis(800);
+const PET_COOLDOWN: Duration = Duration::from_millis(3000);
 
 impl Stroke {
-    /// Devolve true quando reconhece um carinho. `step` = movimento mínimo (px) que conta.
-    pub(crate) fn feed(&mut self, over: bool, x: f64, now: std::time::Instant, step: f64) -> bool {
-        if !over {
-            self.last_x = None;
-            self.dir = 0;
-            self.turns.clear();
-            return false;
+    /// Devolve true quando reconhece um carinho. `near` = cursor em cima (ou bem perto) do Pipo;
+    /// `step` = movimento mínimo (px) que conta.
+    pub(crate) fn feed(&mut self, near: bool, p: (f64, f64), now: std::time::Instant, step: f64) -> bool {
+        if near {
+            self.away_since = None;
+        } else {
+            // Fora por pouco tempo (a mão passou da borda): continua acompanhando o vaivém.
+            let away = *self.away_since.get_or_insert(now);
+            if now.duration_since(away) > PET_AWAY || self.last.is_none() {
+                self.last = None;
+                self.dir = (0, 0);
+                self.turns.clear();
+                return false;
+            }
         }
-        let Some(last) = self.last_x else {
-            self.last_x = Some(x);
+        let Some(last) = self.last else {
+            self.last = Some(p);
             return false;
         };
-        let dx = x - last;
-        if dx.abs() < step {
+        let (dx, dy) = (p.0 - last.0, p.1 - last.1);
+        if dx.abs() < step && dy.abs() < step {
             return false;
         }
-        self.last_x = Some(x);
-        let dir = if dx > 0.0 { 1 } else { -1 };
-        if self.dir != 0 && dir != self.dir {
+        self.last = Some(p);
+        // Conta a virada no eixo em que o movimento foi maior.
+        let sign = |v: f64| if v > 0.0 { 1 } else { -1 };
+        let turned = if dx.abs() >= dy.abs() {
+            let d = sign(dx);
+            let t = self.dir.0 != 0 && d != self.dir.0;
+            self.dir.0 = d;
+            t
+        } else {
+            let d = sign(dy);
+            let t = self.dir.1 != 0 && d != self.dir.1;
+            self.dir.1 = d;
+            t
+        };
+        if turned {
             self.turns.retain(|t| now.duration_since(*t) < PET_WINDOW);
             self.turns.push(now);
         }
-        self.dir = dir;
         if self.turns.len() >= PET_TURNS && self.cooldown.is_none_or(|c| now >= c) {
             self.turns.clear();
             self.cooldown = Some(now + PET_COOLDOWN);
             return true;
         }
         false
+    }
+}
+
+/// Carinho reconhecido: a janela reage, o XP conta (aqui mesmo, sem depender da página) e fica no log.
+fn pet_affection(app: &AppHandle) {
+    let _ = app.emit_to(MAIN, "pipo-pet", ());
+    crate::life::award(app, "carinho", 1);
+    if let Ok(dir) = app.path().app_data_dir() {
+        crate::log(&dir, "carinho reconhecido");
     }
 }
 
@@ -699,8 +745,10 @@ pub fn start_hit_test(app: AppHandle) {
             let calm = !state.dragging.load(Ordering::SeqCst) && !state.radial_open.load(Ordering::SeqCst) && !primary_button_down();
             if island::active() {
                 let over = cursor_point().is_some_and(|c| island::hit(&app, pos, size, scale, c));
-                if stroke.feed(over && calm, cursor_point().map_or(0.0, |c| c.0), std::time::Instant::now(), 6.0 * scale) {
-                    let _ = app.emit_to(MAIN, "pipo-pet", ());
+                if let Some(c) = cursor_point() {
+                    if stroke.feed(over && calm, c, std::time::Instant::now(), 5.0 * scale) {
+                        pet_affection(&app);
+                    }
                 }
                 if !state.dragging.load(Ordering::SeqCst) {
                     island::set_hover(&app, over);
@@ -723,8 +771,16 @@ pub fn start_hit_test(app: AppHandle) {
                     && y >= pos.y as f64 + iy
                     && y <= pos.y as f64 + size.height as f64 - iy
             });
-            if stroke.feed(over_body && calm, cursor.map_or(0.0, |c| c.0), std::time::Instant::now(), 8.0 * scale) {
-                let _ = app.emit_to(MAIN, "pipo-pet", ());
+            // Para o carinho vale um pouco além do corpo (a mão passa da borda a cada ida).
+            let near_body = cursor.is_some_and(|(x, y)| {
+                let (ix, iy) = body_insets(size, scale);
+                let (mx, my) = (ix * 0.5, iy * 0.5);
+                x >= pos.x as f64 + mx && x <= pos.x as f64 + size.width as f64 - mx && y >= pos.y as f64 + my && y <= pos.y as f64 + size.height as f64 - my
+            });
+            if let Some(c) = cursor {
+                if stroke.feed(near_body && calm, c, std::time::Instant::now(), 6.0 * scale) {
+                    pet_affection(&app);
+                }
             }
             let want = state.radial_open.load(Ordering::SeqCst) || state.dragging.load(Ordering::SeqCst) || over_body;
             if interactive != Some(want) {

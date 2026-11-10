@@ -445,3 +445,14 @@ body,
 @media (prefers-reduced-motion: reduce) {
   .hearts-fx span { animation: none; opacity: 0; }
 }
+
+/* Corações do carinho na ilha: saem da pílula e sobem pouco (a janela da ilha é baixa). */
+.hearts-fx.island-hearts { position: absolute; inset: auto; }
+.island-hearts span { top: 0; font-size: 13px; animation-name: heart-up-small; }
+.island-hearts span:nth-child(2) { font-size: 11px; }
+.island-hearts span:nth-child(3) { font-size: 9px; }
+@keyframes heart-up-small {
+  0% { transform: translate(var(--x), 4px) scale(0.6); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translate(calc(var(--x) * 0.8), -16px) scale(1); opacity: 0; }
+}
