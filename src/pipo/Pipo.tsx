@@ -14,6 +14,7 @@ export const PIPO_STATES = [
   "listening",
   "speaking",
   "levelup",
+  "love",
 ] as const;
 export type PipoState = (typeof PIPO_STATES)[number];
 
@@ -211,6 +212,14 @@ function look(state: PipoState): Look {
             fill={C.warn}
           />
         ),
+      };
+    case "love":
+      // Fase 9.8: carinho (olhos fechadinhos de feliz e um coração).
+      return {
+        blinks: false,
+        gaze: false,
+        eyes: arcs(true, C.eye),
+        badge: <path className="heart" d="M180 30 C162 18 164 2 176 4 C179 4.5 180 7 180 9 C180 7 181 4.5 184 4 C196 2 198 18 180 30 Z" fill="#F472B6" />,
       };
     case "sleep":
       return {

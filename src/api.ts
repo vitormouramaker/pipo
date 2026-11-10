@@ -111,7 +111,11 @@ export type LifeStatus = {
   pomodoros: number;
   searches: number;
   voice: number;
+  pets: number;
+  games: number;
 };
+/** Fase 9.8: recorde de um mini-jogo. */
+export type GameScore = { game: string; best: number; plays: number; record: boolean };
 
 export type VoiceStatus = {
   model: string;
@@ -502,6 +506,9 @@ export const api = {
   writeClose: () => invoke<void>("write_close"),
   digestRun: (input: string, focus?: string) => invoke<Digest>("digest_run", { input, focus: focus ?? null }),
   digestPick: () => invoke<string | null>("digest_pick"),
+  minigameFinish: (game: string, score: number) => invoke<GameScore>("minigame_finish", { game, score }),
+  minigameScores: () => invoke<GameScore[]>("minigame_scores"),
+  petAffection: () => invoke<void>("pet_affection"),
   screenAsk: () => invoke<void>("screen_ask"),
   petFind: () => invoke<void>("pet_find"),
   captionsToggle: () => invoke<void>("captions_toggle"),

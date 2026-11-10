@@ -21,6 +21,9 @@ fn reward(kind: &str) -> (i64, Option<i64>) {
         "habit" => (15, Some(90)),
         "habit-streak" => (40, None),
         "write" => (5, Some(50)),
+        "carinho" => (2, Some(20)),
+        "game" => (10, Some(60)),
+        "record" => (15, Some(45)),
         _ => (0, Some(0)),
     }
 }
@@ -75,6 +78,8 @@ const ACHIEVEMENTS: &[Achievement] = &[
     Achievement { id: "level-10", title: "Release estável", detail: "Chegou ao nível 10." },
     Achievement { id: "habit-7", title: "Constância", detail: "7 dias seguidos num hábito." },
     Achievement { id: "habit-30", title: "Hábito formado", detail: "30 dias seguidos num hábito." },
+    Achievement { id: "pet-50", title: "Carinhoso", detail: "50 carinhos no Pipo." },
+    Achievement { id: "game-10", title: "Hora do recreio", detail: "10 partidas de mini-jogo." },
 ];
 
 fn stage_of(level: i64) -> (usize, &'static str) {
@@ -137,6 +142,8 @@ fn progress(conn: &rusqlite::Connection, id: &str) -> (i64, i64) {
         "level-10" => (level_of(total_xp(conn)).0, 10),
         "habit-7" => (crate::habits::best_streak(conn), 7),
         "habit-30" => (crate::habits::best_streak(conn), 30),
+        "pet-50" => (count(conn, "carinho"), 50),
+        "game-10" => (count(conn, "game"), 10),
         _ => (0, 1),
     };
     (done.min(goal), goal)
@@ -267,6 +274,8 @@ pub struct LifeStatus {
     pomodoros: i64,
     searches: i64,
     voice: i64,
+    pets: i64,
+    games: i64,
 }
 
 /// Nível atual (para o relatório semanal).
@@ -317,5 +326,7 @@ pub fn life_status(app: AppHandle) -> LifeStatus {
         pomodoros: count(conn, "pomodoro"),
         searches: count(conn, "web"),
         voice: count(conn, "voice"),
+        pets: count(conn, "carinho"),
+        games: count(conn, "game"),
     }
 }

@@ -124,6 +124,8 @@ impl Db {
         let _ = conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS lol_games_game ON lol_games (game_id)", []);
         // Fase 9.4: diário automático.
         crate::journal::create_table(&conn)?;
+        // Fase 9.8: recordes dos mini-jogos.
+        crate::play::create_table(&conn)?;
         Ok(Self { conn })
     }
 

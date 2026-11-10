@@ -233,6 +233,17 @@ export const sfx = {
       bell(g, t + 0.14, 83, 0.9, 0.06);
       bell(g, t + 0.42, 83, 0.9, 0.035);
     }),
+  /** Carinho: ronronar macio (três ondinhas graves) e um sininho. */
+  purr: () =>
+    play((g, t) => {
+      for (let i = 0; i < 3; i++) tone(g, t + i * 0.09, { f: 150, f2: 190, w: "triangle", d: 0.12, v: 0.14, lp: 700 });
+      bell(g, t + 0.3, 88, 0.5, 0.035);
+    }),
+  /** Mini-jogos: acerto, erro e fim de partida. */
+  hit: () => play((g, t) => tone(g, t, { f: 660, f2: 990, w: "triangle", d: 0.08, v: 0.16, lp: 2200 })),
+  miss: () => play((g, t) => tone(g, t, { f: 240, f2: 160, w: "triangle", d: 0.14, v: 0.16, lp: 900 })),
+  /** Notas da Sequência (0 a 3). */
+  note: (i: number) => play((g, t) => tone(g, t, { f: [392, 494, 587, 698][i] ?? 440, w: "triangle", d: 0.32, v: 0.2, lp: 2400, rev: 0.15 })),
   /** Pipo encolhendo para a ilha / voltando dela. */
   shrink: () => play((g, t) => tone(g, t, { f: 520, f2: 260, w: "triangle", d: 0.22, v: 0.22, lp: 1400 })),
   grow: () => play((g, t) => tone(g, t, { f: 260, f2: 520, w: "triangle", d: 0.22, v: 0.22, lp: 1400 })),

@@ -5,6 +5,7 @@ import { SKINS, Pipo, type PipoState } from "../pipo/Pipo";
 import { ICONS } from "../ui/icons";
 import { sfx } from "../ui/sound";
 import { sqliteDate } from "../format";
+import Games from "./Games";
 
 // Cada conquista tem um emblema: a carinha do Pipo com uma expressão e um selo.
 const EMBLEMS: Record<string, { face: PipoState; icon: keyof typeof ICONS; tier: "cyan" | "gold" }> = {
@@ -135,7 +136,15 @@ export default function Life() {
               {life.pomodoros} · {life.searches} · {life.voice}
             </strong>
           </div>
+          <div>
+            <span>Carinhos · partidas</span>
+            <strong>
+              {life.pets} · {life.games}
+            </strong>
+          </div>
         </div>
+
+        <Games />
 
         <div className="block">
           <h4>Cores</h4>

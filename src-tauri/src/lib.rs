@@ -16,6 +16,7 @@ mod journal;
 mod guardian;
 mod writer;
 mod digest;
+mod play;
 mod wake;
 mod install;
 mod island;
@@ -298,6 +299,9 @@ pub fn run() {
             writer::write_close,
             digest::digest_run,
             digest::digest_pick,
+            play::minigame_finish,
+            play::minigame_scores,
+            play::pet_affection,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,
