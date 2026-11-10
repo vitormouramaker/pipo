@@ -187,7 +187,7 @@ function Lives() {
       </div>
       {error && <p className="hint">{error}</p>}
       {added && <p className="hint ok">{added}</p>}
-      {channels.length === 0 && <p className="hint">Siga canais e o Pipo avisa quando entrarem ao vivo (verifica a cada 2 minutos).</p>}
+      {channels.length === 0 && <p className="hint empty-state">Cole o link de um canal e o Pipo avisa quando ele entrar ao vivo.</p>}
       <div className="table">
         {channels.map((c) => (
           <div key={c.key} className="trow">
@@ -420,7 +420,7 @@ function Github() {
         </div>
       ))}
       {gh.available && gh.prs.length === 0 && gh.reviews.length === 0 && gh.runs.length === 0 && (
-        <p className="hint">Sem PRs abertos nem revisões pedidas. A CI aparece para os repositórios dos seus projetos recentes.</p>
+        <p className="hint empty-state">Tudo em dia: nenhum PR aberto nem revisão pedida.</p>
       )}
     </div>
   );
@@ -498,7 +498,7 @@ function Weekly() {
           {busy === "gen" ? "Montando…" : report ? "Atualizar" : "Gerar agora"}
         </button>
       </div>
-      {!report && <p className="hint">Todo domingo à noite o Pipo resume sua semana aqui (dá para mudar em ⚙ → Relatório semanal).</p>}
+      {!report && <p className="hint empty-state">Sai todo domingo à noite. Ou peça agora em "Gerar agora".</p>}
       {report && (
         <>
           <div className={`weekly${open ? " open" : ""}`}>

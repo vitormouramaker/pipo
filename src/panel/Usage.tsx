@@ -32,16 +32,20 @@ export default function Usage({ onOpenConversation }: { onOpenConversation: (id:
       </div>
 
       {summary.models.length > 0 && (
-        <div className="usage-models">
+        <div className="block usage-block">
+          <h4>Por modelo · este mês</h4>
           {summary.models.map((m) => (
-            <span key={m.model}>
-              {modelName(m.model)}: <strong>{usd(m.cost)}</strong> · {count(m.requests)}{" "}
-              {m.requests === 1 ? "resposta" : "respostas"}
-            </span>
+            <div key={m.model} className="top-row">
+              <span>{modelName(m.model)}</span>
+              <span>
+                <strong>{usd(m.cost)}</strong> · {count(m.requests)} {m.requests === 1 ? "resposta" : "respostas"}
+              </span>
+            </div>
           ))}
         </div>
       )}
 
+      <div className="block usage-block">
       <h4>Por conversa</h4>
       <div className="usage-list">
         {summary.conversations.length === 0 && (
@@ -57,6 +61,7 @@ export default function Usage({ onOpenConversation }: { onOpenConversation: (id:
             </span>
           </button>
         ))}
+      </div>
       </div>
 
       <p className="footnote">

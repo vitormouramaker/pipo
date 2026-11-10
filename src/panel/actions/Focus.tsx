@@ -20,20 +20,18 @@ function Pomodoro({ status }: { status: FocusStatus | null }) {
   }, [pomodoro?.remainingSecs, pomodoro?.phase]);
 
   return (
-    <div className="block wide">
-      <h4>Pomodoro</h4>
+    <div className="block tile action-tile pomo-tile">
+      <div className="block-head">
+        <h4>Pomodoro</h4>
+        {pomodoro && <span className={`pill ${pomodoro.phase === "focus" ? "on" : ""}`}>{pomodoro.phase === "focus" ? `foco ${pomodoro.cycle}` : "pausa"}</span>}
+      </div>
+      <span className={`pomo-time ${pomodoro?.phase ?? "idle"}`}>{pomodoro ? mmss(left) : `${String(focusMin).padStart(2, "0")}:00`}</span>
       {pomodoro ? (
-        <div className="pomodoro">
-          <span className={`pomo-time ${pomodoro.phase}`}>{mmss(left)}</span>
-          <span className="row-meta">
-            {pomodoro.phase === "focus" ? `Foco ${pomodoro.cycle}` : "Pausa"} · {pomodoro.focusMin}/{pomodoro.breakMin} min
-          </span>
-          <button className="link danger" onClick={() => void api.pomodoroStop()}>
-            Encerrar
-          </button>
-        </div>
+        <p className="hint">
+          {pomodoro.focusMin} min de foco · {pomodoro.breakMin} de pausa
+        </p>
       ) : (
-        <div className="inline-form">
+        <div className="pomo-fields">
           <label>
             Foco
             <input type="number" min={1} max={180} value={focusMin} onChange={(e) => setFocusMin(Number(e.target.value))} />
@@ -42,12 +40,17 @@ function Pomodoro({ status }: { status: FocusStatus | null }) {
             Pausa
             <input type="number" min={1} max={60} value={breakMin} onChange={(e) => setBreakMin(Number(e.target.value))} />
           </label>
+        </div>
+      )}
+      <div className="btns">
+        {pomodoro ? (
+          <button onClick={() => void api.pomodoroStop()}>Encerrar</button>
+        ) : (
           <button className="primary" onClick={() => void api.pomodoroStart(focusMin, breakMin)}>
             Começar
           </button>
-        </div>
-      )}
-      <p className="hint">Durante o foco o Pipo fica concentrado; no fim de cada fase ele avisa.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -160,24 +163,38 @@ function Breaks({ status }: { status: FocusStatus | null }) {
   };
 
   return (
-    <div className="block wide">
-      <h4>Pausas</h4>
-      <div className="inline-form">
-        <label className="check">
-          <input type="checkbox" checked={settings.breakReminders} onChange={(e) => save({ breakReminders: e.target.checked })} />
-          Lembrar de beber água e ajustar a postura a cada
-        </label>
+    <div className="block tile action-tile">
+      <div className="block-head">
+        <h4>Pausas</h4>
         <input
-          className="short"
-          type="number"
-          min={10}
-          max={240}
-          value={settings.breakIntervalMin}
-          onChange={(e) => save({ breakIntervalMin: Math.max(10, Number(e.target.value)) })}
+          type="checkbox"
+          className="switch"
+          aria-label="Lembrar de fazer pausas"
+          checked={settings.breakReminders}
+          onChange={(e) => save({ breakReminders: e.target.checked })}
         />
-        <span className="row-meta">min de uso</span>
       </div>
-      {status?.nextBreakSecs != null && <p className="hint">Próxima pausa em {Math.ceil(status.nextBreakSecs / 60)} min.</p>}
+      <p className="hint">Lembrete para beber água, alongar e ajustar a postura.</p>
+      <div className="pomo-fields">
+        <label>
+          A cada
+          <input
+            type="number"
+            min={10}
+            max={240}
+            value={settings.breakIntervalMin}
+            onChange={(e) => save({ breakIntervalMin: Math.max(10, Number(e.target.value)) })}
+          />
+          min
+        </label>
+      </div>
+      <p className="hint">
+        {settings.breakReminders
+          ? status?.nextBreakSecs != null
+            ? `Próxima pausa em ${Math.ceil(status.nextBreakSecs / 60)} min.`
+            : "Ligado."
+          : "Desligado."}
+      </p>
     </div>
   );
 }
@@ -228,8 +245,8 @@ export default function Focus() {
   return (
     <>
       <Pomodoro status={status} />
-      <Reminders status={status} />
       <Breaks status={status} />
+      <Reminders status={status} />
       <Notes />
     </>
   );

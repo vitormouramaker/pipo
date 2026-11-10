@@ -85,8 +85,7 @@ export default function Clipboard({ enabled, onAsk, onRun, onOpenSettings }: Pro
       </div>
       <div className="chat-toolbar">
         <span className="hint">
-          Só neste computador; some ao fechar o Pipo (menos os fixados). Senhas e tokens são ignorados. <strong>{shortcut}</strong> cola o
-          que está copiado como texto puro, sem formatação.
+          Fica só neste PC e some ao fechar o Pipo (menos os fixados); senhas são ignoradas. <kbd>{shortcut}</kbd> cola como texto puro.
         </span>
         {items.some((i) => !i.pinned) && (
           <button className="link" onClick={() => void api.clipboardClear().then(refresh)}>
@@ -109,8 +108,8 @@ export default function Clipboard({ enabled, onAsk, onRun, onOpenSettings }: Pro
             )}
             <div className="clip-actions">
               <span className="clip-time">{item.kind === "image" ? `${item.text} · ${item.at}` : item.at}</span>
-              <button className="link" onClick={() => copy(item)}>
-                {copied === item.id ? "Copiado ✓" : item.kind === "text" ? "Copiar (texto puro)" : "Copiar"}
+              <button className="clip-copy" title={item.kind === "text" ? "Copia como texto puro, sem formatação" : "Copiar a imagem"} onClick={() => copy(item)}>
+                {copied === item.id ? "Copiado ✓" : "Copiar"}
               </button>
               {item.kind === "text" ? (
                 <>
@@ -128,16 +127,20 @@ export default function Clipboard({ enabled, onAsk, onRun, onOpenSettings }: Pro
                   Perguntar ao Pipo
                 </button>
               )}
-              <button
-                className={`link${item.pinned ? "" : " muted"}`}
-                title={item.pinned ? "Desafixar" : item.kind === "text" ? "Fixar (fica guardado mesmo depois de fechar o Pipo)" : "Fixar nesta sessão"}
-                onClick={() => void api.clipboardPin(item.id, !item.pinned).then(refresh)}
-              >
-                {item.pinned ? "📌 Fixado" : "Fixar"}
-              </button>
-              <button className="link muted" onClick={() => void api.clipboardRemove(item.id).then(refresh)}>
-                Excluir
-              </button>
+              <span className="clip-icons">
+                <button
+                  className={`icon-btn clip-pin${item.pinned ? " on" : ""}`}
+                  title={item.pinned ? "Desafixar" : item.kind === "text" ? "Fixar (fica guardado mesmo depois de fechar o Pipo)" : "Fixar nesta sessão"}
+                  aria-label={item.pinned ? "Desafixar" : "Fixar"}
+                  aria-pressed={item.pinned}
+                  onClick={() => void api.clipboardPin(item.id, !item.pinned).then(refresh)}
+                >
+                  📌
+                </button>
+                <button className="icon-btn" title="Excluir" aria-label="Excluir" onClick={() => void api.clipboardRemove(item.id).then(refresh)}>
+                  {ICONS.close}
+                </button>
+              </span>
             </div>
           </div>
         ))}

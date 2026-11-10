@@ -108,7 +108,9 @@ export default function PanelApp() {
           {life && <span className="brand-level">nv {life.level}</span>}
         </button>
         <nav className="tabs">
-          {TABS.map((t) => (
+          {TABS.map((t, i) => [
+            // Grupos: conversar e o dia | ferramentas | configurações.
+            (i === 4 || i === TABS.length - 1) && <span key={`sep-${i}`} className="tab-sep" aria-hidden="true" />,
             <button
               key={t.view}
               className="tab-icon"
@@ -121,8 +123,8 @@ export default function PanelApp() {
               }}
             >
               {ICONS[t.icon]}
-            </button>
-          ))}
+            </button>,
+          ])}
         </nav>
         <button
           className="icon-btn tab-icon"

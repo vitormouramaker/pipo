@@ -288,8 +288,7 @@ export default function Automations() {
           </button>
         </div>
         <p className="hint">
-          "Quando acontecer X, faça Y": o Pipo cuida sozinho. Ex.: ao abrir o LoL, abrir o Discord; nos dias úteis às 9h, começar um
-          pomodoro; ao entrar no modo estudo, pausar a música. Para tocar uma playlist, use "Abrir" com o link dela do Spotify.
+          "Quando acontecer X, faça Y", sem você precisar lembrar. Comece por um modelo:
         </p>
         <div className="chips">
           {TEMPLATES.map((t) => (
