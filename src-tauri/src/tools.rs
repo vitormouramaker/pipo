@@ -189,6 +189,14 @@ pub fn definitions() -> Value {
             &["name"],
         ),
         tool(
+            "memory",
+            "Memória RAM do PC. action \"status\": uso agora e os apps que mais usam (com há quanto tempo estão parados). \
+action \"optimize\": devolve ao Windows a memória dos apps parados há 5 min ou mais (não fecha nada, não mexe no app em uso). \
+Para fechar um app pesado parado, sugira ao usuário o botão Fechar em Sistema → Memória.",
+            json!({ "action": { "type": "string", "enum": ["status", "optimize"] } }),
+            &["action"],
+        ),
+        tool(
             "summarize",
             "Resume algo grande: link do YouTube (usa a legenda quando o YouTube libera; senão, título e descrição), página da web, \
 PDF da web ou arquivo do PC (PDF, Word, PowerPoint, texto; passe o caminho). Textos longos são resumidos em partes. Use focus para \
@@ -291,6 +299,7 @@ pub fn label(name: &str, input: &Value) -> String {
         "habits" => "Olhando seus hábitos".into(),
         "journal" => "Lendo o diário".into(),
         "summarize" => "Lendo e resumindo".into(),
+        "memory" => if input["action"] == "optimize" { "Otimizando a memória".into() } else { "Olhando a memória".into() },
         "log_habit" => format!("Marcando {}", input["name"].as_str().unwrap_or("o hábito")),
         "create_habit" => format!("Criando o hábito {}", s(input, "name")),
         "delete_habit" => format!("Apagando o hábito {}", s(input, "name")),
@@ -576,6 +585,11 @@ pub fn execute(app: &AppHandle, name: &str, input: &Value) -> Result<String, Str
             focus::stop_pomodoro(app);
             Ok("Pomodoro encerrado.".into())
         }
+        "memory" => Ok(if input["action"] == "optimize" {
+            crate::memory::result_text(&crate::memory::optimize(app))
+        } else {
+            crate::memory::summary_text(app)
+        }),
         "summarize" => {
             let source = input["source"].as_str().unwrap_or("").trim();
             if source.is_empty() {

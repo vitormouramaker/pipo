@@ -18,6 +18,7 @@ mod writer;
 mod digest;
 mod play;
 mod mcp;
+mod memory;
 mod wake;
 mod install;
 mod island;
@@ -307,6 +308,9 @@ pub fn run() {
             mcp::mcp_save,
             mcp::mcp_remove,
             mcp::mcp_test,
+            memory::memory_status,
+            memory::memory_optimize,
+            memory::memory_close_app,
             world::media::media_status,
             world::media::media_control,
             proactive::memory_list,

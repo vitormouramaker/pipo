@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type Category, type HardwareInfo, type SenseStatus, type Settings } from "../api";
 import { bytes, duration } from "../format";
+import MemoryCard from "./MemoryCard";
 
 const CATEGORY: Record<Category, string> = {
   dev: "Programando",
@@ -122,6 +123,7 @@ export default function SystemView({ settings }: { settings: Settings | null }) 
                 <p className="hint">GPU: por enquanto o Pipo só lê placas NVIDIA.</p>
               </div>
             )}
+            <MemoryCard settings={settings} />
             <div className="block tile">
               <h4>Mais CPU</h4>
               {hw.topCpu.map((p) => (

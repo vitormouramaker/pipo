@@ -1179,3 +1179,17 @@
 .actions-body > .row-card { border-radius: var(--radius-lg); }
 
 .usage .cards .card { border-radius: var(--radius-lg); }
+
+/* Memória RAM */
+.memory-total { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ram-card .meter-bar { height: 6px; }
+.memory-apps { display: grid; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 10px; }
+.memory-app { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 52px; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+.memory-app + .memory-app { border-top: 1px solid var(--line); }
+.memory-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.memory-idle { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.memory-size { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.memory-app.heavy .memory-size { color: var(--warn); }
+.memory-app .link { justify-self: end; }
+.memory-auto { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.memory-auto select { width: auto; }

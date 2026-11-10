@@ -151,6 +151,9 @@ pub struct Settings {
     pub journal_titles: bool,
     /// Fase 9.11: servidores MCP (os segredos ficam no Gerenciador de Credenciais).
     pub mcp_servers: Vec<crate::mcp::McpServer>,
+    /// Otimizar a memória sozinho quando o uso passar desta porcentagem.
+    pub memory_auto: bool,
+    pub memory_auto_percent: u8,
     /// Fase 9.5: guardião do PC (disco cheio, app travado, Windows Update no jogo) e
     /// organização automática da pasta Downloads (uma vez por dia).
     pub guardian: bool,
@@ -251,6 +254,8 @@ impl Default for Settings {
             journal: true,
             journal_titles: true,
             mcp_servers: Vec::new(),
+            memory_auto: false,
+            memory_auto_percent: 85,
             guardian: true,
             downloads_auto: false,
             email_enabled: false,

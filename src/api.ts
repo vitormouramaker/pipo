@@ -86,6 +86,8 @@ export type Settings = {
   journal: boolean;
   journalTitles: boolean;
   mcpServers: McpServer[];
+  memoryAuto: boolean;
+  memoryAutoPercent: number;
   guardian: boolean;
   downloadsAuto: boolean;
   writeShortcut: string;
@@ -115,6 +117,15 @@ export type LifeStatus = {
   pets: number;
   games: number;
 };
+/** Otimização de memória. */
+export type MemoryStatus = {
+  used: number;
+  total: number;
+  apps: { name: string; memory: number; processes: number; idleMin: number | null; sinceStartMin: number; suggestClose: boolean; protected: boolean }[];
+  lastRun: string | null;
+  lastFreed: number;
+};
+export type OptimizeResult = { freed: number; apps: number; usedBefore: number; usedAfter: number };
 /** Fase 9.11: servidor MCP. */
 export type McpServer = {
   name: string;
@@ -524,6 +535,9 @@ export const api = {
   minigameScores: () => invoke<GameScore[]>("minigame_scores"),
   petAffection: () => invoke<void>("pet_affection"),
   mcpStatus: () => invoke<McpServerStatus[]>("mcp_status"),
+  memoryStatus: () => invoke<MemoryStatus>("memory_status"),
+  memoryOptimize: () => invoke<OptimizeResult>("memory_optimize"),
+  memoryCloseApp: (name: string) => invoke<number>("memory_close_app", { name }),
   mcpSave: (server: McpServer, original: string | null, secretsIn: Record<string, string>) =>
     invoke<void>("mcp_save", { server, original, secretsIn }),
   mcpRemove: (name: string) => invoke<void>("mcp_remove", { name }),

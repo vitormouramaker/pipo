@@ -116,9 +116,11 @@ pub fn start(app: AppHandle) {
                     None if context::own_foreground(own_pid) => state.sense.lock().unwrap().last_app.clone(),
                     other => other,
                 };
-                if current.is_some() {
+                if let Some(c) = &current {
+                    crate::memory::touch(&c.exe);
                     state.sense.lock().unwrap().last_app = current.clone();
                 }
+                crate::memory::tick(&app);
                 let idle = context::idle_seconds();
                 crate::proactive::record(&app, current.as_ref(), idle);
                 crate::journal::observe(&app, current.as_ref(), idle);
