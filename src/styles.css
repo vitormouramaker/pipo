@@ -237,6 +237,7 @@ body,
 .island.s-thinking .island-eyes i + i { animation-delay: 0.3s; }
 .island.s-alert .island-eyes i { background: #f5b544; }
 .island.s-done .island-eyes i, .island.s-levelup .island-eyes i { background: #4ade80; height: 4px; border-radius: 4px 4px 0 0; }
+.island.s-love .island-eyes i { background: #f472b6; height: 4px; border-radius: 4px 4px 0 0; }
 .island.s-sleep .island-eyes i { height: 2px; background: #9aa0a9; }
 .island.s-focused .island-eyes i { width: 9px; height: 3px; }
 .island.s-gaming .island-eyes i { height: 4px; opacity: 0.5; }

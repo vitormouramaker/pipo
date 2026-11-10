@@ -523,6 +523,32 @@ pub fn pet_drag_start(app: AppHandle) {
     });
 }
 
+#[cfg(test)]
+mod stroke_tests {
+    use super::*;
+    use std::time::Instant;
+
+    #[test]
+    fn reconhece_o_carinho() {
+        let mut s = Stroke::default();
+        let t0 = Instant::now();
+        let ms = |n: u64| t0 + Duration::from_millis(n);
+        // Vai e volta 2 vezes (3 viradas) em ~1 s.
+        let xs = [100.0, 130.0, 160.0, 130.0, 100.0, 130.0, 160.0, 130.0];
+        let fired: Vec<bool> = xs.iter().enumerate().map(|(i, &x)| s.feed(true, x, ms(i as u64 * 140), 8.0)).collect();
+        assert_eq!(fired.iter().filter(|f| **f).count(), 1, "{fired:?}");
+        // Logo depois, ainda em espera: não dispara de novo.
+        assert!(!(0..8).any(|i| s.feed(true, if i % 2 == 0 { 100.0 } else { 140.0 }, ms(1200 + i * 100), 8.0)));
+        // Tremidinha (menos que o passo) não conta; sair de cima zera.
+        let mut q = Stroke::default();
+        assert!(!(0..20).any(|i| q.feed(true, 100.0 + (i % 2) as f64 * 3.0, ms(i * 50), 8.0)));
+        let mut r = Stroke::default();
+        assert!(!r.feed(true, 100.0, ms(0), 8.0) && !r.feed(true, 140.0, ms(100), 8.0) && !r.feed(true, 100.0, ms(200), 8.0));
+        assert!(!r.feed(false, 0.0, ms(300), 8.0));
+        assert!(r.turns.is_empty());
+    }
+}
+
 #[cfg(windows)]
 fn primary_button_down() -> bool {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
@@ -585,6 +611,55 @@ fn gaze(pos: PhysicalPosition<i32>, size: PhysicalSize<u32>, cursor: (f64, f64))
     (q(dx), q(dy))
 }
 
+/// Fase 9.8: carinho = cursor indo e voltando em cima do Pipo (sem botão apertado).
+/// Lido aqui, no laço do cursor, porque a janela do Pipo nem sempre recebe o movimento
+/// do mouse (ela deixa o mouse passar fora do corpo, e a ilha é outra interface).
+#[derive(Default)]
+pub(crate) struct Stroke {
+    last_x: Option<f64>,
+    dir: i8,
+    turns: Vec<std::time::Instant>,
+    cooldown: Option<std::time::Instant>,
+}
+
+/// Viradas de direção para contar como carinho, dentro desta janela de tempo.
+const PET_TURNS: usize = 3;
+const PET_WINDOW: Duration = Duration::from_millis(2200);
+const PET_COOLDOWN: Duration = Duration::from_millis(3500);
+
+impl Stroke {
+    /// Devolve true quando reconhece um carinho. `step` = movimento mínimo (px) que conta.
+    pub(crate) fn feed(&mut self, over: bool, x: f64, now: std::time::Instant, step: f64) -> bool {
+        if !over {
+            self.last_x = None;
+            self.dir = 0;
+            self.turns.clear();
+            return false;
+        }
+        let Some(last) = self.last_x else {
+            self.last_x = Some(x);
+            return false;
+        };
+        let dx = x - last;
+        if dx.abs() < step {
+            return false;
+        }
+        self.last_x = Some(x);
+        let dir = if dx > 0.0 { 1 } else { -1 };
+        if self.dir != 0 && dir != self.dir {
+            self.turns.retain(|t| now.duration_since(*t) < PET_WINDOW);
+            self.turns.push(now);
+        }
+        self.dir = dir;
+        if self.turns.len() >= PET_TURNS && self.cooldown.is_none_or(|c| now >= c) {
+            self.turns.clear();
+            self.cooldown = Some(now + PET_COOLDOWN);
+            return true;
+        }
+        false
+    }
+}
+
 /// A margem transparente não pode bloquear cliques nos apps de trás: a janela só
 /// recebe o mouse com o cursor sobre o corpo do Pipo, durante o arrasto ou com o menu aberto.
 /// O mesmo laço avisa a direção do cursor para os olhos do Pipo o seguirem.
@@ -594,6 +669,7 @@ pub fn start_hit_test(app: AppHandle) {
         let mut last_gaze = (0i8, 0i8);
         let mut last_emit = std::time::Instant::now();
         let mut last_sync = std::time::Instant::now();
+        let mut stroke = Stroke::default();
         loop {
             std::thread::sleep(Duration::from_millis(40));
             let state = app.state::<AppState>();
@@ -620,8 +696,12 @@ pub fn start_hit_test(app: AppHandle) {
                 last_emit = std::time::Instant::now();
                 let _ = app.emit_to(MAIN, "pipo-gaze", [target.0, target.1]);
             }
+            let calm = !state.dragging.load(Ordering::SeqCst) && !state.radial_open.load(Ordering::SeqCst) && !primary_button_down();
             if island::active() {
                 let over = cursor_point().is_some_and(|c| island::hit(&app, pos, size, scale, c));
+                if stroke.feed(over && calm, cursor_point().map_or(0.0, |c| c.0), std::time::Instant::now(), 6.0 * scale) {
+                    let _ = app.emit_to(MAIN, "pipo-pet", ());
+                }
                 if !state.dragging.load(Ordering::SeqCst) {
                     island::set_hover(&app, over);
                 }
@@ -635,15 +715,18 @@ pub fn start_hit_test(app: AppHandle) {
                 }
                 continue;
             }
-            let want = state.radial_open.load(Ordering::SeqCst)
-                || state.dragging.load(Ordering::SeqCst)
-                || cursor_point().is_some_and(|(x, y)| {
-                    let (ix, iy) = body_insets(size, scale);
-                    x >= pos.x as f64 + ix
-                        && x <= pos.x as f64 + size.width as f64 - ix
-                        && y >= pos.y as f64 + iy
-                        && y <= pos.y as f64 + size.height as f64 - iy
-                });
+            let cursor = cursor_point();
+            let over_body = cursor.is_some_and(|(x, y)| {
+                let (ix, iy) = body_insets(size, scale);
+                x >= pos.x as f64 + ix
+                    && x <= pos.x as f64 + size.width as f64 - ix
+                    && y >= pos.y as f64 + iy
+                    && y <= pos.y as f64 + size.height as f64 - iy
+            });
+            if stroke.feed(over_body && calm, cursor.map_or(0.0, |c| c.0), std::time::Instant::now(), 8.0 * scale) {
+                let _ = app.emit_to(MAIN, "pipo-pet", ());
+            }
+            let want = state.radial_open.load(Ordering::SeqCst) || state.dragging.load(Ordering::SeqCst) || over_body;
             if interactive != Some(want) {
                 if let Some(pet) = app.get_webview_window(MAIN) {
                     if pet.set_ignore_cursor_events(!want).is_ok() {

@@ -13,10 +13,7 @@ import { Pipo, PIPO_STATES, type PipoState } from "../pipo/Pipo";
 const CLICK_TOLERANCE = 4;
 // Expressões passageiras voltam sozinhas ao humor de base.
 const TRANSIENT: Partial<Record<PipoState, number>> = { done: 2500, alert: 6000, levelup: 3500, love: 2600 };
-// Carinho: o mouse vai e volta em cima do Pipo (sem clicar) várias vezes em pouco tempo.
-const PET_TURNS = 4;
-const PET_WINDOW = 1600;
-const PET_STEP = 10;
+
 // Espaço mínimo entre dois botões do menu radial, em graus.
 const MIN_SPACING = 34;
 
@@ -59,7 +56,6 @@ export default function PetApp() {
   const [find, setFind] = useState<number | null>(null);
   // Corações do carinho (a chave reinicia a animação).
   const [hearts, setHearts] = useState<number | null>(null);
-  const stroke = useRef<{ x: number; dir: number; turns: number[]; cooldown: number }>({ x: 0, dir: 0, turns: [], cooldown: 0 });
 
   const press = useRef<{ x: number; y: number } | null>(null);
   const petRef = useRef<HTMLDivElement>(null);
@@ -134,6 +130,16 @@ export default function PetApp() {
       void el.offsetWidth;
       el.classList.add(side ? "beat-l" : "beat-r");
     });
+    // Carinho (reconhecido pelo laço do cursor, no Pipo e na ilha).
+    const unlistenPet = listen("pipo-pet", () => {
+      const now = lastState.current;
+      if (now === "gaming" || now === "speaking" || now === "listening") return;
+      setOverride("love");
+      setHearts(Date.now());
+      sfx.purr();
+      physics.bump();
+      void api.petAffection();
+    });
     const unlistenFind = listen("pipo-find", () => {
       const key = Date.now();
       setFind(key);
@@ -146,6 +152,7 @@ export default function PetApp() {
       void unlistenState.then((fn) => fn());
       void unlistenRadial.then((fn) => fn());
       void unlistenFind.then((fn) => fn());
+      void unlistenPet.then((fn) => fn());
       void unlistenBeat.then((fn) => fn());
     };
   }, []);
@@ -252,31 +259,6 @@ export default function PetApp() {
       <div
         ref={petRef}
         className="pet"
-        onPointerMove={(e) => {
-          // Carinho: só com o mouse solto, fora do menu e com o Pipo acordado para brincar.
-          if (e.buttons !== 0 || radial || state === "gaming" || state === "speaking" || state === "listening") return;
-          const s = stroke.current;
-          const now = performance.now();
-          const dx = e.screenX - s.x;
-          if (Math.abs(dx) < PET_STEP) return;
-          const dir = Math.sign(dx);
-          s.x = e.screenX;
-          if (s.dir !== 0 && dir !== s.dir) s.turns = [...s.turns.filter((t) => now - t < PET_WINDOW), now];
-          s.dir = dir;
-          if (s.turns.length >= PET_TURNS && now > s.cooldown) {
-            s.turns = [];
-            s.cooldown = now + 3500;
-            setOverride("love");
-            setHearts(Date.now());
-            sfx.purr();
-            physics.bump();
-            void api.petAffection();
-          }
-        }}
-        onPointerLeave={() => {
-          stroke.current.dir = 0;
-          stroke.current.turns = [];
-        }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
           // Coordenadas de tela: a janela se move durante o arrasto.
