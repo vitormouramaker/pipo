@@ -149,7 +149,7 @@ export default function Habits() {
   const today = list.filter((h) => h.scheduled);
   const done = today.filter((h) => h.done).length;
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>
           Hábitos{today.length > 0 ? ` · ${done}/${today.length} hoje` : ""}

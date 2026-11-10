@@ -68,7 +68,7 @@ function BriefingCard() {
   const isToday = briefing?.day === today;
 
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Briefing {isToday ? "de hoje" : briefing ? `de ${briefing.day.split("-").reverse().join("/")}` : "do dia"}</h4>
         <div className="btns">
@@ -166,7 +166,7 @@ function Lives() {
 
   const live = channels.filter((c) => c.live);
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Lives {live.length > 0 ? `· ${live.length} ao vivo` : ""}</h4>
         <button className="link muted" onClick={() => { setChecking(true); void api.livesRefresh().then(refresh).finally(() => setChecking(false)); }}>
@@ -225,7 +225,7 @@ function QuickSearch({ onAsk }: Props) {
   const [query, setQuery] = useState("");
   const search = () => query.trim() && onAsk(`Pesquise na web e responda de forma curta, com as fontes: ${query.trim()}`);
   return (
-    <div className="block">
+    <div className="block wide">
       <h4>Pesquisa rápida</h4>
       <div className="inline-form">
         <input className="grow" placeholder="O que você quer saber agora?" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} />
@@ -276,7 +276,7 @@ function MyDay({ onAsk }: Props) {
         `pomodoros: ${day.pomodoros}; mensagens ao Pipo: ${day.chats}; ações feitas pelo Pipo: ${day.actions}.`,
     );
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Seu dia · {hm(day.activeSecs)} ativo</h4>
         {day.activeSecs > 0 && (
@@ -347,7 +347,7 @@ function Agenda() {
     );
   };
   return (
-    <div className="block">
+    <div className="block wide">
       <h4>Agenda</h4>
       {!cal.configured && (
         <p className="hint">Conecte a Google Agenda em ⚙ → Integrações para ver seus compromissos aqui, ser avisado antes e marcar eventos pelo chat.</p>
@@ -380,7 +380,7 @@ function Github() {
   const ci = (r: GithubStatus["runs"][number]) =>
     r.status !== "completed" ? "running" : r.conclusion === "success" ? "ok" : "fail";
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>GitHub{gh.accounts.length ? ` · ${gh.accounts.join(", ")}` : ""}</h4>
         <button
@@ -437,18 +437,18 @@ function Music() {
   if (!now?.available || !now.title) return null;
   const control = (action: "toggle" | "next" | "previous") => () => void api.mediaControl(action).then(setNow);
   return (
-    <div className="block">
+    <div className="block tile music">
       <h4>Tocando agora{now.app ? ` · ${now.app}` : ""}</h4>
-      <div className="trow">
-        <span className="grow">
-          <strong>{now.title}</strong>
-          {now.artist && <span className="live-title"> · {now.artist}</span>}
-        </span>
-        <button className="link" aria-label="Anterior" onClick={control("previous")}>⏮</button>
-        <button className="link" aria-label={now.playing ? "Pausar" : "Tocar"} onClick={control("toggle")}>
+      <div className="music-info">
+        <strong title={now.title}>{now.title}</strong>
+        {now.artist && <span title={now.artist}>{now.artist}</span>}
+      </div>
+      <div className="music-controls">
+        <button aria-label="Anterior" title="Anterior" onClick={control("previous")}>⏮</button>
+        <button className="play" aria-label={now.playing ? "Pausar" : "Tocar"} title={now.playing ? "Pausar" : "Tocar"} onClick={control("toggle")}>
           {now.playing ? "⏸" : "▶"}
         </button>
-        <button className="link" aria-label="Próxima" onClick={control("next")}>⏭</button>
+        <button aria-label="Próxima" title="Próxima" onClick={control("next")}>⏭</button>
       </div>
     </div>
   );
@@ -491,7 +491,7 @@ function Weekly() {
   };
   const lines = report?.text.split("\n") ?? [];
   return (
-    <div className="block">
+    <div className="block tile weekly">
       <div className="block-head">
         <h4>Relatório da semana {report ? `· ${report.createdAt}` : ""}</h4>
         <button className="link muted" disabled={busy !== null} onClick={generate}>
@@ -643,7 +643,7 @@ function Email({ onAsk }: Props) {
         mail.unread.map((m) => `- [${m.date}] De: ${m.from} — Assunto: ${m.subject}\n  ${m.snippet}`).join("\n"),
     );
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>E-mail {mail.unread.length > 0 ? `· ${mail.unread.length} não lido(s)` : ""}</h4>
         <button

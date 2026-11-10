@@ -229,7 +229,7 @@ export default function Games() {
 
   const meta = (id: GameId) => GAMES.find((g) => g.id === id)!;
   return (
-    <div className="block games">
+    <div className="block games wide">
       <div className="block-head">
         <h4>Mini-jogos</h4>
         {playing && (

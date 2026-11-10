@@ -974,3 +974,155 @@
 .mcp-server .btns { flex-wrap: wrap; gap: 4px 12px; }
 .mcp-trust { margin-right: auto; font-size: 12.5px; }
 .mcp-tools { margin: 2px 0; padding-left: 18px; font-size: 12px; color: var(--muted); display: grid; gap: 2px; }
+
+/* =====================================================================
+   Fase 10: painel em bento grid.
+   Cada aba é uma grade de cartões: "tile" ocupa 1 coluna, "wide" 2 e o
+   resto a largura toda. No painel (500 px) são 2 colunas; em tela cheia,
+   até 4, com largura máxima para a leitura não ficar esticada.
+   ===================================================================== */
+.panel {
+  --radius-lg: 16px;
+  --radius: 11px;
+  --gap: 10px;
+  --surface-3: #2c3037;
+  --label: #9aa1ab;
+}
+
+.actions-body {
+  display: grid;
+  gap: var(--gap);
+  align-content: start;
+  grid-auto-flow: row dense;
+  grid-template-columns: repeat(auto-fill, minmax(max(200px, calc((100% - 3 * var(--gap)) / 4)), 1fr));
+  padding: 12px 12px 18px;
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+}
+.actions-body > * { grid-column: 1 / -1; min-width: 0; }
+.actions-body > .tile { grid-column: auto; }
+.actions-body > .wide { grid-column: span 2; }
+
+/* Cartão */
+.block {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px 14px;
+  gap: 8px;
+  min-width: 0;
+}
+.block .block { background: none; border: 0; padding: 0; border-radius: 0; }
+.block-head { align-items: center; gap: 8px; min-height: 22px; }
+.block-head h4, .block > h4:first-child { margin: 0; }
+.panel h4 { color: var(--label); letter-spacing: 0.07em; }
+.block > .hint:last-child { margin-bottom: 0; }
+
+/* Dentro do cartão, listas e caixas viram "poços" mais escuros. */
+.block .row-card, .block .clip-item, .block .facts > div, .block .game-card, .block .digest { background: var(--bg); }
+.block .row-head:hover:not(.static) { background: var(--surface-2); }
+.block .facts { margin: 0; }
+
+/* Números grandes (Sistema) */
+.gauge { gap: 6px; }
+.gauge-label { font-size: 12px; color: var(--label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gauge-value { font-size: 30px; line-height: 1.05; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.gauge-value.mid { color: var(--warn); }
+.gauge-value.high { color: var(--danger); }
+.gauge-detail { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gauge .meter-bar { height: 5px; }
+.actions-body > .footnote { margin: 2px 4px 0; color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+
+/* Aba do Pipo: o cartão do nível em destaque e as estatísticas como ladrilhos. */
+.actions-body > .life-hero {
+  background: linear-gradient(135deg, rgba(45, 212, 232, 0.10), rgba(45, 212, 232, 0) 55%), var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+.actions-body > .facts { margin: 0; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--gap); }
+.actions-body > .facts > div { border-radius: var(--radius); padding: 10px 12px; }
+.facts span { font-size: 11.5px; }
+.facts strong { font-size: 15px; }
+
+/* Subabas fixas e com respiro */
+.subtabs { padding: 10px 12px; gap: 6px; }
+.subtabs button { padding: 5px 14px; transition: background 0.15s, color 0.15s; }
+.subtabs button:hover { color: var(--ink); }
+
+/* Botões e campos um pouco mais macios */
+.btns > button:not(.link):not(.primary), .inline-form > button:not(.link):not(.primary) { border-radius: 9px; }
+.actions input:not([type="checkbox"]), .actions select, .actions textarea { border-radius: 9px; padding: 6px 10px; }
+
+/* Configurações: cada grupo vira um cartão com o título dentro. */
+.settings fieldset {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px 16px;
+  gap: 12px;
+}
+.settings legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 2px;
+  color: var(--label);
+  font-weight: 600;
+}
+.settings legend + * { clear: both; }
+.settings fieldset input:not([type="checkbox"]):not([type="range"]), .settings fieldset select, .settings fieldset textarea { background: var(--bg); border-radius: 9px; }
+
+/* Gastos */
+.usage-cards > div, .usage .facts > div { border-radius: var(--radius); }
+
+/* Tela cheia: mais respiro */
+@media (min-width: 900px) {
+  .actions-body { padding: 18px 20px 24px; --gap: 12px; }
+  .gauge-value { font-size: 34px; }
+}
+
+/* Cabeçalho do cartão: título encolhe com reticências, a ação não quebra. */
+.block-head { flex-wrap: nowrap; }
+.block-head h4 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.block-head > :not(h4) { flex-shrink: 0; white-space: nowrap; }
+
+/* Música */
+.music-info { display: grid; gap: 1px; min-width: 0; }
+.music-info strong { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-info span { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-controls { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.music-controls button {
+  width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--bg); color: var(--ink); cursor: pointer; font-size: 13px; padding: 0;
+}
+.music-controls button:hover { border-color: var(--accent); }
+.music-controls button.play { width: 40px; height: 40px; background: var(--accent); border-color: var(--accent); color: #0f1215; font-size: 15px; }
+
+/* Ladrilho que ficaria sozinho na linha ocupa a largura de dois. */
+.actions-body:not(:has(> .music)) > .weekly { grid-column: span 2; }
+
+/* Aba do Pipo: estatísticas em 2 colunas (a de "dias juntos" ocupa as duas) e jogos lado a lado. */
+.actions-body > .facts { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); grid-auto-flow: row dense; }
+.actions-body > .facts > div:nth-child(2) { grid-column: span 2; }
+.game-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.game-card { align-content: start; border-radius: var(--radius); }
+.game-card span { font-size: 12px; line-height: 1.4; }
+
+/* Ladrilhos de ação: texto curto em cima, botão sempre no pé (alinhados na linha). */
+.action-tile .btns { margin-top: auto; }
+.action-tile .btns .primary { width: 100%; justify-content: center; }
+.panel kbd {
+  display: inline-block; padding: 0 5px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px;
+  background: var(--bg); color: var(--ink); font: 11px/16px "Cascadia Code", Consolas, monospace; white-space: nowrap;
+}
+.pill { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.pill.on { color: var(--ok); border-color: rgba(74, 222, 128, 0.4); background: rgba(74, 222, 128, 0.08); }
+
+/* Tela cheia: abas de leitura (chat, diário, configurações…) centradas numa coluna confortável. */
+@media (min-width: 900px) {
+  .panel > .chat, .panel > .settings, .panel > .journal, .panel > .clipboard, .panel > .usage {
+    padding-left: max(14px, calc((100% - 920px) / 2));
+    padding-right: max(14px, calc((100% - 920px) / 2));
+  }
+}

@@ -20,17 +20,17 @@ const MOOD: Record<string, string> = {
   gaming: "Modo jogo (escondido)",
 };
 
-function Meter({ label, value, detail }: { label: string; value: number; detail: string }) {
+/** Ladrilho de hardware: número grande, barra e detalhe. */
+function Gauge({ label, value, big, detail }: { label: string; value: number; big: string; detail: string }) {
   const level = value >= 90 ? "high" : value >= 70 ? "mid" : "low";
   return (
-    <div className="meter">
-      <div className="meter-head">
-        <span>{label}</span>
-        <span>{detail}</span>
-      </div>
+    <div className="block tile gauge">
+      <span className="gauge-label">{label}</span>
+      <strong className={`gauge-value ${level}`}>{big}</strong>
       <div className="meter-bar">
         <div className={`meter-fill ${level}`} style={{ width: `${Math.min(100, value)}%` }} />
       </div>
+      <span className="gauge-detail">{detail}</span>
     </div>
   );
 }
@@ -58,67 +58,72 @@ export default function SystemView({ settings }: { settings: Settings | null }) 
   const memPct = hw && hw.memTotal ? (hw.memUsed / hw.memTotal) * 100 : 0;
 
   return (
-    <section className="system">
-      <h4>Agora</h4>
-      <div className="facts">
-        {sense?.context ? (
-          <>
+    <section className="actions">
+      <div className="actions-body">
+        <div className="block wide">
+          <h4>Agora</h4>
+          <div className="facts">
+            {sense?.context ? (
+              <>
+                <div>
+                  <span>App em uso</span>
+                  <strong>
+                    {sense.context.name}
+                    {sense.context.project ? ` · ${sense.context.project}` : ""}
+                  </strong>
+                </div>
+                <div>
+                  <span>Atividade</span>
+                  <strong>{CATEGORY[sense.context.category]}</strong>
+                </div>
+              </>
+            ) : (
+              <div>
+                <span>App em uso</span>
+                <strong>{settings?.senseContext === false ? "sensor desligado" : "—"}</strong>
+              </div>
+            )}
             <div>
-              <span>App em uso</span>
-              <strong>
-                {sense.context.name}
-                {sense.context.project ? ` · ${sense.context.project}` : ""}
-              </strong>
+              <span>Humor do Pipo</span>
+              <strong title={sense ? (MOOD[sense.mood] ?? sense.mood) : undefined}>{sense ? (MOOD[sense.mood] ?? sense.mood).split(" (")[0] : "—"}</strong>
             </div>
             <div>
-              <span>Atividade</span>
-              <strong>{CATEGORY[sense.context.category]}</strong>
+              <span>Sem mexer no PC</span>
+              <strong>{sense ? duration(sense.idleSeconds) : "—"}</strong>
             </div>
-          </>
-        ) : (
-          <div>
-            <span>App em uso</span>
-            <strong>{settings?.senseContext === false ? "sensor desligado" : "—"}</strong>
           </div>
-        )}
-        <div>
-          <span>Humor do Pipo</span>
-          <strong>{sense ? (MOOD[sense.mood] ?? sense.mood) : "—"}</strong>
         </div>
-        <div>
-          <span>Sem mexer no computador</span>
-          <strong>{sense ? duration(sense.idleSeconds) : "—"}</strong>
-        </div>
-      </div>
 
-      <h4>Hardware</h4>
-      {!hw ? (
-        <p className="hint">Lendo…</p>
-      ) : (
-        <>
-          <Meter label={`CPU · ${hw.cores} núcleos`} value={hw.cpu} detail={`${hw.cpu.toFixed(0)}%`} />
-          <Meter label="Memória" value={memPct} detail={`${bytes(hw.memUsed)} de ${bytes(hw.memTotal)}`} />
-          {hw.gpu ? (
-            <>
-              <Meter
-                label={`GPU · ${hw.gpu.name}`}
-                value={hw.gpu.usage}
-                detail={`${hw.gpu.usage}%${hw.gpu.temperature != null ? ` · ${hw.gpu.temperature} °C` : ""}`}
-              />
-              <Meter
-                label="Memória da GPU"
-                value={(hw.gpu.memUsed / hw.gpu.memTotal) * 100}
-                detail={`${bytes(hw.gpu.memUsed)} de ${bytes(hw.gpu.memTotal)}`}
-              />
-            </>
-          ) : (
-            <p className="hint">GPU: por enquanto o Pipo só lê placas NVIDIA.</p>
-          )}
-          <p className="hint">A temperatura da CPU não é exposta pelo Windows sem permissão de administrador.</p>
-
-          <div className="top-lists">
-            <div>
-              <h5>Mais CPU</h5>
+        {!hw ? (
+          <div className="block wide">
+            <p className="hint">Lendo o hardware…</p>
+          </div>
+        ) : (
+          <>
+            <Gauge label={`CPU · ${hw.cores} núcleos`} value={hw.cpu} big={`${hw.cpu.toFixed(0)}%`} detail="uso agora" />
+            <Gauge label="Memória" value={memPct} big={`${memPct.toFixed(0)}%`} detail={`${bytes(hw.memUsed)} de ${bytes(hw.memTotal)}`} />
+            {hw.gpu ? (
+              <>
+                <Gauge
+                  label={`GPU · ${hw.gpu.name}`}
+                  value={hw.gpu.usage}
+                  big={`${hw.gpu.usage}%`}
+                  detail={hw.gpu.temperature != null ? `${hw.gpu.temperature} °C` : "sem temperatura"}
+                />
+                <Gauge
+                  label="Memória da GPU"
+                  value={(hw.gpu.memUsed / hw.gpu.memTotal) * 100}
+                  big={`${((hw.gpu.memUsed / hw.gpu.memTotal) * 100).toFixed(0)}%`}
+                  detail={`${bytes(hw.gpu.memUsed)} de ${bytes(hw.gpu.memTotal)}`}
+                />
+              </>
+            ) : (
+              <div className="block wide">
+                <p className="hint">GPU: por enquanto o Pipo só lê placas NVIDIA.</p>
+              </div>
+            )}
+            <div className="block tile">
+              <h4>Mais CPU</h4>
               {hw.topCpu.map((p) => (
                 <div key={p.name} className="top-row">
                   <span>{p.name}</span>
@@ -126,8 +131,8 @@ export default function SystemView({ settings }: { settings: Settings | null }) 
                 </div>
               ))}
             </div>
-            <div>
-              <h5>Mais memória</h5>
+            <div className="block tile">
+              <h4>Mais memória</h4>
               {hw.topMemory.map((p) => (
                 <div key={p.name} className="top-row">
                   <span>{p.name}</span>
@@ -135,14 +140,14 @@ export default function SystemView({ settings }: { settings: Settings | null }) 
                 </div>
               ))}
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
 
-      <p className="footnote">
-        Tudo o que aparece aqui é lido no seu computador e não é enviado para a internet. Cada sensor pode ser
-        desligado nas configurações.
-      </p>
+        <p className="footnote">
+          Tudo aqui é lido no seu computador e não vai para a internet. A temperatura da CPU o Windows só mostra com permissão de
+          administrador. Cada sensor pode ser desligado nas configurações.
+        </p>
+      </div>
     </section>
   );
 }

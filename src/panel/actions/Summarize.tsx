@@ -53,7 +53,7 @@ export default function Summarize() {
   };
 
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Resumir</h4>
       </div>

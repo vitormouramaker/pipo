@@ -42,7 +42,7 @@ function Projects({ onAsk }: Props) {
   };
 
   return (
-    <div className="block">
+    <div className="block wide">
       <h4>Projetos recentes</h4>
       {projects === null && <p className="hint">Lendo…</p>}
       {projects?.length === 0 && <p className="hint">Nenhum projeto recente do VS Code ou Cursor encontrado.</p>}
@@ -103,7 +103,7 @@ function Jobs() {
 
   if (jobs.length === 0) return null;
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Tarefas</h4>
         <button className="link muted" onClick={() => void api.jobsClear().then(refresh)}>
@@ -154,7 +154,7 @@ function Ports() {
   useEffect(refresh, []);
 
   return (
-    <div className="block">
+    <div className="block tile">
       <div className="block-head">
         <h4>Portas em uso</h4>
         <button className="link muted" onClick={refresh}>
@@ -202,7 +202,7 @@ function Docker() {
     void api.dockerAction(id, action).then(refresh).catch((e) => setError(String(e)));
 
   return (
-    <div className="block">
+    <div className="block tile">
       <div className="block-head">
         <h4>Docker</h4>
         <button className="link muted" onClick={refresh}>

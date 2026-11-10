@@ -20,7 +20,7 @@ function Pomodoro({ status }: { status: FocusStatus | null }) {
   }, [pomodoro?.remainingSecs, pomodoro?.phase]);
 
   return (
-    <div className="block">
+    <div className="block wide">
       <h4>Pomodoro</h4>
       {pomodoro ? (
         <div className="pomodoro">
@@ -91,7 +91,7 @@ function Reminders({ status }: { status: FocusStatus | null }) {
   };
 
   return (
-    <div className="block">
+    <div className="block wide">
       <h4>Lembretes</h4>
       <div className="inline-form">
         <input className="grow" placeholder="Lembrar de…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />
@@ -160,7 +160,7 @@ function Breaks({ status }: { status: FocusStatus | null }) {
   };
 
   return (
-    <div className="block">
+    <div className="block wide">
       <h4>Pausas</h4>
       <div className="inline-form">
         <label className="check">
@@ -191,7 +191,7 @@ function Notes() {
   useEffect(() => refresh(""), []);
 
   return (
-    <div className="block">
+    <div className="block wide">
       <h4>Notas rápidas</h4>
       <div className="inline-form">
         <textarea className="grow" rows={2} placeholder="Escreva uma nota…" value={text} onChange={(e) => setText(e.target.value)} />

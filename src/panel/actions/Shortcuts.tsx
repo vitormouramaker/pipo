@@ -40,13 +40,13 @@ function ReadScreen() {
   };
 
   return (
-    <div className="block">
+    <div className="block tile action-tile">
       <h4>Ler texto da tela</h4>
-      <div className="inline-form">
+      <p className="hint">Recorte uma parte da tela e o texto vai para a área de transferência. Funciona sem internet.</p>
+      <div className="btns">
         <button className="primary" disabled={state === "waiting"} onClick={start}>
-          {state === "waiting" ? "Selecione a área…" : "Recortar e ler texto"}
+          {state === "waiting" ? "Selecione a área…" : "Recortar e ler"}
         </button>
-        <span className="hint">Usa o OCR do Windows, sem internet. O texto vai para a área de transferência.</span>
       </div>
       {error && <p className="hint">{error}</p>}
       {text && <pre className="output selectable">{text}</pre>}
@@ -61,7 +61,7 @@ function Games() {
   useEffect(refresh, []);
 
   return (
-    <div className="block">
+    <div className="block tile">
       <h4>Jogos</h4>
       {games === null && <p className="hint">Procurando jogos…</p>}
       {games?.length === 0 && <p className="hint">Nenhum jogo da Steam, Epic ou Riot encontrado.</p>}
@@ -143,7 +143,7 @@ function Routines() {
   const fresh: Routine = { id: `r${Date.now()}`, name: "", steps: [{ kind: "app", target: "" }] };
 
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Rotinas</h4>
         <button className="link" onClick={() => { setRoutines([...routines, fresh]); setEditing(fresh.id); }}>
@@ -196,7 +196,7 @@ function RecentFiles() {
   }, [query]);
 
   return (
-    <div className="block">
+    <div className="block wide">
       <h4>Arquivos recentes</h4>
       <input className="search" placeholder="Buscar pelo nome" value={query} onChange={(e) => setQuery(e.target.value)} />
       <div className="table">
@@ -251,7 +251,7 @@ function Downloads() {
       .catch((e) => setMessage(String(e)));
   if (!plan)
     return (
-      <div className="block">
+      <div className="block wide">
         <h4>Pasta Downloads</h4>
         <p className="hint">{loading ? "Olhando a pasta e comparando os arquivos…" : message}</p>
       </div>
@@ -259,7 +259,7 @@ function Downloads() {
   const toMove = plan.groups.reduce((n, g) => n + g.count, 0);
   const trashBytes = plan.candidates.filter((c) => picked.includes(c.path)).reduce((n, c) => n + c.bytes, 0);
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Pasta Downloads · {plan.loose} arquivo(s) soltos</h4>
         {plan.canUndo && (
@@ -378,7 +378,7 @@ function TextSnippets() {
     setText("");
   };
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Atalhos de texto</h4>
         <label className="check inline">
@@ -455,7 +455,7 @@ function FileSearch() {
     });
   };
   return (
-    <div className="block">
+    <div className="block wide">
       <div className="block-head">
         <h4>Buscar nos meus arquivos</h4>
         <label className="check inline">
@@ -537,17 +537,17 @@ function LiveCaptions() {
     return () => void unlisten.then((fn) => fn());
   }, []);
   return (
-    <div className="block">
+    <div className="block tile action-tile">
       <div className="block-head">
-        <h4>Legenda ao vivo {on ? "· ligada" : ""}</h4>
+        <h4>Legenda ao vivo</h4>
+        {on && <span className="pill on">ligada</span>}
       </div>
       <p className="hint">
-        Uma faixa por cima de tudo com o que está tocando no PC (live, vídeo, call), traduzido para o português. O áudio é
-        transcrito no próprio computador; só o texto vai para a tradução. Atalho: Ctrl+Alt+Shift+L, ou o botão CC do mini-player.
+        O som do PC (live, vídeo, call) traduzido numa faixa por cima de tudo. <kbd>Ctrl+Alt+Shift+L</kbd>
       </p>
       <div className="btns">
         <button className={on ? undefined : "primary"} onClick={() => void api.captionsToggle()}>
-          {on ? "Desligar a legenda" : "Ligar a legenda"}
+          {on ? "Desligar" : "Ligar a legenda"}
         </button>
       </div>
     </div>
@@ -556,9 +556,11 @@ function LiveCaptions() {
 
 function AskScreen() {
   return (
-    <div className="block">
+    <div className="block tile action-tile">
       <h4>Perguntar sobre a tela</h4>
-      <p className="hint">Recorte qualquer parte da tela (erro, gráfico, print) e o Pipo olha e responde. Atalho: Ctrl+Alt+Shift+S.</p>
+      <p className="hint">
+        Recorte um erro, gráfico ou print e o Pipo explica. <kbd>Ctrl+Alt+Shift+S</kbd>
+      </p>
       <div className="btns">
         <button className="primary" onClick={() => void api.screenAsk()}>
           Recortar e perguntar
@@ -572,15 +574,15 @@ export default function Shortcuts() {
   return (
     <>
       <Summarize />
-      <FileSearch />
-      <LiveCaptions />
       <AskScreen />
-      <TextSnippets />
-      <Downloads />
       <ReadScreen />
+      <LiveCaptions />
       <Games />
-      <Routines />
+      <FileSearch />
       <RecentFiles />
+      <Downloads />
+      <TextSnippets />
+      <Routines />
     </>
   );
 }
